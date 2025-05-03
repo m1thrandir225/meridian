@@ -1,22 +1,25 @@
 FROM golang:1.24.1-alpine AS builder
 
-WORKDIR /build
+RUN apk update && apk add --no-cache git
+
+WORKDIR /app
 
 COPY go.mod go.sum ./
-
 RUN go mod download 
 
 COPY . . 
 
-RUN CGO_ENABLED=0 go build -ldflags="-w -s" -o /app/messaging-server ./cmd/messaging
+RUN CGO_ENABLED=0 go build -ldflags="-w -s" -o messaging-service ./cmd/messaging
 
 FROM alpine:latest
 
 WORKDIR /app
+
+COPY --from=builder /app/messaging-service .
 
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 USER appuser
 
 EXPOSE 8081
 
-CMD ["/app/messaging-server"]
+CMD ["./messaging-service"]

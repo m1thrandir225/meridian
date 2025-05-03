@@ -13,5 +13,3 @@ type ChannelRepository interface {
 	FindMessages(ctx context.Context, channelID uuid.UUID, limit int, offset int) ([]models.Message, error)
 	Delete(ctx context.Context, id uuid.UUID)
 }
-
-// TODO: implementation
