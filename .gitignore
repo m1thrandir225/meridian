@@ -1,0 +1,23 @@
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+#OS 
+.DS_Store
+Thumbs.db
+
+# Go specific
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+# vendor/
+go.work
+go.work.sum
+
+.env
