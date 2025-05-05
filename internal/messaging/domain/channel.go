@@ -127,7 +127,7 @@ func (c *Channel) PostMessage(senderUserID uuid.UUID, content MessageContent, pa
 	if parentMessageID != nil {
 		parentFound := false
 		for _, msg := range c.Messages {
-			if msg.ID == *parentMessageID {
+			if msg.GetId() == *parentMessageID {
 				parentFound = true
 				break
 			}
@@ -143,16 +143,16 @@ func (c *Channel) PostMessage(senderUserID uuid.UUID, content MessageContent, pa
 		return nil, err
 	}
 
-	message := Message{
-		ID:              messageID,
-		ChannelID:       c.ID,
-		SenderUserID:    &senderUserID,
-		IntegrationID:   nil,
-		Content:         content,
-		Timestamp:       now,
-		ParentMessageID: parentMessageID,
-		Reactions:       []Reaction{},
-	}
+	message := NewMessage(
+		messageID,
+		c.ID,
+		&senderUserID,
+		nil,
+		parentMessageID,
+		content,
+		[]Reaction{},
+		now,
+	)
 
 	c.Messages = append(c.Messages, message)
 	c.LastMessageTime = now
@@ -169,16 +169,16 @@ func (c *Channel) PostNotification(integrationID uuid.UUID, content MessageConte
 		return nil, err
 	}
 
-	message := Message{
-		ID:              messageID,
-		ChannelID:       c.ID,
-		SenderUserID:    nil,
-		IntegrationID:   &integrationID,
-		Content:         content,
-		Timestamp:       now,
-		ParentMessageID: nil,
-		Reactions:       []Reaction{},
-	}
+	message := NewMessage(
+		messageID,
+		c.ID,
+		nil,
+		&integrationID,
+		nil,
+		content,
+		[]Reaction{},
+		now,
+	)
 
 	c.Messages = append(c.Messages, message)
 	c.LastMessageTime = now
@@ -193,7 +193,7 @@ func (c *Channel) AddReaction(messageID, userID uuid.UUID, reactionType string) 
 	}
 	var targetMessage *Message
 	for i := range c.Messages {
-		if c.Messages[i].ID == messageID {
+		if c.Messages[i].GetId() == messageID {
 			targetMessage = &c.Messages[i]
 			break
 		}
@@ -203,7 +203,7 @@ func (c *Channel) AddReaction(messageID, userID uuid.UUID, reactionType string) 
 		return nil, errors.New("message not found")
 	}
 
-	for _, reaction := range targetMessage.Reactions {
+	for _, reaction := range targetMessage.GetReactions() {
 		if reaction.UserID == userID && reaction.ReactionType == reactionType {
 			return nil, errors.New("user already added this reaction")
 		}
@@ -222,7 +222,7 @@ func (c *Channel) AddReaction(messageID, userID uuid.UUID, reactionType string) 
 		Timestamp:    now,
 	}
 
-	targetMessage.Reactions = append(targetMessage.Reactions, reaction)
+	targetMessage.setReactions(append(targetMessage.GetReactions(), reaction))
 	c.Version++
 
 	c.addEvent(CreateReactionAddedEvent(c, &reaction))
@@ -233,7 +233,7 @@ func (c *Channel) AddReaction(messageID, userID uuid.UUID, reactionType string) 
 func (c *Channel) RemoveReaction(messageID, userID uuid.UUID, reactionType string) error {
 	var targetMessage *Message
 	for i := range c.Messages {
-		if c.Messages[i].ID == messageID {
+		if c.Messages[i].GetId() == messageID {
 			targetMessage = &c.Messages[i]
 			break
 		}
@@ -244,11 +244,11 @@ func (c *Channel) RemoveReaction(messageID, userID uuid.UUID, reactionType strin
 	}
 
 	found := false
-	for i, reaction := range targetMessage.Reactions {
+	for i, reaction := range targetMessage.GetReactions() {
 		if reaction.UserID == userID && reaction.ReactionType == reactionType {
-			lastIdx := len(targetMessage.Reactions) - 1
-			targetMessage.Reactions[i] = targetMessage.Reactions[lastIdx]
-			targetMessage.Reactions = targetMessage.Reactions[:lastIdx]
+			lastIdx := len(targetMessage.GetReactions()) - 1
+			targetMessage.GetReactions()[i] = targetMessage.GetReactions()[lastIdx]
+			targetMessage.setReactions(targetMessage.GetReactions()[:lastIdx])
 			found = true
 			break
 		}

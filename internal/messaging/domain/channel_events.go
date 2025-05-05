@@ -107,30 +107,30 @@ func CreateMessageSentEvent(channel *Channel, message *Message) MessageSentEvent
 	base := NewBaseDomainEvent("MessageSent", channel.ID, channel.Version)
 
 	var senderUserIDStr *string
-	if message.SenderUserID != nil {
-		id := message.SenderUserID.String()
+	if message.GetSenderUserId() != nil {
+		id := message.GetSenderUserId().String()
 		senderUserIDStr = &id
 	}
 
 	var integrationIDStr *string
-	if message.IntegrationID != nil {
-		id := message.IntegrationID.String()
+	if message.GetIntegrationId() != nil {
+		id := message.GetIntegrationId().String()
 		integrationIDStr = &id
 	}
 
 	var parentMessageIDStr *string
-	if message.ParentMessageID != nil {
-		id := message.ParentMessageID.String()
+	if message.GetParentMessageId() != nil {
+		id := message.GetParentMessageId().String()
 		parentMessageIDStr = &id
 	}
 
 	return MessageSentEvent{
 		BaseDomainEvent: base,
-		MessageID:       message.ID.String(),
+		MessageID:       message.GetId().String(),
 		SenderUserID:    senderUserIDStr,
 		IntegrationID:   integrationIDStr,
-		Content:         message.Content,
-		Timestamp:       message.Timestamp,
+		Content:         message.GetContent(),
+		Timestamp:       message.GetTimestamp(),
 		ParentMessageID: parentMessageIDStr,
 	}
 }
@@ -140,10 +140,10 @@ func CreateNotificationSentEvent(channel *Channel, message *Message) Notificatio
 
 	return NotificationSentEvent{
 		BaseDomainEvent: base,
-		MessageID:       message.ID.String(),
-		IntegrationID:   message.IntegrationID.String(),
-		Content:         message.Content,
-		Timestamp:       message.Timestamp,
+		MessageID:       message.GetId().String(),
+		IntegrationID:   message.GetIntegrationId().String(),
+		Content:         message.GetContent(),
+		Timestamp:       message.GetTimestamp(),
 	}
 }
 
