@@ -1,8 +1,7 @@
-package commands
+package domain
 
 import (
 	"github.com/google/uuid"
-	"github.com/m1thrandir225/meridian/internal/messaging/domain/models"
 )
 
 type Command interface {
@@ -39,7 +38,7 @@ func (c LeaveChannelCommand) CommandName() string {
 type SendMessageCommand struct {
 	ChannelID       uuid.UUID
 	SenderUserID    uuid.UUID
-	Content         models.MessageContent
+	Content         MessageContent
 	ParentMessageID *uuid.UUID
 }
 
@@ -50,7 +49,7 @@ func (c SendMessageCommand) CommandName() string {
 type SendNotificationCommand struct {
 	ChannelID     uuid.UUID
 	IntegrationID uuid.UUID
-	Content       models.MessageContent
+	Content       MessageContent
 }
 
 func (c SendNotificationCommand) CommandName() string {

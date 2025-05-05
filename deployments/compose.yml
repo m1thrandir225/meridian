@@ -1,0 +1,69 @@
+services:
+  messaging_postgres:
+    image: postgres:alpine
+    container_name: meridian_postgres_messaging
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_DB: ${MESSAGING_DB_NAME:-messaging_db}
+    volumes:
+      - messaging_postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${MESSAGING_DB_PORT:-5433}:5432"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER}:-user -d ${MESSAGING_DB_NAME:-messaging_db}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+  messaging_redis:
+    image: redis:7-alpine
+    container_name: meridian_redis_messaging
+    ports:
+      - "${MESSAGING_REDIS_PORT:-6380}:6379"
+    restart: unless-stopped
+  messaging_migrate:
+    build:
+      context: ../
+      dockerfile: deployments/migrate/Dockerfile
+    container_name: meridian_messaging_migrate
+    depends_on:
+      messaging_postgres:
+        condition: service_healthy
+    volumes:
+      - ../internal/messaging/infrastructure/persistence/migrations:/migrations
+    environment:
+      MIGRATE_DB_URL: "pgx5://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@messaging_postgres:${MESSAGING_DB_PORT:-5433}/${MESSAGING_DB_NAME:-messaging_db}?sslmode=disable"
+    command:
+      [
+        "-path",
+        "/migrations",
+        "-database",
+        "pgx5://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@messaging_postgres:5432/${MESSAGING_DB_NAME:-messaging_db}?sslmode=disable",
+        "up",
+      ]
+  messaging:
+    build:
+      context: ../
+      dockerfile: deployments/messaging/Dockerfile
+    container_name: meridian_messaging_service
+    depends_on:
+      messaging_migrate:
+        condition: service_completed_successfully
+      messaging_postgres:
+        condition: service_healthy
+      messaging_redis:
+        condition: service_started
+    environment:
+      MESSAGING_DB_URL: "pgx5://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@messaging_postgres:5432/${MESSAGING_DB_NAME:-messaging_db}?sslmode=disable"
+      HTTP_SERVER_ADDRESS: ":8081"
+    ports:
+      - "${MESSAGING_HTTP_PORT:-8081}:8081"
+    restart: unless-stopped
+
+volumes:
+  messaging_postgres_data:

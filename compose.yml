@@ -1,9 +1,0 @@
-services:
-  messaging:
-    build:
-      context: .
-      dockerfile: deployments/messaging/Dockerfile
-    container_name: meridian_messaging_service
-    ports:
-      - "${MESSAGING_HTTP_PORT:-8081}:8081"
-    restart: unless-stopped

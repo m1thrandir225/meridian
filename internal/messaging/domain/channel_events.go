@@ -1,10 +1,9 @@
-package events
+package domain
 
 import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/m1thrandir225/meridian/internal/messaging/domain/models"
 )
 
 type ChannelCreatedEvent struct {
@@ -31,7 +30,7 @@ type MessageSentEvent struct {
 	MessageID       string
 	SenderUserID    *string
 	IntegrationID   *string
-	Content         models.MessageContent
+	Content         MessageContent
 	Timestamp       time.Time
 	ParentMessageID *string
 }
@@ -40,7 +39,7 @@ type NotificationSentEvent struct {
 	BaseDomainEvent
 	MessageID     string
 	IntegrationID string
-	Content       models.MessageContent
+	Content       MessageContent
 	Timestamp     time.Time
 }
 
@@ -76,7 +75,7 @@ type ChannelTopicChangedEvent struct {
 	ChangedBy string
 }
 
-func CreateChannelCreatedEvent(channel *models.Channel) ChannelCreatedEvent {
+func CreateChannelCreatedEvent(channel *Channel) ChannelCreatedEvent {
 	base := NewBaseDomainEvent("ChannelCreated", channel.ID, channel.Version)
 	return ChannelCreatedEvent{
 		BaseDomainEvent: base,
@@ -86,17 +85,17 @@ func CreateChannelCreatedEvent(channel *models.Channel) ChannelCreatedEvent {
 	}
 }
 
-func CreateUserJoinedChannelEvent(channel *models.Channel, member models.Member) UserJoinedChannelEvent {
+func CreateUserJoinedChannelEvent(channel *Channel, member Member) UserJoinedChannelEvent {
 	base := NewBaseDomainEvent("UserJoinedChannel", channel.ID, channel.Version)
 	return UserJoinedChannelEvent{
 		BaseDomainEvent: base,
-		UserID:          member.ID.String(),
-		Role:            member.Role,
-		JoinedAt:        member.JoinedAt,
+		UserID:          member.GetId().String(),
+		Role:            member.GetRole(),
+		JoinedAt:        member.GetJoinedAt(),
 	}
 }
 
-func CreateUserLeftChannelEvent(channel *models.Channel, userID uuid.UUID) UserLeftChannelEvent {
+func CreateUserLeftChannelEvent(channel *Channel, userID uuid.UUID) UserLeftChannelEvent {
 	base := NewBaseDomainEvent("UserLeftChannel", channel.ID, channel.Version)
 	return UserLeftChannelEvent{
 		BaseDomainEvent: base,
@@ -104,7 +103,7 @@ func CreateUserLeftChannelEvent(channel *models.Channel, userID uuid.UUID) UserL
 	}
 }
 
-func CreateMessageSentEvent(channel *models.Channel, message *models.Message) MessageSentEvent {
+func CreateMessageSentEvent(channel *Channel, message *Message) MessageSentEvent {
 	base := NewBaseDomainEvent("MessageSent", channel.ID, channel.Version)
 
 	var senderUserIDStr *string
@@ -136,7 +135,7 @@ func CreateMessageSentEvent(channel *models.Channel, message *models.Message) Me
 	}
 }
 
-func CreateNotificationSentEvent(channel *models.Channel, message *models.Message) NotificationSentEvent {
+func CreateNotificationSentEvent(channel *Channel, message *Message) NotificationSentEvent {
 	base := NewBaseDomainEvent("NotificationSent", channel.ID, channel.Version)
 
 	return NotificationSentEvent{
@@ -148,7 +147,7 @@ func CreateNotificationSentEvent(channel *models.Channel, message *models.Messag
 	}
 }
 
-func CreateReactionAddedEvent(channel *models.Channel, reaction *models.Reaction) ReactionAddedEvent {
+func CreateReactionAddedEvent(channel *Channel, reaction *Reaction) ReactionAddedEvent {
 	base := NewBaseDomainEvent("ReactionAdded", channel.ID, channel.Version)
 
 	return ReactionAddedEvent{
@@ -161,7 +160,7 @@ func CreateReactionAddedEvent(channel *models.Channel, reaction *models.Reaction
 	}
 }
 
-func CreateReactionRemovedEvent(channel *models.Channel, messageID uuid.UUID, userID uuid.UUID, reactionType string) ReactionRemovedEvent {
+func CreateReactionRemovedEvent(channel *Channel, messageID uuid.UUID, userID uuid.UUID, reactionType string) ReactionRemovedEvent {
 	base := NewBaseDomainEvent("ReactionRemoved", channel.ID, channel.Version)
 
 	return ReactionRemovedEvent{
@@ -172,7 +171,7 @@ func CreateReactionRemovedEvent(channel *models.Channel, messageID uuid.UUID, us
 	}
 }
 
-func CreateChannelTopicChangedEvent(channel *models.Channel, changedBy uuid.UUID) ChannelTopicChangedEvent {
+func CreateChannelTopicChangedEvent(channel *Channel, changedBy uuid.UUID) ChannelTopicChangedEvent {
 	base := NewBaseDomainEvent("ChannelTopicChanged", channel.ID, channel.Version)
 
 	return ChannelTopicChangedEvent{
@@ -182,7 +181,7 @@ func CreateChannelTopicChangedEvent(channel *models.Channel, changedBy uuid.UUID
 	}
 }
 
-func CreateChannelArchivedEvent(channel *models.Channel, archivedBy uuid.UUID) ChannelArchivedEvent {
+func CreateChannelArchivedEvent(channel *Channel, archivedBy uuid.UUID) ChannelArchivedEvent {
 	base := NewBaseDomainEvent("ChannelArchived", channel.ID, channel.Version)
 
 	return ChannelArchivedEvent{
@@ -191,7 +190,7 @@ func CreateChannelArchivedEvent(channel *models.Channel, archivedBy uuid.UUID) C
 	}
 }
 
-func CreateChannelUnarchivedEvent(channel *models.Channel, unarchivedBy uuid.UUID) ChannelUnarchivedEvent {
+func CreateChannelUnarchivedEvent(channel *Channel, unarchivedBy uuid.UUID) ChannelUnarchivedEvent {
 	base := NewBaseDomainEvent("ChannelUnarchived", channel.ID, channel.Version)
 
 	return ChannelUnarchivedEvent{

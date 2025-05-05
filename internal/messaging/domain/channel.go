@@ -1,4 +1,4 @@
-package models
+package domain
 
 import (
 	"errors"
@@ -18,6 +18,19 @@ type Channel struct {
 	LastMessageTime time.Time
 	IsArchived      bool
 	Version         int64
+	pendingEvents   []DomainEvent
+}
+
+func (c *Channel) addEvent(event DomainEvent) {
+	c.pendingEvents = append(c.pendingEvents, event)
+}
+
+func (c *Channel) GetPendingEvents() []DomainEvent {
+	return c.pendingEvents
+}
+
+func (c *Channel) ClearPendingEvents() {
+	c.pendingEvents = []DomainEvent{}
 }
 
 func NewChannel(name string, creatorUserID uuid.UUID) (*Channel, error) {
@@ -27,41 +40,36 @@ func NewChannel(name string, creatorUserID uuid.UUID) (*Channel, error) {
 
 	now := time.Now().UTC()
 	channelID := uuid.New()
+	creator := NewMember(creatorUserID, "owner", now, now)
 
 	channel := &Channel{
-		ID:            channelID,
-		Name:          name,
-		CreatorUserID: creatorUserID,
-		CreationTime:  now,
-		Members: []Member{ // TODO: add to member
-			{
-				ID:       creatorUserID,
-				Role:     "owner",
-				JoinedAt: now,
-				LastRead: now,
-			},
-		},
+		ID:              channelID,
+		Name:            name,
+		CreatorUserID:   creatorUserID,
+		CreationTime:    now,
+		Members:         []Member{creator},
 		Messages:        []Message{},
 		LastMessageTime: now,
 		IsArchived:      false,
 		Version:         1,
 	}
+
+	channel.addEvent(CreateChannelCreatedEvent(channel))
 	return channel, nil
 }
 
 func (c *Channel) AddMember(userID uuid.UUID) error {
 	for _, member := range c.Members {
-		if member.ID == userID {
+		if member.GetId() == userID {
 			return errors.New("user is already a member of the channel")
 		}
 	}
 	now := time.Now().UTC()
-	c.Members = append(c.Members, Member{
-		ID:       userID,
-		Role:     "member",
-		JoinedAt: now,
-		LastRead: now,
-	})
+	member := NewMember(userID, "member", now, now)
+	c.Members = append(c.Members, member)
+
+	c.addEvent(CreateUserJoinedChannelEvent(c, member))
+
 	return nil
 }
 
@@ -73,6 +81,7 @@ func (c *Channel) ArchiveChannel(userID uuid.UUID) error {
 	c.IsArchived = true
 	c.Version++
 
+	c.addEvent(CreateChannelArchivedEvent(c, userID))
 	return nil
 }
 
@@ -83,6 +92,8 @@ func (c *Channel) UnarchiveChannel(userId uuid.UUID) error {
 
 	c.IsArchived = false
 	c.Version++
+
+	c.addEvent(CreateChannelUnarchivedEvent(c, userId))
 	return nil
 }
 
@@ -94,12 +105,13 @@ func (c *Channel) SetTopic(userID uuid.UUID, topic string) error {
 	c.Topic = topic
 	c.Version++
 
+	c.addEvent(CreateChannelTopicChangedEvent(c, userID))
 	return nil
 }
 
 func (c *Channel) CanUserPostMessage(userID uuid.UUID) bool {
 	for _, member := range c.Members {
-		if member.ID == userID {
+		if member.GetId() == userID {
 			return true
 		}
 	}
@@ -145,6 +157,7 @@ func (c *Channel) PostMessage(senderUserID uuid.UUID, content MessageContent, pa
 	c.Messages = append(c.Messages, message)
 	c.LastMessageTime = now
 	c.Version++
+	c.addEvent(CreateMessageSentEvent(c, &message))
 	return &message, nil
 }
 
@@ -170,7 +183,7 @@ func (c *Channel) PostNotification(integrationID uuid.UUID, content MessageConte
 	c.Messages = append(c.Messages, message)
 	c.LastMessageTime = now
 	c.Version++
-
+	c.addEvent(CreateMessageSentEvent(c, &message))
 	return &message, nil
 }
 
@@ -212,6 +225,8 @@ func (c *Channel) AddReaction(messageID, userID uuid.UUID, reactionType string) 
 	targetMessage.Reactions = append(targetMessage.Reactions, reaction)
 	c.Version++
 
+	c.addEvent(CreateReactionAddedEvent(c, &reaction))
+
 	return &reaction, nil
 }
 
@@ -242,5 +257,6 @@ func (c *Channel) RemoveReaction(messageID, userID uuid.UUID, reactionType strin
 		return errors.New("reaction not found")
 	}
 	c.Version++
+	c.addEvent(CreateReactionRemovedEvent(c, messageID, userID, reactionType))
 	return nil
 }

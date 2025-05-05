@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/m1thrandir225/meridian/internal/messaging/domain/models"
+	models "github.com/m1thrandir225/meridian/internal/messaging/domain"
 )
 
 type ChannelRepository interface {

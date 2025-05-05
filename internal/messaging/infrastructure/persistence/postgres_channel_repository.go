@@ -5,7 +5,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/m1thrandir225/meridian/internal/messaging/domain/models"
+	models "github.com/m1thrandir225/meridian/internal/messaging/domain"
 )
 
 var _ ChannelRepository = (*PostgresChannelRepository)(nil)
