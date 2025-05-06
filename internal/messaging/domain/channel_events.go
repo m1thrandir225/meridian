@@ -152,11 +152,11 @@ func CreateReactionAddedEvent(channel *Channel, reaction *Reaction) ReactionAdde
 
 	return ReactionAddedEvent{
 		BaseDomainEvent: base,
-		ReactionID:      reaction.ID.String(),
-		MessageID:       reaction.MessageID.String(),
-		UserID:          reaction.UserID.String(),
-		ReactionType:    reaction.ReactionType,
-		Timestamp:       reaction.Timestamp,
+		ReactionID:      reaction.GetId().String(),
+		MessageID:       reaction.GetMessageId().String(),
+		UserID:          reaction.GetUserId().String(),
+		ReactionType:    reaction.GetReactionType(),
+		Timestamp:       reaction.GetCreatedAt(),
 	}
 }
 

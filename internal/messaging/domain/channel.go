@@ -204,7 +204,7 @@ func (c *Channel) AddReaction(messageID, userID uuid.UUID, reactionType string) 
 	}
 
 	for _, reaction := range targetMessage.GetReactions() {
-		if reaction.UserID == userID && reaction.ReactionType == reactionType {
+		if reaction.GetUserId() == userID && reaction.GetReactionType() == reactionType {
 			return nil, errors.New("user already added this reaction")
 		}
 	}
@@ -214,13 +214,13 @@ func (c *Channel) AddReaction(messageID, userID uuid.UUID, reactionType string) 
 	if err != nil {
 		return nil, err
 	}
-	reaction := Reaction{
-		ID:           reactionID,
-		UserID:       userID,
-		MessageID:    messageID,
-		ReactionType: reactionType,
-		Timestamp:    now,
-	}
+	reaction := NewReaction(
+		reactionID,
+		messageID,
+		userID,
+		reactionType,
+		now,
+	)
 
 	targetMessage.setReactions(append(targetMessage.GetReactions(), reaction))
 	c.Version++
@@ -245,7 +245,7 @@ func (c *Channel) RemoveReaction(messageID, userID uuid.UUID, reactionType strin
 
 	found := false
 	for i, reaction := range targetMessage.GetReactions() {
-		if reaction.UserID == userID && reaction.ReactionType == reactionType {
+		if reaction.GetUserId() == userID && reaction.GetReactionType() == reactionType {
 			lastIdx := len(targetMessage.GetReactions()) - 1
 			targetMessage.GetReactions()[i] = targetMessage.GetReactions()[lastIdx]
 			targetMessage.setReactions(targetMessage.GetReactions()[:lastIdx])
