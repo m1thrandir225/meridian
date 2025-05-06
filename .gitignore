@@ -4,7 +4,7 @@
 *.swp
 *.swo
 
-#OS 
+#OS
 .DS_Store
 Thumbs.db
 
@@ -16,7 +16,9 @@ Thumbs.db
 *.dylib
 *.test
 *.out
-# vendor/
+
+vendor/
+bin/
 go.work
 go.work.sum
 

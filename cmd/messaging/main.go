@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"strings"
@@ -10,9 +12,11 @@ import (
 	"time"
 
 	"github.com/IBM/sarama"
+	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/m1thrandir225/meridian/internal/messaging/application"
+	"github.com/m1thrandir225/meridian/internal/messaging/application/handlers"
+	"github.com/m1thrandir225/meridian/internal/messaging/application/services"
 	kafkainfra "github.com/m1thrandir225/meridian/internal/messaging/infrastructure/kafka"
 	"github.com/m1thrandir225/meridian/internal/messaging/infrastructure/persistence"
 )
@@ -75,7 +79,42 @@ func main() {
 
 	repository := persistence.NewPostgresChannelRepository(dbPool)
 
-	_ = application.NewChannelService(repository, eventPublisher)
+	service := services.NewChannelService(repository, eventPublisher)
+
+	httpHandler := handlers.NewHttpHandler(service)
+
+	// -- GIN ROUTE SETUP --
+	gin.SetMode(gin.ReleaseMode)
+	router := gin.Default()
+
+	router.Use(gin.Logger())
+	router.Use(gin.Recovery())
+
+	apiV1 := router.Group("/api/v1")
+	{
+		channelsGroup := apiV1.Group("/channels")
+		{
+			channelsGroup.POST("/", httpHandler.CreateChannel)
+			channelsGroup.GET("/:channelId", httpHandler.GetChannel)
+			channelsGroup.POST("/:channelId/join", httpHandler.JoinChannel)
+			messagesGroup := channelsGroup.Group("/:channelId/messages")
+			{
+				messagesGroup.POST("/", httpHandler.SendMessage)
+			}
+		}
+	}
+	// -- HTTP SERVER  --
+	httpServer := &http.Server{
+		Addr:    cfg.HTPPServerAddress,
+		Handler: router,
+	}
+
+	go func() {
+		logger.Printf("HTTP Server listening on %s", cfg.HTPPServerAddress)
+		if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logger.Fatalf("Failed to start HTTP server: %v", err)
+		}
+	}()
 
 	// Graceful shutdown
 	quit := make(chan os.Signal, 1)

@@ -7,11 +7,11 @@ import (
 	"log"
 
 	"github.com/IBM/sarama"
-	"github.com/m1thrandir225/meridian/internal/messaging/application"
+	"github.com/m1thrandir225/meridian/internal/messaging/application/services"
 	"github.com/m1thrandir225/meridian/internal/messaging/domain"
 )
 
-var _ application.EventPublisher = (*SaramaEventPublisher)(nil)
+var _ services.EventPublisher = (*SaramaEventPublisher)(nil)
 
 type SaramaEventPublisher struct {
 	producer sarama.SyncProducer

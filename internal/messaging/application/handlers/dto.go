@@ -1,0 +1,91 @@
+package handlers
+
+import (
+	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/m1thrandir225/meridian/internal/messaging/domain"
+)
+
+type CreateChannelRequest struct {
+	Name          string `json:"name"  binding:"required"`
+	CreatorUserID string `json:"creatorUserId" binding:"required,uuid"`
+}
+
+type ChannelResponse struct {
+	ID              string    `json:"id"`
+	Name            string    `json:"name"`
+	Topic           string    `json:"topic"`
+	CreatorUserID   string    `json:"creator_user_id"`
+	CreationTime    time.Time `json:"creation_time"`
+	LastMessageTime time.Time `json:"last_message_time"`
+	IsArchived      bool      `json:"is_archived"`
+	MembersCount    int       `json:"members_count"`
+}
+
+func ToChannelResponse(channel *domain.Channel) ChannelResponse {
+	return ChannelResponse{
+		ID:              channel.ID.String(),
+		Name:            channel.Name,
+		Topic:           channel.Topic,
+		CreatorUserID:   channel.CreatorUserID.String(),
+		CreationTime:    channel.CreationTime,
+		LastMessageTime: channel.LastMessageTime,
+		IsArchived:      channel.IsArchived,
+		MembersCount:    len(channel.Members),
+	}
+}
+
+type SendMessageRequest struct {
+	ContentText          string  `json:"content_text" binding:"required"`
+	SenderUserID         string  `json:"sender_user_id" binding:"required,uuid"` // either user_id or integration_id
+	IsIntegrationMessage bool    `json:"is_integration_message" binding:"required"`
+	ParentMessageID      *string `json:"parent_message_id,omitempty" binding:"omitempty"`
+}
+
+type MessageResponse struct {
+	ID              string    `json:"id"`
+	ChannelID       string    `json:"channel_id"`
+	SenderUserID    *string   `json:"sender_user_id,omitempty"`
+	IntegrationID   *string   `json:"integration_id,omitempty"`
+	ContentText     string    `json:"content_text"`
+	Timestamp       time.Time `json:"timestamp"`
+	ParentMessageID *string
+	// Reactions       []ReactionResponse `json:"reactions,omitempty"`
+}
+
+func ToMessageResponse(message *domain.Message) MessageResponse {
+	var senderId, integrationId, parentId *string
+	if message.GetSenderUserId() != nil {
+		sId := message.GetSenderUserId().String()
+		senderId = &sId
+	}
+
+	if message.GetIntegrationId() != nil {
+		iId := message.GetIntegrationId().String()
+		integrationId = &iId
+	}
+
+	if message.GetParentMessageId() != nil {
+		pId := message.GetParentMessageId().String()
+		parentId = &pId
+	}
+
+	return MessageResponse{
+		ID:              message.GetId().String(),
+		ChannelID:       message.GetChannelId().String(),
+		SenderUserID:    senderId,
+		IntegrationID:   integrationId,
+		ContentText:     message.GetContent().GetText(),
+		Timestamp:       message.GetTimestamp(),
+		ParentMessageID: parentId,
+	}
+}
+
+type JoinChannelRequest struct {
+	UserID string `json:"user_id" binding:"required,uuid"`
+}
+
+func errorResponse(err error) gin.H {
+	return gin.H{"error": err.Error()}
+}

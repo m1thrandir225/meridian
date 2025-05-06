@@ -62,8 +62,8 @@ func (m *Message) setIntegrationId(id *uuid.UUID) {
 	m.integrationId = id
 }
 
-func (m *Message) GetContent() MessageContent {
-	return m.content
+func (m *Message) GetContent() *MessageContent {
+	return &m.content
 }
 
 func (m *Message) setContent(content MessageContent) {
