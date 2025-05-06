@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -25,7 +26,17 @@ type Config struct {
 
 // TODO: implement
 func loadConfig() Config {
-	return Config{}
+	brokers := []string{"kafka:9092"} // Default kafka brokers
+
+	if brokerList := os.Getenv("KAFKA_BROKERS"); brokerList != "" {
+		brokers = strings.Split(brokerList, ",")
+	}
+	return Config{
+		HTPPServerAddress: os.Getenv("HTTP_SERVER_ADDRESS"),
+		KafkaBrokers:      brokers,
+		KafkaDefaultTopic: os.Getenv("KAFKA_DEFAULT_TOPIC"),
+		DatabaseURL:       os.Getenv("MESSAGING_DB_URL"),
+	}
 }
 
 func main() {

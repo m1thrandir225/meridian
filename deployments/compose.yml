@@ -1,15 +1,48 @@
 services:
+  zookeeper:
+    image: bitnami/zookeeper:latest
+    container_name: meridian_zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+    volumes:
+      - zookeeper_data:/bitnami/zookeeper
+    restart: unless-stopped
+  kafka:
+    image: bitnami/kafka:latest
+    container_name: meridian_kafka
+    ports:
+      - "9092:9092"
+    environment:
+      - KAFKA_CFG_NODE_ID=1
+      - KAFKA_CFG_PROCESS_ROLES=broker,controller # Run as both broker and controller
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_CFG_LISTENERS=INTERNAL://:9093,EXTERNAL://:9092,CONTROLLER://:9094
+      - KAFKA_CFG_ADVERTISED_LISTENERS=INTERNAL://kafka:9093,EXTERNAL://localhost:9092
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=INTERNAL
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=1@kafka:9094
+      - KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+      - KAFKA_CFG_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
+      - KAFKA_CFG_TRANSACTION_STATE_LOG_MIN_ISR=1
+      - ALLOW_PLAINTEXT_LISTENER=yes
+    volumes:
+      - kafka_data:/bitnami/kafka
+    depends_on:
+      - zookeeper
+    restart: unless-stopped
   messaging_postgres:
     image: postgres:alpine
     container_name: meridian_postgres_messaging
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
-      POSTGRES_DB: ${MESSAGING_DB_NAME:-messaging_db}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${MESSAGING_DB_NAME}
     volumes:
       - messaging_postgres_data:/var/lib/postgresql/data
     ports:
-      - "${MESSAGING_DB_PORT:-5433}:5432"
+      - "${MESSAGING_DB_PORT}:5432"
     healthcheck:
       test:
         [
@@ -20,12 +53,14 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+
   messaging_redis:
     image: redis:7-alpine
     container_name: meridian_redis_messaging
     ports:
-      - "${MESSAGING_REDIS_PORT:-6380}:6379"
+      - "${MESSAGING_REDIS_PORT}:6379"
     restart: unless-stopped
+
   messaging_migrate:
     build:
       context: ../
@@ -37,15 +72,8 @@ services:
     volumes:
       - ../internal/messaging/infrastructure/persistence/migrations:/migrations
     environment:
-      MIGRATE_DB_URL: "pgx5://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@messaging_postgres:${MESSAGING_DB_PORT:-5433}/${MESSAGING_DB_NAME:-messaging_db}?sslmode=disable"
-    command:
-      [
-        "-path",
-        "/migrations",
-        "-database",
-        "pgx5://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@messaging_postgres:5432/${MESSAGING_DB_NAME:-messaging_db}?sslmode=disable",
-        "up",
-      ]
+      MIGRATE_DB_URL: "${MESSAGING_DB_URL}"
+    command: ["-path", "/migrations", "-database", "${MESSAGING_DB_URL}", "up"]
   messaging:
     build:
       context: ../
@@ -59,11 +87,14 @@ services:
       messaging_redis:
         condition: service_started
     environment:
-      MESSAGING_DB_URL: "pgx5://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@messaging_postgres:5432/${MESSAGING_DB_NAME:-messaging_db}?sslmode=disable"
-      HTTP_SERVER_ADDRESS: ":8081"
+      MESSAGING_DB_URL: "${MESSAGING_DB_URL}"
+      HTTP_SERVER_ADDRESS: ":${MESSAGING_HTTP_PORT}"
+      KAFKA_BROKERS: "${MESSAGING_KAFKA_BROKERS}"
+      KAFKA_DEFAULT_TOPIC: "${MESSAGING_KAFKA_DEFAULT_TOPIC}"
     ports:
-      - "${MESSAGING_HTTP_PORT:-8081}:8081"
+      - "${MESSAGING_HTTP_PORT}:8081"
     restart: unless-stopped
-
 volumes:
   messaging_postgres_data:
+  zookeeper_data:
+  kafka_data:
