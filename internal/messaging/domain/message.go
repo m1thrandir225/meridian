@@ -107,3 +107,11 @@ func (m *Message) GetReactions() []Reaction {
 func (m *Message) setReactions(reactions []Reaction) {
 	m.reactions = reactions
 }
+
+func (m *Message) SetLoadedReactions(loadedReactions []Reaction) {
+	if loadedReactions == nil {
+		m.reactions = []Reaction{}
+		return
+	}
+	m.reactions = loadedReactions
+}

@@ -47,7 +47,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "pg_isready -U ${POSTGRES_USER}:-user -d ${MESSAGING_DB_NAME:-messaging_db}",
+          "pg_isready -U ${MESSAGING_POSTGRES_USER} -d ${MESSAGING_DB_NAME}",
         ]
       interval: 5s
       timeout: 5s
@@ -72,8 +72,9 @@ services:
     volumes:
       - ../internal/messaging/infrastructure/persistence/migrations:/migrations
     environment:
-      MIGRATE_DB_URL: "${MESSAGING_DB_URL}"
-    command: ["-path", "/migrations", "-database", "${MESSAGING_DB_URL}", "up"]
+      MIGRATE_DB_URL_MIGRATE: "${MESSAGING_DB_URL_MIGRATE}"
+    command:
+      ["-path", "/migrations", "-database", "${MESSAGING_DB_URL_MIGRATE}", "up"]
   messaging:
     build:
       context: ../

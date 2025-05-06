@@ -61,7 +61,7 @@ func (r *PostgresChannelRepository) Save(ctx context.Context, channel *models.Ch
 			UPDATE channels SET name = $1, topic = $2, last_message_time = $3, is_archived = $4, version = $5
 			WHERE id = $6 and version = $7
 		`
-		cmdTag, err := tx.Exec(ctx, updateQuery, channel.Name, channel.Topic, channel.LastMessageTime, channel.IsArchived, channel.Version, channel.ID, channel.Version)
+		cmdTag, err := tx.Exec(ctx, updateQuery, channel.Name, channel.Topic, channel.LastMessageTime, channel.IsArchived, channel.Version, channel.ID, currentVersion)
 		if err != nil {
 			return fmt.Errorf("error updating channel %s: %w", channel.ID, err)
 		}
@@ -174,7 +174,7 @@ func (r *PostgresChannelRepository) FindById(ctx context.Context, id uuid.UUID) 
 }
 
 func (r *PostgresChannelRepository) FindMessages(ctx context.Context, channelID uuid.UUID, limit int, offset int) ([]models.Message, error) {
-	query := `
+	queryMessages := `
 		SELECT id, channel_id, sender_user_id, integration_id,
 		       content_text, content_mentions, content_links, content_formatted,
 		       timestamp, parent_message_id
@@ -182,39 +182,41 @@ func (r *PostgresChannelRepository) FindMessages(ctx context.Context, channelID 
 		WHERE channel_id = $1
 		ORDER BY timestamp DESC
 		LIMIT $2 OFFSET $3`
+
 	if limit <= 0 {
-		limit = 50 // Default limit
+		limit = 50
 	}
 	if offset < 0 {
 		offset = 0
 	}
 
-	rows, err := r.pool.Query(ctx, query, channelID, limit, offset)
+	rows, err := r.pool.Query(ctx, queryMessages, channelID, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("error querying messages for channel %s: %w", channelID, err)
 	}
 	defer rows.Close()
 
 	messages := []models.Message{}
+	messageIDs := []uuid.UUID{}
+
 	for rows.Next() {
 		var messageId uuid.UUID
-		var channelID uuid.UUID
-		var senderUserID uuid.UUID
-		var integrationID uuid.UUID
-		var parentMessageID uuid.UUID
+		var senderUserID, integrationID, parentMessageID *uuid.UUID
+
 		var mentions []uuid.UUID
 		var links []string
 		var text string
 		var timestamp time.Time
 		var isFormatted bool
+
 		err := rows.Scan(
 			&messageId,
 			&channelID,
 			&senderUserID,
 			&integrationID,
-			&text,     // TEXT
-			&mentions, // MENTIONS
-			&links,    // LINKS
+			&text,
+			&mentions,
+			&links,
 			&isFormatted,
 			&timestamp,
 			&parentMessageID,
@@ -225,22 +227,82 @@ func (r *PostgresChannelRepository) FindMessages(ctx context.Context, channelID 
 
 		content := models.RehydrateMessageContent(text, mentions, links, isFormatted)
 
+		var pSenderUserID, pIntegrationID, pParentMessageID *uuid.UUID
+		if senderUserID != nil {
+			pSenderUserID = senderUserID
+		}
+		if integrationID != nil {
+			pIntegrationID = integrationID
+		}
+		if parentMessageID != nil {
+			pParentMessageID = parentMessageID
+		}
+
 		msg := models.RehydrateMessage(
 			messageId,
 			channelID,
-			&senderUserID,
-			&integrationID,
-			&parentMessageID,
+			pSenderUserID,
+			pIntegrationID,
+			pParentMessageID,
 			content,
 			[]models.Reaction{},
 			timestamp,
 		)
 
 		messages = append(messages, msg)
+		messageIDs = append(messageIDs, messageId)
 	}
-
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("error iterating messages for channel %s: %w", channelID, err)
+	}
+	rows.Close()
+
+	if len(messages) == 0 {
+		return messages, nil
+	}
+
+	queryReactions := `
+		SELECT id, message_id, user_id, reaction_type, timestamp
+		FROM reactions
+		WHERE message_id = ANY($1) -- Use ANY with an array of UUIDs
+		ORDER BY message_id, timestamp ASC`
+
+	reactionRows, err := r.pool.Query(ctx, queryReactions, messageIDs)
+	if err != nil {
+		return nil, fmt.Errorf("error querying reactions for messages: %w", err)
+	}
+	defer reactionRows.Close()
+
+	reactionsByMessageID := make(map[uuid.UUID][]models.Reaction)
+	for reactionRows.Next() {
+		var reactionID uuid.UUID
+		var reactionMessageID uuid.UUID
+		var reactionUserID uuid.UUID
+		var reactionType string
+		var reactionTimestamp time.Time
+
+		err := reactionRows.Scan(
+			&reactionID,
+			&reactionMessageID,
+			&reactionUserID,
+			&reactionType,
+			&reactionTimestamp,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("error scanning reaction: %w", err)
+		}
+
+		reaction := models.RehydrateReaction(reactionID, reactionMessageID, reactionUserID, reactionType, reactionTimestamp)
+		reactionsByMessageID[reactionMessageID] = append(reactionsByMessageID[reactionMessageID], reaction)
+	}
+	if err := reactionRows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating reactions: %w", err)
+	}
+
+	for i := range messages {
+		if reactions, ok := reactionsByMessageID[messages[i].GetId()]; ok {
+			messages[i].SetLoadedReactions(reactions)
+		}
 	}
 
 	return messages, nil

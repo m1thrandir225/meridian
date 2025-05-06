@@ -70,6 +70,27 @@ func (c *Channel) AddMember(userID uuid.UUID) error {
 	c.Members = append(c.Members, member)
 
 	c.addEvent(CreateUserJoinedChannelEvent(c, member))
+	c.Version++
+	return nil
+}
+
+func (c *Channel) RemoveMember(userID uuid.UUID) error {
+	found := false
+	var searchMember Member
+	for _, member := range c.Members {
+		if member.GetId() == userID {
+			lastIdx := len(c.Members) - 1
+			searchMember = member
+			c.Members = c.Members[:lastIdx]
+			found = true
+			break
+		}
+	}
+	if !found {
+		return errors.New("user not apart of the channel")
+	}
+
+	c.addEvent(CreateUserLeftChannelEvent(c, searchMember.id))
 
 	return nil
 }
@@ -231,7 +252,7 @@ func (c *Channel) AddReaction(messageID, userID uuid.UUID, reactionType string) 
 	return &reaction, nil
 }
 
-func (c *Channel) RemoveReaction(messageID, userID uuid.UUID, reactionType string) error {
+func (c *Channel) RemoveReaction(messageID, userID uuid.UUID, reactionType string) (*Reaction, error) {
 	var targetMessage *Message
 	for i := range c.Messages {
 		if c.Messages[i].GetId() == messageID {
@@ -241,23 +262,27 @@ func (c *Channel) RemoveReaction(messageID, userID uuid.UUID, reactionType strin
 	}
 
 	if targetMessage == nil {
-		return errors.New("message not found")
+		return nil, errors.New("message not found")
 	}
 
 	found := false
+	var reaction Reaction
 	for i, reaction := range targetMessage.GetReactions() {
 		if reaction.GetUserId() == userID && reaction.GetReactionType() == reactionType {
 			lastIdx := len(targetMessage.GetReactions()) - 1
 			targetMessage.GetReactions()[i] = targetMessage.GetReactions()[lastIdx]
+			reaction = targetMessage.GetReactions()[lastIdx]
 			targetMessage.setReactions(targetMessage.GetReactions()[:lastIdx])
+
 			found = true
+
 			break
 		}
 	}
 	if !found {
-		return errors.New("reaction not found")
+		return nil, errors.New("reaction not found")
 	}
 	c.Version++
 	c.addEvent(CreateReactionRemovedEvent(c, messageID, userID, reactionType))
-	return nil
+	return &reaction, nil
 }

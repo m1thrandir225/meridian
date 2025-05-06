@@ -35,6 +35,7 @@ func loadConfig() Config {
 	if brokerList := os.Getenv("KAFKA_BROKERS"); brokerList != "" {
 		brokers = strings.Split(brokerList, ",")
 	}
+	log.Println(os.Getenv("MESSAGING_DB_URL"))
 	return Config{
 		HTPPServerAddress: os.Getenv("HTTP_SERVER_ADDRESS"),
 		KafkaBrokers:      brokers,

@@ -8,7 +8,11 @@ import (
 )
 
 type ChannelIDUri struct {
-	ChannelID string `uri:"channel_id" binding:"required, uuid"`
+	ChannelID string `uri:"channelId" binding:"required,uuid"`
+}
+
+type MessageIDUri struct {
+	MessageID string `uri:"messageId" binding:"required,uuid"`
 }
 
 type CreateChannelRequest struct {
@@ -43,8 +47,8 @@ func ToChannelResponse(channel *domain.Channel) ChannelResponse {
 
 type SendMessageRequest struct {
 	ContentText          string  `json:"content_text" binding:"required"`
-	SenderUserID         string  `json:"sender_user_id" binding:"required,uuid"` // either user_id or integration_id
-	IsIntegrationMessage bool    `json:"is_integration_message" binding:"required"`
+	SenderUserID         string  `json:"user_id" binding:"required,uuid"`
+	IsIntegrationMessage *bool   `json:"is_integration_message" binding:"required"`
 	ParentMessageID      *string `json:"parent_message_id,omitempty" binding:"omitempty"`
 }
 
@@ -54,7 +58,7 @@ type MessageResponse struct {
 	SenderUserID    *string   `json:"sender_user_id,omitempty"`
 	IntegrationID   *string   `json:"integration_id,omitempty"`
 	ContentText     string    `json:"content_text"`
-	Timestamp       time.Time `json:"timestamp"`
+	CreatedAt       time.Time `json:"created_at"`
 	ParentMessageID *string
 	// Reactions       []ReactionResponse `json:"reactions,omitempty"`
 }
@@ -82,7 +86,7 @@ func ToMessageResponse(message *domain.Message) MessageResponse {
 		SenderUserID:    senderId,
 		IntegrationID:   integrationId,
 		ContentText:     message.GetContent().GetText(),
-		Timestamp:       message.GetTimestamp(),
+		CreatedAt:       message.GetCreatedAt(),
 		ParentMessageID: parentId,
 	}
 }

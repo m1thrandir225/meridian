@@ -10,11 +10,20 @@ type Command interface {
 
 type CreateChannelCommand struct {
 	Name          string
+	Topic         string
 	CreatorUserID uuid.UUID
 }
 
 func (c CreateChannelCommand) CommandName() string {
 	return "CreateChannel"
+}
+
+type GetChannelCommand struct {
+	ChannelID uuid.UUID
+}
+
+func (c GetChannelCommand) CommandName() string {
+	return "GetChannel"
 }
 
 type JoinChannelCommand struct {
@@ -104,6 +113,16 @@ type UnarchiveChannelCommand struct {
 
 func (c UnarchiveChannelCommand) CommandName() string {
 	return "UnarchiveChannel"
+}
+
+type ListMessagesForChannelCommand struct {
+	ChannelID uuid.UUID
+	Limit     int
+	Offset    int
+}
+
+func (c ListMessagesForChannelCommand) CommandName() string {
+	return "ListMessagesForChannel"
 }
 
 type CommandResult interface {
