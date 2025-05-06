@@ -36,8 +36,8 @@ services:
     image: postgres:alpine
     container_name: meridian_postgres_messaging
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_USER: ${MESSAGING_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${MESSAGING_POSTGRES_PASSWORD}
       POSTGRES_DB: ${MESSAGING_DB_NAME}
     volumes:
       - messaging_postgres_data:/var/lib/postgresql/data

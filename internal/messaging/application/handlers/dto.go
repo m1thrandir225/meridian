@@ -7,9 +7,14 @@ import (
 	"github.com/m1thrandir225/meridian/internal/messaging/domain"
 )
 
+type ChannelIDUri struct {
+	ChannelID string `uri:"channel_id" binding:"required, uuid"`
+}
+
 type CreateChannelRequest struct {
 	Name          string `json:"name"  binding:"required"`
-	CreatorUserID string `json:"creatorUserId" binding:"required,uuid"`
+	Topic         string `json:"topic" `
+	CreatorUserID string `json:"creator_user_id" binding:"required,uuid"`
 }
 
 type ChannelResponse struct {
@@ -84,6 +89,34 @@ func ToMessageResponse(message *domain.Message) MessageResponse {
 
 type JoinChannelRequest struct {
 	UserID string `json:"user_id" binding:"required,uuid"`
+}
+
+type AddReactionRequest struct {
+	UserID       string `json:"user_id" binding:"required,uuid"`
+	ReactionType string `json:"reaction_type" binding:"required"`
+}
+
+type ReactionResponse struct {
+	ID           string    `json:"id"`
+	MessageID    string    `json:"message_id"`
+	UserID       string    `json:"user_id"`
+	ReactionType string    `json:"reaction_type"`
+	Timestamp    time.Time `json:"timestamp"`
+}
+
+func ToReactionResponse(reaction *domain.Reaction) ReactionResponse {
+	return ReactionResponse{
+		ID:           reaction.GetId().String(),
+		MessageID:    reaction.GetMessageId().String(),
+		UserID:       reaction.GetUserId().String(),
+		ReactionType: reaction.GetReactionType(),
+		Timestamp:    reaction.GetCreatedAt(),
+	}
+}
+
+type RemoveReactionRequest struct {
+	UserID       string `json:"user_id" binding:"required,uuid"`
+	ReactionType string `json:"reaction_type" binding:"required"`
 }
 
 func errorResponse(err error) gin.H {

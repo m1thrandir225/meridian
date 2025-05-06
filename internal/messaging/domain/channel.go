@@ -33,7 +33,7 @@ func (c *Channel) ClearPendingEvents() {
 	c.pendingEvents = []DomainEvent{}
 }
 
-func NewChannel(name string, creatorUserID uuid.UUID) (*Channel, error) {
+func NewChannel(name, topic string, creatorUserID uuid.UUID) (*Channel, error) {
 	if name == "" {
 		return nil, errors.New("channel name cannot be empty")
 	}
@@ -45,6 +45,7 @@ func NewChannel(name string, creatorUserID uuid.UUID) (*Channel, error) {
 	channel := &Channel{
 		ID:              channelID,
 		Name:            name,
+		Topic:           topic,
 		CreatorUserID:   creatorUserID,
 		CreationTime:    now,
 		Members:         []Member{creator},

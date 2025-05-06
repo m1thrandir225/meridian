@@ -14,18 +14,17 @@ DB_URL_ENV_VAR_PATTERN = $(shell echo $(1) | tr '[:lower:]' '[:upper:]')_DB_URL
 GOLANGCI_LINT := $(GOBIN)/golangci-lint
 
 $(COMPOSE_ENV_FILE):
-	@echo "Creating default $(COMPOSE_ENV_FILE)... Please review and update it."
-	@echo "# $(COMPOSE_ENV_FILE)" > $(COMPOSE_ENV_FILE)
-	@echo "POSTGRES_USER=meridian_user" >> $(COMPOSE_ENV_FILE)
-	@echo "POSTGRES_PASSWORD=a_very_secret_password" >> $(COMPOSE_ENV_FILE)
-	@echo "" >> $(COMPOSE_ENV_FILE)
 	@echo "# Messaging Service" >> $(COMPOSE_ENV_FILE)
-	@echo "MESSAGING_DB_NAME=meridian_messaging" >> $(COMPOSE_ENV_FILE)
+	@echo "MESSAGING_POSTGRES_USER=root" >> $(COMPOSE_ENV_FILE)
+	@echo "MESSAGING_POSTGRES_PASSWORD=secret" >> $(COMPOSE_ENV_FILE)
+	@echo "MESSAGING_DB_NAME=messaging_db" >> $(COMPOSE_ENV_FILE)
 	@echo "MESSAGING_DB_PORT=5433" >> $(COMPOSE_ENV_FILE)
 	@echo "MESSAGING_REDIS_PORT=6380" >> $(COMPOSE_ENV_FILE)
 	@echo "MESSAGING_HTTP_PORT=8081" >> $(COMPOSE_ENV_FILE)
+	@echo "MESSAGING_DB_URL=pgx5://root:secret@messaging_postgres:5432/messaging_db?sslmode=disable" >> $(COMPOSE_ENV_FILE)
+	@echo "MESSAGING_KAFKA_BROKERS=kafka:9092" >> $(COMPOSE_ENV_FILE)
+	@echo "MESSAGING_KAFKA_DEFAULT_TOPIC=meridian.messaging.events" >> $(COMPOSE_ENV_FILE)
 	@echo "" >> $(COMPOSE_ENV_FILE)
-	@echo "# Add sections for identity, integration, notification..." >> $(COMPOSE_ENV_FILE)
 
 
 .PHONY: build

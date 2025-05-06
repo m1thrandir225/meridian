@@ -44,7 +44,7 @@ func loadConfig() Config {
 }
 
 func main() {
-	cfg := loadConfig() // TODO: implement
+	cfg := loadConfig()
 	ctx, cancel := context.WithCancel(context.Background())
 
 	logger := log.New(os.Stdout, "[MessagingService] ", log.LstdFlags|log.Lshortfile)
@@ -71,17 +71,19 @@ func main() {
 			logger.Printf("ERROR closing Kafka producer: %v", err)
 		}
 	}()
-
 	logger.Println("Kafka sync producer initialized.")
 
 	eventPublisher := kafkainfra.NewSaramaEventPublisher(producer, cfg.KafkaDefaultTopic)
 	logger.Println("Kafka event publisher initialized.")
 
 	repository := persistence.NewPostgresChannelRepository(dbPool)
+	logger.Println("Database pool initialized.")
 
 	service := services.NewChannelService(repository, eventPublisher)
+	logger.Println("Channel service initialized.")
 
 	httpHandler := handlers.NewHttpHandler(service)
+	logger.Println("HTTP Handler initialized")
 
 	// -- GIN ROUTE SETUP --
 	gin.SetMode(gin.ReleaseMode)
@@ -90,19 +92,9 @@ func main() {
 	router.Use(gin.Logger())
 	router.Use(gin.Recovery())
 
-	apiV1 := router.Group("/api/v1")
-	{
-		channelsGroup := apiV1.Group("/channels")
-		{
-			channelsGroup.POST("/", httpHandler.CreateChannel)
-			channelsGroup.GET("/:channelId", httpHandler.GetChannel)
-			channelsGroup.POST("/:channelId/join", httpHandler.JoinChannel)
-			messagesGroup := channelsGroup.Group("/:channelId/messages")
-			{
-				messagesGroup.POST("/", httpHandler.SendMessage)
-			}
-		}
-	}
+	handlers.SetupRoutes(router, httpHandler)
+	logger.Println("HTTP Routes initialized")
+
 	// -- HTTP SERVER  --
 	httpServer := &http.Server{
 		Addr:    cfg.HTPPServerAddress,
