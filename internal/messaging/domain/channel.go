@@ -40,7 +40,7 @@ func NewChannel(name, topic string, creatorUserID uuid.UUID) (*Channel, error) {
 
 	now := time.Now().UTC()
 	channelID := uuid.New()
-	creator := NewMember(creatorUserID, "owner", now, now)
+	creator := newMember(creatorUserID, "owner", now, now)
 
 	channel := &Channel{
 		ID:              channelID,
@@ -66,7 +66,7 @@ func (c *Channel) AddMember(userID uuid.UUID) error {
 		}
 	}
 	now := time.Now().UTC()
-	member := NewMember(userID, "member", now, now)
+	member := newMember(userID, "member", now, now)
 	c.Members = append(c.Members, member)
 
 	c.addEvent(CreateUserJoinedChannelEvent(c, member))
@@ -144,7 +144,7 @@ func (c *Channel) PostMessage(senderUserID uuid.UUID, content MessageContent, pa
 		return nil, err
 	}
 
-	message := NewMessage(
+	message := newMessage(
 		messageID,
 		c.ID,
 		&senderUserID,
@@ -170,7 +170,7 @@ func (c *Channel) PostNotification(integrationID uuid.UUID, content MessageConte
 		return nil, err
 	}
 
-	message := NewMessage(
+	message := newMessage(
 		messageID,
 		c.ID,
 		nil,

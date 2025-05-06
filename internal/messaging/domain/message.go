@@ -17,7 +17,21 @@ type Message struct {
 	reactions       []Reaction
 }
 
-func NewMessage(id uuid.UUID, channelId uuid.UUID, senderUserId, integrationId, parentMessageId *uuid.UUID, content MessageContent, reactions []Reaction, timestamp time.Time) Message {
+func newMessage(id uuid.UUID, channelId uuid.UUID, senderUserId, integrationId, parentMessageId *uuid.UUID, content MessageContent, reactions []Reaction, timestamp time.Time) Message {
+	return Message{
+		id:              id,
+		channelId:       channelId,
+		senderUserId:    senderUserId,
+		integrationId:   integrationId,
+		parentMessageId: parentMessageId,
+		content:         content,
+		reactions:       reactions,
+		timestamp:       timestamp,
+	}
+}
+
+// For external usage
+func RehydrateMessage(id uuid.UUID, channelId uuid.UUID, senderUserId, integrationId, parentMessageId *uuid.UUID, content MessageContent, reactions []Reaction, timestamp time.Time) Message {
 	return Message{
 		id:              id,
 		channelId:       channelId,

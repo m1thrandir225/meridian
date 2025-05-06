@@ -13,7 +13,7 @@ type Member struct {
 	lastRead time.Time
 }
 
-func NewMember(id uuid.UUID, role string, joinedAt, lastRead time.Time) Member {
+func newMember(id uuid.UUID, role string, joinedAt, lastRead time.Time) Member {
 	return Member{
 		id:       id,
 		role:     role,
@@ -52,4 +52,18 @@ func (m *Member) GetLastRead() time.Time {
 
 func (m *Member) setLastRead(lastRead time.Time) {
 	m.lastRead = lastRead
+}
+
+func RehydrateMember(
+	id uuid.UUID,
+	role string,
+	joinedAt time.Time,
+	lastRead time.Time,
+) Member {
+	return Member{
+		id:       id,
+		role:     role,
+		joinedAt: joinedAt,
+		lastRead: lastRead,
+	}
 }

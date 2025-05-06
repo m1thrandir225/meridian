@@ -10,7 +10,16 @@ type MessageContent struct {
 	formatted bool
 }
 
-func NewMessageContent(text string, mentions []uuid.UUID, links []string, formatted bool) MessageContent {
+func newMessageContent(text string, mentions []uuid.UUID, links []string, formatted bool) MessageContent {
+	return MessageContent{
+		text:      text,
+		mentions:  mentions,
+		links:     links,
+		formatted: formatted,
+	}
+}
+
+func RehydrateMessageContent(text string, mentions []uuid.UUID, links []string, formatted bool) MessageContent {
 	return MessageContent{
 		text:      text,
 		mentions:  mentions,
