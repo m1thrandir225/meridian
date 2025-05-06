@@ -12,7 +12,7 @@ type Message struct {
 	senderUserId    *uuid.UUID // may be nil
 	integrationId   *uuid.UUID // may be nil
 	content         MessageContent
-	timestamp       time.Time
+	createdAt       time.Time
 	parentMessageId *uuid.UUID
 	reactions       []Reaction
 }
@@ -26,7 +26,7 @@ func newMessage(id uuid.UUID, channelId uuid.UUID, senderUserId, integrationId, 
 		parentMessageId: parentMessageId,
 		content:         content,
 		reactions:       reactions,
-		timestamp:       timestamp,
+		createdAt:       timestamp,
 	}
 }
 
@@ -40,7 +40,7 @@ func RehydrateMessage(id uuid.UUID, channelId uuid.UUID, senderUserId, integrati
 		parentMessageId: parentMessageId,
 		content:         content,
 		reactions:       reactions,
-		timestamp:       timestamp,
+		createdAt:       timestamp,
 	}
 }
 
@@ -84,12 +84,12 @@ func (m *Message) setContent(content MessageContent) {
 	m.content = content
 }
 
-func (m *Message) GetTimestamp() time.Time {
-	return m.timestamp
+func (m *Message) GetCreatedAt() time.Time {
+	return m.createdAt
 }
 
-func (m *Message) setTimestamp(timestamp time.Time) {
-	m.timestamp = timestamp
+func (m *Message) setCreatedAt(timestamp time.Time) {
+	m.createdAt = timestamp
 }
 
 func (m *Message) GetParentMessageId() *uuid.UUID {

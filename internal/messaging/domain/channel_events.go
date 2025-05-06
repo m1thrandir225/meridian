@@ -130,7 +130,7 @@ func CreateMessageSentEvent(channel *Channel, message *Message) MessageSentEvent
 		SenderUserID:    senderUserIDStr,
 		IntegrationID:   integrationIDStr,
 		Content:         *message.GetContent(),
-		Timestamp:       message.GetTimestamp(),
+		Timestamp:       message.GetCreatedAt(),
 		ParentMessageID: parentMessageIDStr,
 	}
 }
@@ -143,7 +143,7 @@ func CreateNotificationSentEvent(channel *Channel, message *Message) Notificatio
 		MessageID:       message.GetId().String(),
 		IntegrationID:   message.GetIntegrationId().String(),
 		Content:         *message.GetContent(),
-		Timestamp:       message.GetTimestamp(),
+		Timestamp:       message.GetCreatedAt(),
 	}
 }
 

@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	models "github.com/m1thrandir225/meridian/internal/messaging/domain"
 )
@@ -256,4 +257,116 @@ func (r *PostgresChannelRepository) Delete(ctx context.Context, id uuid.UUID) er
 		return fmt.Errorf("channel with ID %s was not found for deletion: %w", id, ErrNotFound)
 	}
 	return nil
+}
+
+func (r *PostgresChannelRepository) SaveMessage(ctx context.Context, message *models.Message) error {
+	query := `
+		INSERT INTO messages (
+			id, channel_id, sender_user_id, integration_id,
+			content_text, content_mentions, content_links, content_formatted,
+			created_at, parent_message_id
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`
+
+	var senderID, integrationID, parentID interface{}
+	if message.GetSenderUserId() != nil {
+		senderID = *message.GetSenderUserId()
+	}
+	if message.GetIntegrationId() != nil {
+		integrationID = *message.GetIntegrationId()
+	}
+	if message.GetParentMessageId() != nil {
+		parentID = *message.GetParentMessageId()
+	}
+
+	_, err := r.pool.Exec(ctx, query,
+		message.GetId(),
+		message.GetChannelId(),
+		senderID,
+		integrationID,
+		message.GetContent().GetText(),
+		message.GetContent().GetMentions(),
+		message.GetContent().GetLinks(),
+		message.GetContent().GetIsFormatted(),
+		message.GetCreatedAt(),
+		parentID,
+	)
+	if err != nil {
+		return fmt.Errorf("error inserting message %s for channel %s: %w", message.GetId(), message.GetChannelId(), err)
+	}
+	return nil
+}
+
+func (r *PostgresChannelRepository) SaveReaction(ctx context.Context, reaction *models.Reaction) error {
+	query := `
+		INSERT INTO reactions (id, message_id, user_id, reaction_type, timestamp)
+		VALUES ($1, $2, $3, $4, $5)`
+
+	_, err := r.pool.Exec(ctx, query,
+		reaction.GetId(),
+		reaction.GetMessageId(),
+		reaction.GetUserId(),
+		reaction.GetReactionType(),
+		reaction.GetCreatedAt(),
+	)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return fmt.Errorf("reaction already exists for message %s by user %s with type %s: %w",
+				reaction.GetMessageId(), reaction.GetUserId(), reaction.GetReactionType(), ErrConflict)
+		}
+		return fmt.Errorf("error inserting reaction %s: %w", reaction.GetId(), err)
+	}
+	return nil
+}
+
+func (r *PostgresChannelRepository) DeleteReaction(ctx context.Context, messageID, userID uuid.UUID, reactionType string) error {
+	query := `
+		DELETE FROM reactions
+		WHERE message_id = $1 AND user_id = $2 AND reaction_type = $3`
+
+	cmdTag, err := r.pool.Exec(ctx, query, messageID, userID, reactionType)
+	if err != nil {
+		return fmt.Errorf("error deleting reaction (type: %s) from message %s by user %s: %w",
+			reactionType, messageID, userID, err)
+	}
+	if cmdTag.RowsAffected() == 0 {
+		return fmt.Errorf("reaction (type: %s) not found on message %s for user %s to delete: %w",
+			reactionType, messageID, userID, ErrNotFound)
+	}
+	return nil
+}
+
+func (r *PostgresChannelRepository) FindReactionsByMessageID(ctx context.Context, messageID uuid.UUID) ([]models.Reaction, error) {
+	query := `
+		SELECT id, message_id, user_id, reaction_type, timestamp
+		FROM reactions
+		WHERE message_id = $1
+		ORDER BY created_at ASC`
+
+	rows, err := r.pool.Query(ctx, query, messageID)
+	if err != nil {
+		return nil, fmt.Errorf("error querying reactions for message %s: %w", messageID, err)
+	}
+	defer rows.Close()
+
+	var reactions []models.Reaction
+	for rows.Next() {
+		var reactionID uuid.UUID
+		var msgID uuid.UUID
+		var userID uuid.UUID
+		var reactionType string
+		var timestamp time.Time
+
+		err := rows.Scan(&reactionID, &msgID, &userID, &reactionType, &timestamp)
+		if err != nil {
+			return nil, fmt.Errorf("error scanning reaction for message %s: %w", messageID, err)
+		}
+		reaction := models.RehydrateReaction(reactionID, msgID, userID, reactionType, timestamp)
+		reactions = append(reactions, reaction)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating reactions for message %s: %w", messageID, err)
+	}
+	return reactions, nil
 }

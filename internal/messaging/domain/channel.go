@@ -215,7 +215,7 @@ func (c *Channel) AddReaction(messageID, userID uuid.UUID, reactionType string) 
 	if err != nil {
 		return nil, err
 	}
-	reaction := NewReaction(
+	reaction := newReaction(
 		reactionID,
 		messageID,
 		userID,

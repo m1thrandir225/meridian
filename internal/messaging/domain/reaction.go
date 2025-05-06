@@ -14,7 +14,17 @@ type Reaction struct {
 	createdAt    time.Time
 }
 
-func NewReaction(id, messageId, userId uuid.UUID, reactionType string, createdAt time.Time) Reaction {
+func newReaction(id, messageId, userId uuid.UUID, reactionType string, createdAt time.Time) Reaction {
+	return Reaction{
+		id:           id,
+		messageId:    messageId,
+		userId:       userId,
+		reactionType: reactionType,
+		createdAt:    createdAt,
+	}
+}
+
+func RehydrateReaction(id, messageId, userId uuid.UUID, reactionType string, createdAt time.Time) Reaction {
 	return Reaction{
 		id:           id,
 		messageId:    messageId,
