@@ -176,11 +176,11 @@ func (r *PostgresChannelRepository) FindById(ctx context.Context, id uuid.UUID) 
 func (r *PostgresChannelRepository) FindMessages(ctx context.Context, channelID uuid.UUID, limit int, offset int) ([]models.Message, error) {
 	queryMessages := `
 		SELECT id, channel_id, sender_user_id, integration_id,
-		       content_text, content_mentions, content_links, content_formatted,
-		       timestamp, parent_message_id
+		       content_text, content_mentions, content_link, content_formatted,
+		       created_at, parent_message_id
 		FROM messages
 		WHERE channel_id = $1
-		ORDER BY timestamp DESC
+		ORDER BY created_at DESC
 		LIMIT $2 OFFSET $3`
 
 	if limit <= 0 {
@@ -262,10 +262,10 @@ func (r *PostgresChannelRepository) FindMessages(ctx context.Context, channelID 
 	}
 
 	queryReactions := `
-		SELECT id, message_id, user_id, reaction_type, timestamp
+		SELECT id, message_id, user_id, reaction_type, created_at
 		FROM reactions
 		WHERE message_id = ANY($1) -- Use ANY with an array of UUIDs
-		ORDER BY message_id, timestamp ASC`
+		ORDER BY message_id, created_at ASC`
 
 	reactionRows, err := r.pool.Query(ctx, queryReactions, messageIDs)
 	if err != nil {
@@ -325,7 +325,7 @@ func (r *PostgresChannelRepository) SaveMessage(ctx context.Context, message *mo
 	query := `
 		INSERT INTO messages (
 			id, channel_id, sender_user_id, integration_id,
-			content_text, content_mentions, content_links, content_formatted,
+			content_text, content_mentions, content_link, content_formatted,
 			created_at, parent_message_id
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`
 
@@ -360,7 +360,7 @@ func (r *PostgresChannelRepository) SaveMessage(ctx context.Context, message *mo
 
 func (r *PostgresChannelRepository) SaveReaction(ctx context.Context, reaction *models.Reaction) error {
 	query := `
-		INSERT INTO reactions (id, message_id, user_id, reaction_type, timestamp)
+		INSERT INTO reactions (id, message_id, user_id, reaction_type, created_at)
 		VALUES ($1, $2, $3, $4, $5)`
 
 	_, err := r.pool.Exec(ctx, query,
@@ -400,7 +400,7 @@ func (r *PostgresChannelRepository) DeleteReaction(ctx context.Context, messageI
 
 func (r *PostgresChannelRepository) FindReactionsByMessageID(ctx context.Context, messageID uuid.UUID) ([]models.Reaction, error) {
 	query := `
-		SELECT id, message_id, user_id, reaction_type, timestamp
+		SELECT id, message_id, user_id, reaction_type, created_at
 		FROM reactions
 		WHERE message_id = $1
 		ORDER BY created_at ASC`

@@ -289,6 +289,7 @@ func (h *HTTPHandler) RemoveReaction(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, errorResponse(err))
 		return
 	}
+
 	if err := ctx.ShouldBindUri(&messageIdUri); err != nil {
 		ctx.JSON(http.StatusBadRequest, errorResponse(err))
 		return
@@ -310,6 +311,7 @@ func (h *HTTPHandler) RemoveReaction(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, errorResponse(err))
 		return
 	}
+
 	_, err = h.channelService.HandleRemoveReaction(ctx, domain.RemoveReactionCommand{
 		ChannelID:    channelId,
 		MessageID:    messageId,

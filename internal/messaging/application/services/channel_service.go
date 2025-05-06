@@ -28,6 +28,12 @@ func (s *ChannelService) HandleCreateChannel(ctx context.Context, cmd domain.Cre
 	if err := s.repo.Save(ctx, channel); err != nil {
 		return nil, err
 	}
+
+	err = s.eventPub.PublishEvents(ctx, channel.GetPendingEvents())
+	if err != nil {
+		return nil, err
+	}
+	channel.ClearPendingEvents()
 	return channel, err
 }
 
@@ -36,6 +42,12 @@ func (s *ChannelService) HandleGetChannel(ctx context.Context, cmd domain.GetCha
 	if err != nil {
 		return nil, err
 	}
+
+	err = s.eventPub.PublishEvents(ctx, channel.GetPendingEvents())
+	if err != nil {
+		return nil, err
+	}
+	channel.ClearPendingEvents()
 
 	return channel, nil
 }
@@ -53,6 +65,11 @@ func (s *ChannelService) HandleListMessages(ctx context.Context, cmd domain.List
 
 	channel.Messages = messages
 
+	err = s.eventPub.PublishEvents(ctx, channel.GetPendingEvents())
+	if err != nil {
+		return nil, err
+	}
+	channel.ClearPendingEvents()
 	return channel, nil
 }
 
@@ -70,6 +87,11 @@ func (s *ChannelService) HandleJoinChannel(ctx context.Context, cmd domain.JoinC
 	if err := s.repo.Save(ctx, channel); err != nil {
 		return nil, err
 	}
+	err = s.eventPub.PublishEvents(ctx, channel.GetPendingEvents())
+	if err != nil {
+		return nil, err
+	}
+	channel.ClearPendingEvents()
 	return channel, err
 }
 
@@ -87,6 +109,12 @@ func (s *ChannelService) HandleLeaveChannel(ctx context.Context, cmd domain.Leav
 	if err := s.repo.Save(ctx, channel); err != nil {
 		return nil, err
 	}
+
+	err = s.eventPub.PublishEvents(ctx, channel.GetPendingEvents())
+	if err != nil {
+		return nil, err
+	}
+	channel.ClearPendingEvents()
 	return channel, nil
 }
 
@@ -103,6 +131,12 @@ func (s *ChannelService) HandleMessageSent(ctx context.Context, cmd domain.SendM
 	if err := s.repo.SaveMessage(ctx, message); err != nil {
 		return nil, err
 	}
+
+	err = s.eventPub.PublishEvents(ctx, channel.GetPendingEvents())
+	if err != nil {
+		return nil, err
+	}
+	channel.ClearPendingEvents()
 	return message, err
 }
 
@@ -119,6 +153,13 @@ func (s *ChannelService) HandleNotificationSent(ctx context.Context, cmd domain.
 	if err := s.repo.SaveMessage(ctx, message); err != nil {
 		return nil, err
 	}
+
+	err = s.eventPub.PublishEvents(ctx, channel.GetPendingEvents())
+	if err != nil {
+		return nil, err
+	}
+	channel.ClearPendingEvents()
+
 	return message, err
 }
 
@@ -128,6 +169,13 @@ func (s *ChannelService) HandleAddReaction(ctx context.Context, cmd domain.AddRe
 		return nil, err
 	}
 
+	// FIXME:  should the channel return all the messages??
+	messages, err := s.repo.FindMessages(ctx, cmd.ChannelID, 100, 0)
+	if err != nil {
+		return nil, err
+	}
+	channel.Messages = messages
+
 	newReaction, err := channel.AddReaction(cmd.MessageID, cmd.UserID, cmd.ReactionType)
 	if err != nil {
 		return nil, err
@@ -136,6 +184,12 @@ func (s *ChannelService) HandleAddReaction(ctx context.Context, cmd domain.AddRe
 	if err := s.repo.SaveReaction(ctx, newReaction); err != nil {
 		return nil, err
 	}
+
+	err = s.eventPub.PublishEvents(ctx, channel.GetPendingEvents())
+	if err != nil {
+		return nil, err
+	}
+	channel.ClearPendingEvents()
 	return newReaction, nil
 }
 
@@ -144,15 +198,28 @@ func (s *ChannelService) HandleRemoveReaction(ctx context.Context, cmd domain.Re
 	if err != nil {
 		return nil, err
 	}
+
+	messages, err := s.repo.FindMessages(ctx, cmd.ChannelID, 100, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	channel.Messages = messages
+
 	reaction, err := channel.RemoveReaction(cmd.MessageID, cmd.UserID, cmd.ReactionType)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := s.repo.Delete(ctx, reaction.GetId()); err != nil {
+	if err := s.repo.DeleteReaction(ctx, cmd.MessageID, cmd.UserID, cmd.ReactionType); err != nil {
 		return nil, err
 	}
 
+	err = s.eventPub.PublishEvents(ctx, channel.GetPendingEvents())
+	if err != nil {
+		return nil, err
+	}
+	channel.ClearPendingEvents()
 	return reaction, nil
 }
 
@@ -167,6 +234,12 @@ func (s *ChannelService) HandleSetChannelTopic(ctx context.Context, cmd domain.S
 	if err := s.repo.Save(ctx, channel); err != nil {
 		return nil, err
 	}
+
+	err = s.eventPub.PublishEvents(ctx, channel.GetPendingEvents())
+	if err != nil {
+		return nil, err
+	}
+	channel.ClearPendingEvents()
 	return channel, err
 }
 
@@ -181,6 +254,12 @@ func (s *ChannelService) HandleArchiveChannel(ctx context.Context, cmd domain.Ar
 	if err := s.repo.Save(ctx, channel); err != nil {
 		return nil, err
 	}
+
+	err = s.eventPub.PublishEvents(ctx, channel.GetPendingEvents())
+	if err != nil {
+		return nil, err
+	}
+	channel.ClearPendingEvents()
 	return channel, err
 }
 
@@ -195,5 +274,11 @@ func (s *ChannelService) HandleUnarchiveChannel(ctx context.Context, cmd domain.
 	if err := s.repo.Save(ctx, channel); err != nil {
 		return nil, err
 	}
+
+	err = s.eventPub.PublishEvents(ctx, channel.GetPendingEvents())
+	if err != nil {
+		return nil, err
+	}
+	channel.ClearPendingEvents()
 	return channel, err
 }

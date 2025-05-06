@@ -14,12 +14,13 @@ func SetupRoutes(router *gin.Engine, httpHandler *HTTPHandler) {
 			channelsGroup.PUT("/:channelId/unarchive", httpHandler.UnarchiveChannel)
 			messagesGroup := channelsGroup.Group("/:channelId/messages")
 			{
+				messagesGroup.GET("/", httpHandler.GetMessages)
 				messagesGroup.POST("/", httpHandler.SendMessage)
 
 				reactionsGroup := messagesGroup.Group("/:messageId/reactions")
 				{
-					reactionsGroup.PUT("", httpHandler.AddReaction)
-					reactionsGroup.DELETE("", httpHandler.RemoveReaction)
+					reactionsGroup.PUT("/", httpHandler.AddReaction)
+					reactionsGroup.DELETE("/", httpHandler.RemoveReaction)
 				}
 			}
 		}
