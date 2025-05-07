@@ -21,7 +21,8 @@ $(COMPOSE_ENV_FILE):
 	@echo "MESSAGING_DB_PORT=5433" >> $(COMPOSE_ENV_FILE)
 	@echo "MESSAGING_REDIS_PORT=6380" >> $(COMPOSE_ENV_FILE)
 	@echo "MESSAGING_HTTP_PORT=8081" >> $(COMPOSE_ENV_FILE)
-	@echo "MESSAGING_DB_URL=pgx5://root:secret@messaging_postgres:5432/messaging_db?sslmode=disable" >> $(COMPOSE_ENV_FILE)
+	@echo "MESSAGING_DB_URL_MIGRATE=pgx5://root:secret@messaging_postgres:5433/messaging_db?sslmode=disable" >> $(COMPOSE_ENV_FILE)
+	@echo "MESSAGING_DB_URL=postgres://root:secret@messaging_postgres:5433/messaging_db?sslmode=disable" >> $(COMPOSE_ENV_FILE)
 	@echo "MESSAGING_KAFKA_BROKERS=kafka:9092" >> $(COMPOSE_ENV_FILE)
 	@echo "MESSAGING_KAFKA_DEFAULT_TOPIC=meridian.messaging.events" >> $(COMPOSE_ENV_FILE)
 	@echo "" >> $(COMPOSE_ENV_FILE)
@@ -67,6 +68,8 @@ lint: ## Lint Go source code using golangci-lint
 test: tidy ## Run Go tests for all modules
 	@echo "Running Go tests..."
 	@$(GO) test -v -race -cover ./...
+
+
 .PHONY: docker-build
 docker-build: $(COMPOSE_ENV_FILE) ## Build Docker images using Docker Compose
 	@echo "Building Docker images defined in $(COMPOSE_FILE)..."

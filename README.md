@@ -14,7 +14,7 @@ All of the internal logic for each service is under `/internal/{service}/`
 
 All of the `Dockerfile` and `compose.yml` configurations for each service are under `/deployments/{service}`
 
-Each service has it's own database, along with it's own migrations, to make it easier to run migrations each service has a seperate container called `{service}_migrate` which runs the CLI-tool `golang-migrate` which makes sure the database is up to date when running the containers.
+Each service has it's own database, along with it's own migrations, to make it easier to run migrations each service has a separate container called `{service}_migrate` which runs the CLI-tool `golang-migrate` which makes sure the database is up to date when running the containers.
 
 Each entity has public getters and private setters except the Aggregate Root.
 
@@ -24,21 +24,31 @@ Common shared packages and tools are placed under the `pkg` folder.
 
 1. Clone the repository
 
-2. Start the services using the `Makefile`
+2. Checkout the `Makefile`
 
-The makefile is quite configured check out all of the commands using:
+The project primarily uses the `Makefile` for running all of the commands.
+
+To checkout all of the defined commands run:
 
 ```bash
 make help
 ```
 
-To run all of the currently defined services:
+3. Start the services using the `Makefile`
+
+Firstly build the defined images using:
+
+```bash
+make docker-build
+```
+
+Then run all of the currently defined services:
 
 ```bash
 make docker-up
 ```
 
-3. To stop the running containers
+4. To stop the running containers
 
 To stop the containers:
 
@@ -46,7 +56,7 @@ To stop the containers:
 make docker-stop
 ```
 
-or to stop and remove the containers:
+To stop and remove the containers:
 
 ```
 make docker-down
@@ -68,9 +78,11 @@ Here are the required variables by the services:
 - `MESSAGING_DB_PORT`: port for the PostgreSQL instance of the messaging service
 - `MESSAGING_REDIS_PORT`: port for the Redis instace of the messaging service
 - `MESSAGING_HTTP_PORT`: The http port the messaging service is going to be running on
-- `MESSAGING_DB_URL`: The url that the messaging service is going to use to connect to the PostgreSQL instance (currently using the PGX driver)
-- `MESSAGING_KAFKA_BROKERS`: a list of kafka brokers for the messaging service
-- `MESSAGING_KAFKA_DEFAULT_TOPIC`: the default topic for the messaging service
+- `MESSAGING_DB_URL_MIGRATE`: The URL that the migrate service uses for running
+  migrations
+- `MESSAGING_DB_URL`: The URL that the messaging service is going to use to connect to the PostgreSQL instance (currently using the PGX driver)
+- `MESSAGING_KAFKA_BROKERS`: A list of Kafka brokers for the messaging service
+- `MESSAGING_KAFKA_DEFAULT_TOPIC`: The default topic for the messaging service
 
 ## API Documentation
 
@@ -84,6 +96,7 @@ Here are the exposed API endpoints by the services:
 - **Method**: `POST`
 - **Description**: Create a channel and become the owner of it
 - **Body**:
+
   ```json
   {
     "name": "string",
@@ -91,8 +104,10 @@ Here are the exposed API endpoints by the services:
     "creator_user_id": "string" //The UUID of the user from the identity service
   }
   ```
+
 - **Response Status**: `201 Created`
 - **Response Content**:
+
   ```json
   {
     "id": "string",
@@ -112,11 +127,13 @@ Here are the exposed API endpoints by the services:
 - **Method**: `POST`
 - **Description**: Join a channel
 - **Body**:
+
   ```json
   {
     "user_id": "string" //The UUID of the user from the identity service
   }
   ```
+
 - **Response Status**: `204 No Content`
 
 #### SendMessage
@@ -125,6 +142,7 @@ Here are the exposed API endpoints by the services:
 - **Method**: `POST`
 - **Description**: Send a message to a channel
 - **Body**:
+
   ```json
   {
     "content_text": "string",
@@ -133,8 +151,10 @@ Here are the exposed API endpoints by the services:
     "parent_message_id": "string" //If the message is a reply the ID of the parent message
   }
   ```
+
 - **Response Status**: `200 OK`
 - **Response Content**:
+
   ```json
   {
     "id": "string",
@@ -142,7 +162,7 @@ Here are the exposed API endpoints by the services:
     "sender_user_id": "string",
     "integration_id": "string",
     "content_text": "string",
-    "timestamp": "string", //ISO 8601 timestamp
+    "created_at": "string", //ISO 8601 timestamp
     "parent_message_id": "string" //If the message is a reply the ID of the parent message
   }
   ```
@@ -154,6 +174,7 @@ Here are the exposed API endpoints by the services:
 - **Description**: Get a channels details by their ID
 - **Response Status**: `200 OK`
 - **Response Content**:
+
   ```json
   {
     "id": "string",
@@ -197,8 +218,8 @@ Here are the exposed API endpoints by the services:
         "sender_user_id": "string",
         "integration_id": "string",
         "content_text": "string",
-        "timestamp": "string", //ISO 8601 timestamp
-        "parent_message_id": "string" //If the message is a reply the ID of the parent message
+        "created_at": "ISO 8601 timestamp",
+        "parent_message_id": "string"
       }[]
   }
   ```
@@ -209,14 +230,17 @@ Here are the exposed API endpoints by the services:
 - **Method**: `POST`
 - **Description**: Add a reaction to a message
 - **Body**:
+
   ```json
   {
     "user_id": "string",
     "reaction_type": "string"
   }
   ```
+
 - **Response Status**: `200 OK`
 - **Response Content**:
+
   ```json
   {
     "id": "string",
@@ -233,10 +257,43 @@ Here are the exposed API endpoints by the services:
 - **Method**: `DELETE`
 - **Description**: Remove a reaction from a message
 - **Body**:
+
   ```json
   {
     "user_id": "string",
     "reaction_type": "string"
   }
   ```
+
 - **Response Status**: `204 No Content`
+
+## Kafka
+
+### Message Format
+
+Kafka messages are sent in the following format
+
+```GO
+type BaseDomainEvent struct {
+ ID          string
+ Name        string
+ Time        time.Time
+ AggrID      string
+ AggrType    string
+ AggrVersion int64
+}
+
+```
+
+All of the events share this information, along with event specific information.
+
+Example Event Structure:
+
+```GO
+type ChannelCreatedEvent struct {
+ BaseDomainEvent
+ Name          string
+ CreatorUserID string
+ Topic         string
+}
+```

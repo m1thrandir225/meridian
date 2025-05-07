@@ -39,10 +39,11 @@ services:
       POSTGRES_USER: ${MESSAGING_POSTGRES_USER}
       POSTGRES_PASSWORD: ${MESSAGING_POSTGRES_PASSWORD}
       POSTGRES_DB: ${MESSAGING_DB_NAME}
+      PGPORT: ${MESSAGING_DB_PORT}
     volumes:
       - messaging_postgres_data:/var/lib/postgresql/data
     ports:
-      - "${MESSAGING_DB_PORT}:5432"
+      - "${MESSAGING_DB_PORT}:${MESSAGING_DB_PORT}"
     healthcheck:
       test:
         [
@@ -93,7 +94,7 @@ services:
       KAFKA_BROKERS: "${MESSAGING_KAFKA_BROKERS}"
       KAFKA_DEFAULT_TOPIC: "${MESSAGING_KAFKA_DEFAULT_TOPIC}"
     ports:
-      - "${MESSAGING_HTTP_PORT}:8081"
+      - "${MESSAGING_HTTP_PORT}:${MESSAGING_HTTP_PORT}"
     restart: unless-stopped
 volumes:
   messaging_postgres_data:
