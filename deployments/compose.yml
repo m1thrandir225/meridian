@@ -58,8 +58,9 @@ services:
   messaging_redis:
     image: redis:7-alpine
     container_name: meridian_redis_messaging
+    command: --port ${MESSAGING_REDIS_PORT}
     ports:
-      - "${MESSAGING_REDIS_PORT}:6379"
+      - "${MESSAGING_REDIS_PORT}:${MESSAGING_REDIS_PORT}"
     restart: unless-stopped
 
   messaging_migrate:

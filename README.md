@@ -62,6 +62,15 @@ To stop and remove the containers:
 make docker-down
 ```
 
+## Docker Services
+
+- `zookeeper` Distributed coordination for Kafka. Port: `2181`
+- `kafka` Kafka for the whole project. Port: `9092`
+- `messaging` The messaging service. Port: `8081`
+- `messaging_postgres` PostgreSQL instance for the messaging service. Port: `5433`
+- `messaging_redis` Redis instance for the messaging service. Port: `6380`
+- `messaging_migrate` Runs the messaging migrations
+
 ## Environment Setup
 
 By default when running the `Makefile` it will generate a basic `.env` file by
