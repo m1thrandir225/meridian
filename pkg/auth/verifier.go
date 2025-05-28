@@ -37,7 +37,6 @@ func (v *PasetoTokenVerifier) Verify(tokenString string) (*TokenClaims, error) {
 		return nil, nil
 	}
 
-	var claims TokenClaims
 	aud, err := token.GetAudience()
 	if err != nil {
 		return nil, err
@@ -70,4 +69,8 @@ func (v *PasetoTokenVerifier) Verify(tokenString string) (*TokenClaims, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	tokenClaims := NewTokenClaims(issuer, aud, jti, sub, userId, email, issuedAt, exp)
+
+	return &tokenClaims, nil
 }
