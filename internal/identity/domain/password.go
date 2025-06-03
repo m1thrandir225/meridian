@@ -10,37 +10,37 @@ import (
 
 const passwordBcryptCost = bcrypt.DefaultCost
 
-type PasswordHash struct {
+type passwordHash struct {
 	hash string
 }
 
-func NewPasswordHash(rawPassword string) (PasswordHash, error) {
+func NewPasswordHash(rawPassword string) (passwordHash, error) {
 	if err := validatePasswordPolicy(rawPassword); err != nil {
-		return PasswordHash{}, err
+		return passwordHash{}, err
 	}
 	hashedBytes, err := bcrypt.GenerateFromPassword([]byte(rawPassword), passwordBcryptCost)
 	if err != nil {
-		return PasswordHash{}, fmt.Errorf("failed to hash password: %w", err)
+		return passwordHash{}, fmt.Errorf("failed to hash password: %w", err)
 	}
-	return PasswordHash{hash: string(hashedBytes)}, nil
+	return passwordHash{hash: string(hashedBytes)}, nil
 }
 
-func (ph PasswordHash) Match(rawPassword string) bool {
+func (ph passwordHash) Match(rawPassword string) bool {
 	err := bcrypt.CompareHashAndPassword([]byte(ph.hash), []byte(rawPassword))
 	return err == nil
 }
 
-func FromHashedString(hashedPassword string) (PasswordHash, error) {
+func FromHashedString(hashedPassword string) (passwordHash, error) {
 	if hashedPassword == "" {
-		return PasswordHash{}, errors.New("hashed password string cannot be empty")
+		return passwordHash{}, errors.New("hashed password string cannot be empty")
 	}
 	if len(hashedPassword) < 10 {
-		return PasswordHash{}, errors.New("hashed password string too short")
+		return passwordHash{}, errors.New("hashed password string too short")
 	}
-	return PasswordHash{hash: hashedPassword}, nil
+	return passwordHash{hash: hashedPassword}, nil
 }
 
-func (ph PasswordHash) String() string {
+func (ph passwordHash) String() string {
 	return ph.hash
 }
 

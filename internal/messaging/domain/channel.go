@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/m1thrandir225/meridian/pkg/common"
 )
 
 type Channel struct {
@@ -18,19 +19,19 @@ type Channel struct {
 	LastMessageTime time.Time
 	IsArchived      bool
 	Version         int64
-	pendingEvents   []DomainEvent
+	pendingEvents   []common.DomainEvent
 }
 
-func (c *Channel) addEvent(event DomainEvent) {
+func (c *Channel) addEvent(event common.DomainEvent) {
 	c.pendingEvents = append(c.pendingEvents, event)
 }
 
-func (c *Channel) GetPendingEvents() []DomainEvent {
+func (c *Channel) GetPendingEvents() []common.DomainEvent {
 	return c.pendingEvents
 }
 
 func (c *Channel) ClearPendingEvents() {
-	c.pendingEvents = []DomainEvent{}
+	c.pendingEvents = []common.DomainEvent{}
 }
 
 func NewChannel(name, topic string, creatorUserID uuid.UUID) (*Channel, error) {

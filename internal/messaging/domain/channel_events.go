@@ -4,29 +4,30 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/m1thrandir225/meridian/pkg/common"
 )
 
 type ChannelCreatedEvent struct {
-	BaseDomainEvent
+	common.BaseDomainEvent
 	Name          string
 	CreatorUserID string
 	Topic         string
 }
 
 type UserJoinedChannelEvent struct {
-	BaseDomainEvent
+	common.BaseDomainEvent
 	UserID   string
 	Role     string
 	JoinedAt time.Time
 }
 
 type UserLeftChannelEvent struct {
-	BaseDomainEvent
+	common.BaseDomainEvent
 	UserID string
 }
 
 type MessageSentEvent struct {
-	BaseDomainEvent
+	common.BaseDomainEvent
 	MessageID       string
 	SenderUserID    *string
 	IntegrationID   *string
@@ -36,7 +37,7 @@ type MessageSentEvent struct {
 }
 
 type NotificationSentEvent struct {
-	BaseDomainEvent
+	common.BaseDomainEvent
 	MessageID     string
 	IntegrationID string
 	Content       MessageContent
@@ -44,7 +45,7 @@ type NotificationSentEvent struct {
 }
 
 type ReactionAddedEvent struct {
-	BaseDomainEvent
+	common.BaseDomainEvent
 	ReactionID   string
 	MessageID    string
 	UserID       string
@@ -53,30 +54,30 @@ type ReactionAddedEvent struct {
 }
 
 type ReactionRemovedEvent struct {
-	BaseDomainEvent
+	common.BaseDomainEvent
 	MessageID    string
 	UserID       string
 	ReactionType string
 }
 
 type ChannelArchivedEvent struct {
-	BaseDomainEvent
+	common.BaseDomainEvent
 	ArchivedBy string
 }
 
 type ChannelUnarchivedEvent struct {
-	BaseDomainEvent
+	common.BaseDomainEvent
 	UnarchivedBy string
 }
 
 type ChannelTopicChangedEvent struct {
-	BaseDomainEvent
+	common.BaseDomainEvent
 	Topic     string
 	ChangedBy string
 }
 
 func CreateChannelCreatedEvent(channel *Channel) ChannelCreatedEvent {
-	base := NewBaseDomainEvent("ChannelCreated", channel.ID, channel.Version)
+	base := common.NewBaseDomainEvent("ChannelCreated", channel.ID, channel.Version)
 	return ChannelCreatedEvent{
 		BaseDomainEvent: base,
 		Name:            channel.Name,
@@ -86,7 +87,7 @@ func CreateChannelCreatedEvent(channel *Channel) ChannelCreatedEvent {
 }
 
 func CreateUserJoinedChannelEvent(channel *Channel, member Member) UserJoinedChannelEvent {
-	base := NewBaseDomainEvent("UserJoinedChannel", channel.ID, channel.Version)
+	base := common.NewBaseDomainEvent("UserJoinedChannel", channel.ID, channel.Version)
 	return UserJoinedChannelEvent{
 		BaseDomainEvent: base,
 		UserID:          member.GetId().String(),
@@ -96,7 +97,7 @@ func CreateUserJoinedChannelEvent(channel *Channel, member Member) UserJoinedCha
 }
 
 func CreateUserLeftChannelEvent(channel *Channel, userID uuid.UUID) UserLeftChannelEvent {
-	base := NewBaseDomainEvent("UserLeftChannel", channel.ID, channel.Version)
+	base := common.NewBaseDomainEvent("UserLeftChannel", channel.ID, channel.Version)
 	return UserLeftChannelEvent{
 		BaseDomainEvent: base,
 		UserID:          userID.String(),
@@ -104,7 +105,7 @@ func CreateUserLeftChannelEvent(channel *Channel, userID uuid.UUID) UserLeftChan
 }
 
 func CreateMessageSentEvent(channel *Channel, message *Message) MessageSentEvent {
-	base := NewBaseDomainEvent("MessageSent", channel.ID, channel.Version)
+	base := common.NewBaseDomainEvent("MessageSent", channel.ID, channel.Version)
 
 	var senderUserIDStr *string
 	if message.GetSenderUserId() != nil {
@@ -136,7 +137,7 @@ func CreateMessageSentEvent(channel *Channel, message *Message) MessageSentEvent
 }
 
 func CreateNotificationSentEvent(channel *Channel, message *Message) NotificationSentEvent {
-	base := NewBaseDomainEvent("NotificationSent", channel.ID, channel.Version)
+	base := common.NewBaseDomainEvent("NotificationSent", channel.ID, channel.Version)
 
 	return NotificationSentEvent{
 		BaseDomainEvent: base,
@@ -148,7 +149,7 @@ func CreateNotificationSentEvent(channel *Channel, message *Message) Notificatio
 }
 
 func CreateReactionAddedEvent(channel *Channel, reaction *Reaction) ReactionAddedEvent {
-	base := NewBaseDomainEvent("ReactionAdded", channel.ID, channel.Version)
+	base := common.NewBaseDomainEvent("ReactionAdded", channel.ID, channel.Version)
 
 	return ReactionAddedEvent{
 		BaseDomainEvent: base,
@@ -161,7 +162,7 @@ func CreateReactionAddedEvent(channel *Channel, reaction *Reaction) ReactionAdde
 }
 
 func CreateReactionRemovedEvent(channel *Channel, messageID uuid.UUID, userID uuid.UUID, reactionType string) ReactionRemovedEvent {
-	base := NewBaseDomainEvent("ReactionRemoved", channel.ID, channel.Version)
+	base := common.NewBaseDomainEvent("ReactionRemoved", channel.ID, channel.Version)
 
 	return ReactionRemovedEvent{
 		BaseDomainEvent: base,
@@ -172,7 +173,7 @@ func CreateReactionRemovedEvent(channel *Channel, messageID uuid.UUID, userID uu
 }
 
 func CreateChannelTopicChangedEvent(channel *Channel, changedBy uuid.UUID) ChannelTopicChangedEvent {
-	base := NewBaseDomainEvent("ChannelTopicChanged", channel.ID, channel.Version)
+	base := common.NewBaseDomainEvent("ChannelTopicChanged", channel.ID, channel.Version)
 
 	return ChannelTopicChangedEvent{
 		BaseDomainEvent: base,
@@ -182,7 +183,7 @@ func CreateChannelTopicChangedEvent(channel *Channel, changedBy uuid.UUID) Chann
 }
 
 func CreateChannelArchivedEvent(channel *Channel, archivedBy uuid.UUID) ChannelArchivedEvent {
-	base := NewBaseDomainEvent("ChannelArchived", channel.ID, channel.Version)
+	base := common.NewBaseDomainEvent("ChannelArchived", channel.ID, channel.Version)
 
 	return ChannelArchivedEvent{
 		BaseDomainEvent: base,
@@ -191,7 +192,7 @@ func CreateChannelArchivedEvent(channel *Channel, archivedBy uuid.UUID) ChannelA
 }
 
 func CreateChannelUnarchivedEvent(channel *Channel, unarchivedBy uuid.UUID) ChannelUnarchivedEvent {
-	base := NewBaseDomainEvent("ChannelUnarchived", channel.ID, channel.Version)
+	base := common.NewBaseDomainEvent("ChannelUnarchived", channel.ID, channel.Version)
 
 	return ChannelUnarchivedEvent{
 		BaseDomainEvent: base,

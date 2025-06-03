@@ -8,7 +8,7 @@ import (
 
 	"github.com/IBM/sarama"
 	"github.com/m1thrandir225/meridian/internal/messaging/application/services"
-	"github.com/m1thrandir225/meridian/internal/messaging/domain"
+	"github.com/m1thrandir225/meridian/pkg/common"
 )
 
 var _ services.EventPublisher = (*SaramaEventPublisher)(nil)
@@ -28,7 +28,7 @@ func NewSaramaEventPublisher(producer sarama.SyncProducer, defaultTopic string) 
 	}
 }
 
-func (p *SaramaEventPublisher) PublishEvents(ctx context.Context, domainEvents []domain.DomainEvent) error {
+func (p *SaramaEventPublisher) PublishEvents(ctx context.Context, domainEvents []common.DomainEvent) error {
 	for _, event := range domainEvents {
 		topic := p.determineTopic(event)
 
@@ -55,6 +55,6 @@ func (p *SaramaEventPublisher) PublishEvents(ctx context.Context, domainEvents [
 	return nil
 }
 
-func (p *SaramaEventPublisher) determineTopic(event domain.DomainEvent) string {
+func (p *SaramaEventPublisher) determineTopic(event common.DomainEvent) string {
 	return p.topic
 }
