@@ -22,6 +22,7 @@ type User struct {
 	LastName         string
 	Email            email
 	PasswordHash     passwordHash
+	Version          int64
 	RegistrationTime time.Time
 
 	events []interface{}
@@ -63,6 +64,7 @@ func NewUser(usernameStr, emailStr, firstName, lastName, rawPassword string) (*U
 		FirstName:        firstName,
 		LastName:         lastName,
 		PasswordHash:     passwordHash,
+		Version:          1,
 		RegistrationTime: time.Now(),
 	}
 

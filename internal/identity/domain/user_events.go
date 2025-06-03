@@ -36,3 +36,50 @@ type UserDeletedEvent struct {
 	UserID    string    `json:"user_id"`
 	Timestamp time.Time `json:"timestamp"`
 }
+
+func CreateUserRegisteredEvent(user *User) UserRegisteredEvent {
+	base := common.NewBaseDomainEvent("UserRegistered", user.ID.value, user.Version)
+
+	return UserRegisteredEvent{
+		BaseDomainEvent: base,
+		UserID:          user.ID.value.String(),
+		Username:        user.Username.String(),
+		Email:           user.Email.String(),
+		FirstName:       user.FirstName,
+		LastName:        user.LastName,
+		Timestamp:       time.Now(),
+	}
+}
+
+func CreateUserAuthenticatedEvent(user *User, token string) UserAuthenticatedEvent {
+	base := common.NewBaseDomainEvent("UserAuthenticated", user.ID.value, user.Version)
+
+	return UserAuthenticatedEvent{
+		BaseDomainEvent:     base,
+		UserID:              user.ID.value.String(),
+		Username:            user.Username.String(),
+		AuthenticationToken: token,
+		Timestamp:           time.Now(),
+	}
+}
+
+func CreateUserProfileUpdated(user *User, updatedFields map[string]interface{}) UserProfileUpdatedEvent {
+	base := common.NewBaseDomainEvent("UserProfileUpdated", user.ID.value, user.Version)
+
+	return UserProfileUpdatedEvent{
+		BaseDomainEvent: base,
+		UserID:          user.ID.value.String(),
+		UpdatedFields:   updatedFields,
+		Timestamp:       time.Now(),
+	}
+}
+
+func CreateUserDeletedEvent(user *User) UserDeletedEvent {
+	base := common.NewBaseDomainEvent("UserDeleted", user.ID.value, user.Version)
+
+	return UserDeletedEvent{
+		BaseDomainEvent: base,
+		UserID:          user.ID.value.String(),
+		Timestamp:       time.Now(),
+	}
+}
