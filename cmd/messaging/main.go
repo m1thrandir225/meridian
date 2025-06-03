@@ -28,7 +28,6 @@ type Config struct {
 	KafkaDefaultTopic string
 }
 
-// TODO: implement
 func loadConfig() Config {
 	brokers := []string{"kafka:9092"} // Default kafka brokers
 
@@ -71,6 +70,7 @@ func main() {
 			logger.Printf("ERROR closing Kafka producer: %v", err)
 		}
 	}()
+
 	logger.Println("Kafka sync producer initialized.")
 
 	eventPublisher := kafkainfra.NewSaramaEventPublisher(producer, cfg.KafkaDefaultTopic)
