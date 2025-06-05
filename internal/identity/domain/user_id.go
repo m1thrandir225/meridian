@@ -16,6 +16,10 @@ func NewUserID() (*userID, error) {
 	}, nil
 }
 
+func (id *userID) String() string {
+	return id.value.String()
+}
+
 func UserIDFromString(input string) (*userID, error) {
 	id, err := uuid.Parse(input)
 	if err != nil {
