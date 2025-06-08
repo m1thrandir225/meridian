@@ -11,4 +11,3 @@ CREATE TABLE channels (
 
 CREATE INDEX idx_channels_creator_user_id ON channels (creator_user_id);
 CREATE INDEX idx_channels_is_archived ON channels (is_archived);
-

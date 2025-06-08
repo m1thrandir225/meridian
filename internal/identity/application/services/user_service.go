@@ -16,7 +16,7 @@ import (
 var (
 	ErrUserExists      = errors.New("user with given username or email already exists")
 	ErrAuthFailed      = domain.ErrAuthentication
-	ErrUserNotFound    = persistence.ErrUserNotFound
+	ErrUserNotFound    = domain.ErrUserNotFound
 	ErrTokenGeneration = errors.New("failed to generate authentication token")
 )
 
