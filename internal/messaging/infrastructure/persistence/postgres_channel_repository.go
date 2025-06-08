@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	models "github.com/m1thrandir225/meridian/internal/messaging/domain"
+	"github.com/m1thrandir225/meridian/pkg/common"
 )
 
 var _ ChannelRepository = (*PostgresChannelRepository)(nil)
@@ -54,7 +55,7 @@ func (r *PostgresChannelRepository) Save(ctx context.Context, channel *models.Ch
 		}
 	} else {
 		if currentVersion != channel.Version-1 {
-			return fmt.Errorf("concurrency conflict saving channel %s: expected version %d, found %d: %w", channel.ID, currentVersion, channel.Version, ErrConcurrency)
+			return fmt.Errorf("concurrency conflict saving channel %s: expected version %d, found %d: %w", channel.ID, currentVersion, channel.Version, common.ErrConcurrency)
 		}
 
 		updateQuery := `
@@ -67,7 +68,7 @@ func (r *PostgresChannelRepository) Save(ctx context.Context, channel *models.Ch
 		}
 
 		if cmdTag.RowsAffected() != 1 {
-			return fmt.Errorf("channel %s update affected %d rows, expected 1 (possible lost update): %w", channel.ID, cmdTag.RowsAffected(), ErrConcurrency)
+			return fmt.Errorf("channel %s update affected %d rows, expected 1 (possible lost update): %w", channel.ID, cmdTag.RowsAffected(), common.ErrConcurrency)
 		}
 	}
 
@@ -126,7 +127,7 @@ func (r *PostgresChannelRepository) FindById(ctx context.Context, id uuid.UUID) 
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, fmt.Errorf("channel with ID %s not found: %w", id, ErrNotFound)
+			return nil, fmt.Errorf("channel with ID %s not found: %w", id, common.ErrNotFound)
 		}
 		return nil, fmt.Errorf("error scanning channel %s: %w", id, err)
 	}
@@ -316,7 +317,7 @@ func (r *PostgresChannelRepository) Delete(ctx context.Context, id uuid.UUID) er
 	}
 
 	if cmdTag.RowsAffected() == 0 {
-		return fmt.Errorf("channel with ID %s was not found for deletion: %w", id, ErrNotFound)
+		return fmt.Errorf("channel with ID %s was not found for deletion: %w", id, common.ErrNotFound)
 	}
 	return nil
 }
@@ -374,7 +375,7 @@ func (r *PostgresChannelRepository) SaveReaction(ctx context.Context, reaction *
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
 			return fmt.Errorf("reaction already exists for message %s by user %s with type %s: %w",
-				reaction.GetMessageId(), reaction.GetUserId(), reaction.GetReactionType(), ErrConflict)
+				reaction.GetMessageId(), reaction.GetUserId(), reaction.GetReactionType(), common.ErrConflict)
 		}
 		return fmt.Errorf("error inserting reaction %s: %w", reaction.GetId(), err)
 	}
@@ -393,7 +394,7 @@ func (r *PostgresChannelRepository) DeleteReaction(ctx context.Context, messageI
 	}
 	if cmdTag.RowsAffected() == 0 {
 		return fmt.Errorf("reaction (type: %s) not found on message %s for user %s to delete: %w",
-			reactionType, messageID, userID, ErrNotFound)
+			reactionType, messageID, userID, common.ErrNotFound)
 	}
 	return nil
 }

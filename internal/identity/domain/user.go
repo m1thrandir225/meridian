@@ -13,6 +13,7 @@ var (
 	ErrEmailTaken      = errors.New("email is already taken")
 	ErrPasswordPolicy  = errors.New("password does not meet policy requirements")
 	ErrAuthentication  = errors.New("authentication failed: invalid credentials")
+	ErrUserNotFound    = errors.New("the specified user was not found")
 )
 
 type User struct {
@@ -25,10 +26,10 @@ type User struct {
 	Version          int64
 	RegistrationTime time.Time
 
-	events []interface{}
+	events []any
 }
 
-func (u *User) Events() []interface{} {
+func (u *User) Events() []any {
 	return u.events
 }
 

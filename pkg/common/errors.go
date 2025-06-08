@@ -1,4 +1,4 @@
-package persistence
+package common
 
 import "errors"
 
