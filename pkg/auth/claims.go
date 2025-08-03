@@ -26,23 +26,14 @@ type TokenClaims struct {
 }
 
 func NewTokenClaims(
-	issuer,
-	audience,
-	sub,
-	userId,
-	email string,
-	issuedAt,
-	expirationDate time.Time) TokenClaims {
+	issuer string, issuedAt time.Time, expirationDate time.Time, audience string, sub string, customClaims CustomClaims) TokenClaims {
 	return TokenClaims{
 		Issuer:         issuer,
 		IssuedAt:       issuedAt,
 		ExpirationDate: expirationDate,
 		Audience:       audience,
 		Subject:        sub,
-		Custom: CustomClaims{
-			UserID: userId,
-			Email:  email,
-		},
+		Custom:         customClaims,
 	}
 }
 

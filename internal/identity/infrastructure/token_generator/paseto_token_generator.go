@@ -39,12 +39,15 @@ func (g *PasetoTokenGenerator) GenerateToken(user *domain.User, duration time.Du
 	}
 	claims := auth.NewTokenClaims(
 		auth.AUTH_ISSUER,
+		time.Now(),
+		time.Now().Add(duration),
 		auth.AUTH_AUDIENCE,
 		auth.AUTH_SUBJECT,
-		user.ID.String(),
-		user.Email.String(),
-		time.Now(),
-		time.Now().Add(duration))
+		auth.CustomClaims{
+			UserID: user.ID.String(),
+			Email:  user.Email.String(),
+		},
+	)
 	token := paseto.NewToken()
 	tokenWithClaims, err := auth.SetTokenClaims(claims, &token)
 	if err != nil {

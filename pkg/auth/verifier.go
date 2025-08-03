@@ -1,6 +1,9 @@
 package auth
 
-import "aidanwoods.dev/go-paseto"
+import (
+	"aidanwoods.dev/go-paseto"
+	"fmt"
+)
 
 type TokenVerifier interface {
 	Verify(token string) (*TokenClaims, error)
@@ -35,7 +38,7 @@ func (v *PasetoTokenVerifier) Verify(tokenString string) (*TokenClaims, error) {
 
 	token, err := parser.ParseV4Public(v.publicKey, tokenString, nil)
 	if err != nil {
-		return nil, nil
+		return nil, err
 	}
 
 	aud, err := token.GetAudience()
@@ -58,16 +61,13 @@ func (v *PasetoTokenVerifier) Verify(tokenString string) (*TokenClaims, error) {
 	if err != nil {
 		return nil, err
 	}
-	email, err := token.GetString("email")
+	var customClaims CustomClaims
+	err = token.Get("custom_claims", &customClaims)
 	if err != nil {
-		return nil, err
-	}
-	userId, err := token.GetString("user_id")
-	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get custom claims: %w", err)
 	}
 
-	tokenClaims := NewTokenClaims(issuer, aud, sub, userId, email, issuedAt, exp)
+	tokenClaims := NewTokenClaims(issuer, issuedAt, exp, aud, sub, customClaims)
 
 	return &tokenClaims, nil
 }

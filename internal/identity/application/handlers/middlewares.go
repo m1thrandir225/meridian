@@ -30,11 +30,20 @@ func AuthenticationMiddleware(verifier auth.TokenVerifier) gin.HandlerFunc {
 			return
 		}
 
+		if claims == nil {
+			log.Printf("AuthenticationMiddleware: Token verification returned nil claims")
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid token claims"})
+			return
+		}
+
 		//Store user information in context
 		customContext := auth.ContextWithTokenClaims(ctx.Request.Context(), claims)
 		customContext = auth.ContextWithUserID(customContext, claims.Custom.UserID)
-		ctx.Request = ctx.Request.WithContext(ctx)
+		customContext = auth.ContextWithEmail(customContext, claims.Custom.Email)
+		ctx.Request = ctx.Request.WithContext(customContext)
 
+		log.Printf("AuthenticationMiddleware: Successfully set context values")
 		ctx.Next()
+
 	}
 }

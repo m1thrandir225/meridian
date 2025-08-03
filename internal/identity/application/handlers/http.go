@@ -125,13 +125,17 @@ func (h *HTTPHandler) handleLoginRequest(ctx *gin.Context) {
 
 // GET /api/v1/me
 func (h *HTTPHandler) handleGetCurrentUser(ctx *gin.Context) {
-	userId, exists := auth.UserIDFromContext(ctx)
+	userId, exists := auth.UserIDFromContext(ctx.Request.Context())
 	if !exists {
 		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: User ID not found in token"})
 		return
 	}
 
-	claims, _ := auth.TokenClaimsFromContext(ctx)
+	claims, claimsExist := auth.TokenClaimsFromContext(ctx.Request.Context())
+	if !claimsExist {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: TokenClaims not found  in token."})
+		return
+	}
 
 	//TODO: fetch user from repository and return details
 	ctx.JSON(http.StatusOK, gin.H{

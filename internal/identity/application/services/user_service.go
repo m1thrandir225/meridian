@@ -77,7 +77,7 @@ func (s *IdentityService) RegisterUser(ctx context.Context, cmd domain.RegisterU
 		return nil, fmt.Errorf("failed to save user: %w", err)
 	}
 
-	log.Printf("User regriistered: %s (%s)", user.Username, user.ID.String())
+	log.Printf("User registered: %s (%s)", user.Username, user.ID.String())
 	return user, nil
 }
 

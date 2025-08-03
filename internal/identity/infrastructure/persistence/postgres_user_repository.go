@@ -35,7 +35,7 @@ func (r *PostgresUserRepository) Save(ctx context.Context, user *domain.User) er
 
 	lockQuery := `SELECT version FROM users WHERE id = $1 FOR UPDATE`
 	var currentVersion int64
-	err = tx.QueryRow(ctx, lockQuery, user.ID).Scan(&currentVersion)
+	err = tx.QueryRow(ctx, lockQuery, user.ID.String()).Scan(&currentVersion)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			if user.Version != 1 {
@@ -43,18 +43,18 @@ func (r *PostgresUserRepository) Save(ctx context.Context, user *domain.User) er
 			}
 
 			insertQuery := `
-				INSERT INTO users(id, username, first_name, last_name, email, password, version, registration_time)
+				INSERT INTO users(id, username, first_name, last_name, email, password, version, registartion_time)
 			VALUES($1, $2, $3, $4, $5, $6, $7, $8)
 			`
 			_, err := tx.Exec(
 				ctx,
 				insertQuery,
-				user.ID,
-				user.Username,
+				user.ID.String(),
+				user.Username.String(),
 				user.FirstName,
 				user.LastName,
-				user.Email,
-				user.PasswordHash,
+				user.Email.String(),
+				user.PasswordHash.String(),
 				user.Version,
 				user.RegistrationTime,
 			)
@@ -77,13 +77,13 @@ func (r *PostgresUserRepository) Save(ctx context.Context, user *domain.User) er
 		cmdTag, err := tx.Exec(
 			ctx,
 			updateQuery,
-			user.Username,
+			user.Username.String(),
 			user.FirstName,
 			user.LastName,
-			user.Email,
-			user.PasswordHash,
+			user.Email.String(),
+			user.PasswordHash.String(),
 			user.Version,
-			user.ID,
+			user.ID.String(),
 			currentVersion,
 		)
 		if err != nil {
@@ -95,11 +95,15 @@ func (r *PostgresUserRepository) Save(ctx context.Context, user *domain.User) er
 		}
 	}
 
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("error committing transaction: %w", err)
+	}
+
 	return nil
 }
 
 func (r *PostgresUserRepository) FindById(ctx context.Context, id uuid.UUID) (*domain.User, error) {
-	return r.findByField(ctx, "id", id)
+	return r.findByField(ctx, "id", id.String())
 }
 
 func (r *PostgresUserRepository) FindByUsername(ctx context.Context, username string) (*domain.User, error) {
@@ -112,7 +116,7 @@ func (r *PostgresUserRepository) FindByEmail(ctx context.Context, email string) 
 
 func (r *PostgresUserRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	deleteQuery := `DELETE FROM users WHERE id = $1`
-	cmdTag, err := r.db.Exec(ctx, deleteQuery, id)
+	cmdTag, err := r.db.Exec(ctx, deleteQuery, id.String())
 	if err != nil {
 		return fmt.Errorf("error deleting user %s: %w", id, err)
 	}
@@ -125,9 +129,9 @@ func (r *PostgresUserRepository) Delete(ctx context.Context, id uuid.UUID) error
 }
 
 func (r *PostgresUserRepository) findByField(ctx context.Context, fieldName string, value any) (*domain.User, error) {
-	query := fmt.Sprintf(`SELECT id, username, first_name, last_name, email, password, version, registration_time
-		FROM %s
-		WHERE id = $1`, fieldName)
+	query := fmt.Sprintf(`SELECT id, username, first_name, last_name, email, password, version, registartion_time
+		FROM users
+		WHERE %s = $1`, fieldName)
 
 	row := r.db.QueryRow(ctx, query, value)
 	return r.scanUser(row)
@@ -174,5 +178,6 @@ func (r *PostgresUserRepository) scanUser(row pgx.Row) (*domain.User, error) {
 	user.ID = *domId
 	user.Username = domUsername
 	user.PasswordHash = domPassHash
+	user.RegistrationTime = regTime
 	return &user, nil
 }
