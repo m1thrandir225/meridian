@@ -2,30 +2,30 @@ package domain
 
 import "github.com/google/uuid"
 
-type userID struct {
+type UserID struct {
 	value uuid.UUID
 }
 
-func NewUserID() (*userID, error) {
+func NewUserID() (*UserID, error) {
 	id, err := uuid.NewV7()
 	if err != nil {
 		return nil, err
 	}
-	return &userID{
+	return &UserID{
 		value: id,
 	}, nil
 }
 
-func (id *userID) String() string {
+func (id *UserID) String() string {
 	return id.value.String()
 }
 
-func UserIDFromString(input string) (*userID, error) {
+func UserIDFromString(input string) (*UserID, error) {
 	id, err := uuid.Parse(input)
 	if err != nil {
 		return nil, err
 	}
-	return &userID{
+	return &UserID{
 		value: id,
 	}, nil
 }

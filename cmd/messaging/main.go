@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
+	"github.com/m1thrandir225/meridian/pkg/kafka"
 	"log"
 	"net/http"
 	"os"
@@ -17,33 +19,50 @@ import (
 
 	"github.com/m1thrandir225/meridian/internal/messaging/application/handlers"
 	"github.com/m1thrandir225/meridian/internal/messaging/application/services"
-	kafkainfra "github.com/m1thrandir225/meridian/internal/messaging/infrastructure/kafka"
 	"github.com/m1thrandir225/meridian/internal/messaging/infrastructure/persistence"
 )
 
 type Config struct {
-	HTPPServerAddress string
+	HTTPPort          string
 	DatabaseURL       string
 	KafkaBrokers      []string
 	KafkaDefaultTopic string
 }
 
-func loadConfig() Config {
-	brokers := []string{"kafka:9092"} // Default kafka brokers
+func loadConfig() (*Config, error) {
+	kafkaBrokerStr := os.Getenv("MESSAGING_KAFKA_BROKERS")
+	if kafkaBrokerStr == "" {
+		return nil, fmt.Errorf("missing MESSAGING_KAFKA_BROKERS")
+	}
 
-	if brokerList := os.Getenv("KAFKA_BROKERS"); brokerList != "" {
-		brokers = strings.Split(brokerList, ",")
+	httpPort := os.Getenv("MESSAGING_HTTP_PORT")
+	if httpPort == "" {
+		return nil, fmt.Errorf("missing MESSAGING_HTTP_PORT")
 	}
-	return Config{
-		HTPPServerAddress: os.Getenv("HTTP_SERVER_ADDRESS"),
-		KafkaBrokers:      brokers,
-		KafkaDefaultTopic: os.Getenv("KAFKA_DEFAULT_TOPIC"),
-		DatabaseURL:       os.Getenv("MESSAGING_DB_URL"),
+
+	kafkaDefaultTopic := os.Getenv("MESSAGING_KAFKA_DEFAULT_TOPIC")
+	if kafkaDefaultTopic == "" {
+		return nil, fmt.Errorf("missing MESSAGING_KAFKA_DEFAULT_TOPIC")
 	}
+
+	dbURL := os.Getenv("MESSAGING_DB_URL")
+	if dbURL == "" {
+		return nil, fmt.Errorf("missing MESSAGING_DB_URL")
+	}
+
+	return &Config{
+		HTTPPort:          httpPort,
+		KafkaBrokers:      strings.Split(kafkaBrokerStr, ","),
+		KafkaDefaultTopic: kafkaDefaultTopic,
+		DatabaseURL:       dbURL,
+	}, nil
 }
 
 func main() {
-	cfg := loadConfig()
+	cfg, err := loadConfig()
+	if err != nil {
+		log.Fatal(err)
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 
 	logger := log.New(os.Stdout, "[MessagingService] ", log.LstdFlags|log.Lshortfile)
@@ -73,7 +92,7 @@ func main() {
 
 	logger.Println("Kafka sync producer initialized.")
 
-	eventPublisher := kafkainfra.NewSaramaEventPublisher(producer, cfg.KafkaDefaultTopic)
+	eventPublisher := kafka.NewSaramaEventPublisher(producer, cfg.KafkaDefaultTopic)
 	logger.Println("Kafka event publisher initialized.")
 
 	repository := persistence.NewPostgresChannelRepository(dbPool)
@@ -97,12 +116,12 @@ func main() {
 
 	// -- HTTP SERVER  --
 	httpServer := &http.Server{
-		Addr:    cfg.HTPPServerAddress,
+		Addr:    cfg.HTTPPort,
 		Handler: router,
 	}
 
 	go func() {
-		logger.Printf("HTTP Server listening on %s", cfg.HTPPServerAddress)
+		logger.Printf("HTTP Server listening on %s", cfg.HTTPPort)
 		if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Fatalf("Failed to start HTTP server: %v", err)
 		}

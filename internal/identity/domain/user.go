@@ -1,40 +1,21 @@
 package domain
 
 import (
-	"errors"
+	"github.com/m1thrandir225/meridian/pkg/common"
 	"time"
 )
 
-var (
-	ErrUserIDInvalid   = errors.New("user ID is invalid")
-	ErrUsernameInvalid = errors.New("username is invalid (length, characters)")
-	ErrUsernameTaken   = errors.New("username is already taken")
-	ErrEmailInvalid    = errors.New("email format is invalid")
-	ErrEmailTaken      = errors.New("email is already taken")
-	ErrPasswordPolicy  = errors.New("password does not meet policy requirements")
-	ErrAuthentication  = errors.New("authentication failed: invalid credentials")
-	ErrUserNotFound    = errors.New("the specified user was not found")
-)
-
 type User struct {
-	ID               userID
-	Username         username
+	ID               UserID
+	Username         Username
 	FirstName        string
 	LastName         string
-	Email            email
-	PasswordHash     passwordHash
+	Email            UserEmail
+	PasswordHash     PasswordHash
 	Version          int64
 	RegistrationTime time.Time
 
 	events []any
-}
-
-func (u *User) Events() []any {
-	return u.events
-}
-
-func (u *User) ClearEvents() {
-	u.events = nil
 }
 
 func NewUser(usernameStr, emailStr, firstName, lastName, rawPassword string) (*User, error) {
@@ -69,7 +50,6 @@ func NewUser(usernameStr, emailStr, firstName, lastName, rawPassword string) (*U
 		RegistrationTime: time.Now(),
 	}
 
-	// user.addEvent()
 	return &user, nil
 }
 
@@ -77,5 +57,73 @@ func (u *User) addEvent(event interface{}) {
 	u.events = append(u.events, event)
 }
 
-func (u *User) UpdateProfile(updated any) {
+func (u *User) Events() []any {
+	return u.events
+}
+
+func (u *User) ClearEvents() {
+	u.events = nil
+}
+
+func (u *User) Authenticate(rawPassword string) error {
+	if !u.PasswordHash.Match(rawPassword) {
+		return ErrPasswordPolicy
+	}
+	return nil
+}
+
+func (u *User) UpdateProfile(
+	newEmailStr,
+	newFirstNameStr,
+	newLastNameStr string) error {
+
+	emailChanged := false
+	firstNameChanged := false
+	lastNameChanged := false
+
+	if newEmailStr != "" {
+		oldEmail := u.Email
+		newEmail, err := NewEmail(newEmailStr)
+		if err != nil {
+			return err
+		}
+		if newEmail != oldEmail {
+			u.Email = newEmail
+			emailChanged = true
+		}
+	}
+	if newFirstNameStr != "" {
+		oldFirstName := u.FirstName
+		if newFirstNameStr != oldFirstName {
+			u.FirstName = newFirstNameStr
+			firstNameChanged = true
+		}
+	}
+
+	if newLastNameStr != "" {
+		oldLastName := u.LastName
+		if newLastNameStr != oldLastName {
+			u.LastName = newLastNameStr
+			lastNameChanged = true
+		}
+	}
+
+	changedFields := make(map[string]any)
+	if emailChanged {
+		changedFields["email"] = u.Email
+	}
+	if firstNameChanged {
+		changedFields["first_name"] = u.FirstName
+	}
+	if lastNameChanged {
+		changedFields["last_name"] = u.LastName
+	}
+
+	u.addEvent(UserProfileUpdatedEvent{
+		BaseDomainEvent: common.NewBaseDomainEvent("updated_user_profile", u.ID.value, u.Version),
+		UserID:          u.ID.String(),
+		UpdatedFields:   changedFields,
+		Timestamp:       time.Now(),
+	})
+	return nil
 }

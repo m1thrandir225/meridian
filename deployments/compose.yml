@@ -1,4 +1,13 @@
 services:
+#  nginx_proxy:
+#    image: nginx:latest
+#    container_name: meridian_reverse_proxy
+#    ports:
+#      - "80:80"
+#    volumes:
+#      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+#    depends_on:
+#      - messaging
   zookeeper:
     image: bitnami/zookeeper:latest
     container_name: meridian_zookeeper
@@ -39,11 +48,12 @@ services:
       POSTGRES_USER: ${MESSAGING_POSTGRES_USER}
       POSTGRES_PASSWORD: ${MESSAGING_POSTGRES_PASSWORD}
       POSTGRES_DB: ${MESSAGING_DB_NAME}
-      PGPORT: ${MESSAGING_DB_PORT}
+    networks:
+      - meridian_network
     volumes:
       - messaging_postgres_data:/var/lib/postgresql/data
     ports:
-      - "${MESSAGING_DB_PORT}:${MESSAGING_DB_PORT}"
+      - "${MESSAGING_DB_PORT}:5432"
     healthcheck:
       test:
         [
@@ -62,12 +72,13 @@ services:
     ports:
       - "${MESSAGING_REDIS_PORT}:${MESSAGING_REDIS_PORT}"
     restart: unless-stopped
-
   messaging_migrate:
     build:
       context: ../
       dockerfile: deployments/migrate/Dockerfile
     container_name: meridian_messaging_migrate
+    networks:
+      - meridian_network
     depends_on:
       messaging_postgres:
         condition: service_healthy
@@ -91,13 +102,74 @@ services:
         condition: service_started
     environment:
       MESSAGING_DB_URL: "${MESSAGING_DB_URL}"
-      HTTP_SERVER_ADDRESS: ":${MESSAGING_HTTP_PORT}"
-      KAFKA_BROKERS: "${MESSAGING_KAFKA_BROKERS}"
-      KAFKA_DEFAULT_TOPIC: "${MESSAGING_KAFKA_DEFAULT_TOPIC}"
+      MESSAGING_HTTP_PORT: ":${MESSAGING_HTTP_PORT}"
+      MESSAGING_KAFKA_BROKERS: "${KAFKA_BROKERS}"
+      MESSAGING_KAFKA_DEFAULT_TOPIC: "${MESSAGING_KAFKA_DEFAULT_TOPIC}"
     ports:
       - "${MESSAGING_HTTP_PORT}:${MESSAGING_HTTP_PORT}"
     restart: unless-stopped
+  identity_postgres:
+    image: postgres:alpine
+    container_name: meridian_postgres_identity
+    environment:
+      POSTGRES_USER: "${IDENTITY_POSTGRES_USER}"
+      POSTGRES_PASSWORD: "${IDENTITY_POSTGRES_PASSWORD}"
+      POSTGRES_DB: "${IDENTITY_DB_NAME}"
+    networks:
+      - meridian_network
+    volumes:
+      - identity_postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${IDENTITY_DB_PORT}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${IDENTITY_POSTGRES_USER} -d ${IDENTITY_DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+  identity_migrate:
+    build:
+      context: ../
+      dockerfile: deployments/migrate/Dockerfile
+    container_name: meridian_identity_migrate
+    networks:
+      - meridian_network
+    depends_on:
+      identity_postgres:
+        condition: service_healthy
+    volumes:
+      - ../internal/identity/infrastructure/persistence/migrations:/migrations
+    environment:
+      MIGRATE_DB_URL_MIGRATE: "${IDENTITY_DB_URL_MIGRATE}"
+    command:
+      ["-path", "/migrations", "-database", "${IDENTITY_DB_URL_MIGRATE}", "up"]
+  identity:
+    build:
+      context: ../
+      dockerfile: deployments/identity/Dockerfile
+    container_name: meridian_identity_service
+    depends_on:
+      identity_migrate:
+        condition: service_completed_successfully
+      identity_postgres:
+        condition: service_healthy
+    environment:
+      IDENTITY_HTTP_PORT: ":${IDENTITY_HTTP_PORT}"
+      IDENTITY_DB_URL: "${IDENTITY_DB_URL}"
+      IDENTITY_KAFKA_BROKERS: "${KAFKA_BROKERS}"
+      IDENTITY_KAFKA_DEFAULT_TOPIC: "${IDENTITY_KAFKA_DEFAULT_TOPIC}"
+      IDENTITY_PASETO_PRIVATE_KEY: "${IDENTITY_PASETO_PRIVATE_KEY}"
+      IDENTITY_PASETO_PUBLIC_KEY: "${IDENTITY_PASETO_PUBLIC_KEY}"
+      AUTH_TOKEN_VALIDITY_MINUTES: "${AUTH_TOKEN_VALIDITY_MINUTES}"
+    ports:
+      - "${IDENTITY_HTTP_PORT}:${IDENTITY_HTTP_PORT}"
+    restart: unless-stopped
+
+networks:
+  meridian_network:
+    driver: bridge
 volumes:
   messaging_postgres_data:
+  identity_postgres_data:
   zookeeper_data:
   kafka_data:

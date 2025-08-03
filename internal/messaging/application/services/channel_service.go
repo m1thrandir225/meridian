@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"github.com/m1thrandir225/meridian/pkg/kafka"
 
 	"github.com/m1thrandir225/meridian/internal/messaging/domain"
 	"github.com/m1thrandir225/meridian/internal/messaging/infrastructure/persistence"
@@ -9,10 +10,10 @@ import (
 
 type ChannelService struct {
 	repo     persistence.ChannelRepository
-	eventPub EventPublisher
+	eventPub kafka.EventPublisher
 }
 
-func NewChannelService(repo persistence.ChannelRepository, eventPub EventPublisher) *ChannelService {
+func NewChannelService(repo persistence.ChannelRepository, eventPub kafka.EventPublisher) *ChannelService {
 	return &ChannelService{
 		repo:     repo,
 		eventPub: eventPub,
@@ -249,7 +250,10 @@ func (s *ChannelService) HandleArchiveChannel(ctx context.Context, cmd domain.Ar
 		return nil, err
 	}
 
-	channel.ArchiveChannel(cmd.UserID)
+	err = channel.ArchiveChannel(cmd.UserID)
+	if err != nil {
+		return nil, err
+	}
 
 	if err := s.repo.Save(ctx, channel); err != nil {
 		return nil, err
@@ -269,7 +273,10 @@ func (s *ChannelService) HandleUnarchiveChannel(ctx context.Context, cmd domain.
 		return nil, err
 	}
 
-	channel.UnarchiveChannel(cmd.UserID)
+	err = channel.UnarchiveChannel(cmd.UserID)
+	if err != nil {
+		return nil, err
+	}
 
 	if err := s.repo.Save(ctx, channel); err != nil {
 		return nil, err

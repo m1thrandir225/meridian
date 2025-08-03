@@ -29,8 +29,9 @@ func NewPasetoTokenVerifier() (*PasetoTokenVerifier, error) {
 func (v *PasetoTokenVerifier) Verify(tokenString string) (*TokenClaims, error) {
 	parser := paseto.NewParser()
 
-	parser.AddRule(paseto.IssuedBy("meridian-identity-service"))
-	parser.AddRule(paseto.ForAudience("meridian-services"))
+	parser.AddRule(paseto.IssuedBy(AUTH_ISSUER))
+	parser.AddRule(paseto.ForAudience(AUTH_AUDIENCE))
+	parser.AddRule(paseto.Subject(AUTH_SUBJECT))
 
 	token, err := parser.ParseV4Public(v.publicKey, tokenString, nil)
 	if err != nil {
@@ -53,10 +54,6 @@ func (v *PasetoTokenVerifier) Verify(tokenString string) (*TokenClaims, error) {
 	if err != nil {
 		return nil, err
 	}
-	jti, err := token.GetJti()
-	if err != nil {
-		return nil, err
-	}
 	sub, err := token.GetSubject()
 	if err != nil {
 		return nil, err
@@ -70,7 +67,9 @@ func (v *PasetoTokenVerifier) Verify(tokenString string) (*TokenClaims, error) {
 		return nil, err
 	}
 
-	tokenClaims := NewTokenClaims(issuer, aud, jti, sub, userId, email, issuedAt, exp)
+	tokenClaims := NewTokenClaims(issuer, aud, sub, userId, email, issuedAt, exp)
 
 	return &tokenClaims, nil
 }
+
+var _ TokenVerifier = (*PasetoTokenVerifier)(nil)

@@ -9,15 +9,16 @@ RUN go mod download
 
 COPY . .
 
-RUN go build  -o messaging-service ./cmd/messaging
+RUN CGO_ENABLED=0 GOOS=linux go build  -o identity-service ./cmd/identity
 
 FROM alpine:latest
 
 WORKDIR /app
 
-COPY --from=builder /app/messaging-service .
+COPY --from=builder /app/identity-service .
 
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+RUN chmod +x /app/identity-service
 USER appuser
 
-CMD ["./messaging-service"]
+CMD ["./identity-service"]

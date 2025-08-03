@@ -2,17 +2,17 @@ package domain
 
 import "strings"
 
-type email string
+type UserEmail string
 
-func NewEmail(emailAddr string) (email, error) {
+func NewEmail(emailAddr string) (UserEmail, error) {
 	emailAddr = strings.ToLower(strings.Trim(emailAddr, " "))
 
 	if !strings.Contains(emailAddr, "@") || len(emailAddr) < 5 {
 		return "", ErrEmailInvalid
 	}
-	return email(emailAddr), nil
+	return UserEmail(emailAddr), nil
 }
 
-func (e *email) String() string {
+func (e *UserEmail) String() string {
 	return string(*e)
 }

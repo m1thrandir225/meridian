@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/m1thrandir225/meridian/pkg/kafka"
 	"log"
 	"strings"
 	"time"
@@ -20,25 +21,28 @@ var (
 	ErrTokenGeneration = errors.New("failed to generate authentication token")
 )
 
-type UserService struct {
+type IdentityService struct {
 	repo              persistence.UserRepository
 	tokenGenerator    AuthTokenGenerator
 	authTokenValidity time.Duration
+	publisher         kafka.EventPublisher
 }
 
 func NewUserService(
 	repository persistence.UserRepository,
 	tokenGenerator AuthTokenGenerator,
 	tokenValidity time.Duration,
-) *UserService {
-	return &UserService{
+	eventPublisher kafka.EventPublisher,
+) *IdentityService {
+	return &IdentityService{
 		repo:              repository,
 		tokenGenerator:    tokenGenerator,
 		authTokenValidity: tokenValidity,
+		publisher:         eventPublisher,
 	}
 }
 
-func (s *UserService) RegisterUser(ctx context.Context, cmd domain.RegisterUserCommand) (*domain.User, error) {
+func (s *IdentityService) RegisterUser(ctx context.Context, cmd domain.RegisterUserCommand) (*domain.User, error) {
 	uName, err := domain.NewUsername(cmd.Username)
 	if err != nil {
 		return nil, err
@@ -77,7 +81,7 @@ func (s *UserService) RegisterUser(ctx context.Context, cmd domain.RegisterUserC
 	return user, nil
 }
 
-func (s *UserService) AuthenticateUser(ctx context.Context, cmd domain.AuthenticateUserCommand) (string, *auth.TokenClaims, error) {
+func (s *IdentityService) AuthenticateUser(ctx context.Context, cmd domain.AuthenticateUserCommand) (string, *auth.TokenClaims, error) {
 	var user *domain.User
 	var err error
 
@@ -98,12 +102,33 @@ func (s *UserService) AuthenticateUser(ctx context.Context, cmd domain.Authentic
 	}
 
 	if err != nil {
-		if errors.Is(err, ErrUserNotFound) {
+		if errors.Is(err, domain.ErrUserNotFound) {
 			return "", nil, ErrAuthFailed
 		}
-		return "", nil, fmt.Errorf("error retreiving user: %w", err)
+		return "", nil, fmt.Errorf("error retrieving user: %w", err)
 	}
 
-	return "", nil, nil
-	// TODO
+	if err := user.Authenticate(cmd.Password); err != nil {
+		return "", nil, ErrAuthFailed
+	}
+
+	tokenString, claims, err := s.tokenGenerator.GenerateToken(user, s.authTokenValidity)
+	if err != nil {
+		log.Printf("ERROR generating token for user %s: %v", user.ID.String(), err)
+		return "", nil, ErrTokenGeneration
+	}
+
+	authEvent := domain.UserAuthenticatedEvent{
+		UserID:              user.ID.String(),
+		Username:            user.Username.String(),
+		AuthenticationToken: tokenString,
+		Timestamp:           time.Now().UTC(),
+	}
+
+	if err := s.publisher.PublishEvent(ctx, authEvent); err != nil {
+		log.Printf("ERROR publishing UserAuthenticatedEvent for %s: %v", user.ID.String(), err)
+	}
+
+	log.Printf("User authenticated: %s (%s)", user.Username, user.ID.String())
+	return tokenString, claims, nil
 }

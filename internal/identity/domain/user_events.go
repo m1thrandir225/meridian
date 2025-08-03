@@ -9,8 +9,8 @@ import (
 type UserRegisteredEvent struct {
 	common.BaseDomainEvent
 	UserID    string    `json:"user_id"`
-	Username  string    `json:"username"`
-	Email     string    `json:"email"`
+	Username  string    `json:"Username"`
+	Email     string    `json:"UserEmail"`
 	FirstName string    `json:"first_name"`
 	LastName  string    `json:"last_name"`
 	Timestamp time.Time `json:"registered_at"`
@@ -19,7 +19,7 @@ type UserRegisteredEvent struct {
 type UserAuthenticatedEvent struct {
 	common.BaseDomainEvent
 	UserID              string    `json:"user_id"`
-	Username            string    `json:"username"`
+	Username            string    `json:"Username"`
 	AuthenticationToken string    `json:"authentication_token"`
 	Timestamp           time.Time `json:"timestamp"`
 }

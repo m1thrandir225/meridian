@@ -12,8 +12,9 @@ import (
 var pasetoKublicKey ed25519.PublicKey
 
 func LoadPublicKeyFromEnv() error {
-	hexKey := os.Getenv("INTEGRITY_PASETO_PUBLIC_KEY")
+	hexKey := os.Getenv("IDENTITY_PASETO_PUBLIC_KEY")
 	if hexKey == "" {
+		log.Println("WARN: IDENTITY_PASETO_PUBLIC_KEY not set.")
 	}
 
 	keyBytes, err := hex.DecodeString(hexKey)
@@ -30,7 +31,7 @@ func LoadPublicKeyFromEnv() error {
 
 func GetPublicKey() (ed25519.PublicKey, error) {
 	if pasetoKublicKey == nil {
-		return nil, errors.New("paseto public key not loaded")
+		return nil, errors.New("PASETO public key not loaded. Call LoadPublicKeyFromEnv() first")
 	}
 	return pasetoKublicKey, nil
 }

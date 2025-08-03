@@ -6,9 +6,9 @@ import (
 	"unicode"
 )
 
-type username string
+type Username string
 
-func NewUsername(input string) (username, error) {
+func NewUsername(input string) (Username, error) {
 	name := strings.TrimSpace(input)
 
 	if len(name) < 3 || len(name) > 30 {
@@ -19,9 +19,9 @@ func NewUsername(input string) (username, error) {
 			return "", fmt.Errorf("%w: contains invalid characters", ErrUsernameInvalid)
 		}
 	}
-	return username(input), nil
+	return Username(input), nil
 }
 
-func (u username) String() string {
+func (u Username) String() string {
 	return string(u)
 }
