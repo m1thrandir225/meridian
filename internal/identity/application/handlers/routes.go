@@ -26,6 +26,7 @@ func SetupIdentityRouter(service *services.IdentityService, tokenVerifier auth.T
 			me.GET("", handler.handleGetCurrentUser)
 			me.DELETE("", handler.DeleteCurrentUser)
 			me.PUT("/update-profile", handler.UpdateCurrentUser)
+			me.PUT("/password", handler.UpdateUserPassword)
 		}
 	}
 	log.Println("Identity HTTP Router configured")

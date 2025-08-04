@@ -35,6 +35,7 @@ func (r *PostgresUserRepository) Save(ctx context.Context, user *domain.User) er
 
 	lockQuery := `SELECT version FROM users WHERE id = $1 FOR UPDATE`
 	var currentVersion int64
+
 	err = tx.QueryRow(ctx, lockQuery, user.ID.String()).Scan(&currentVersion)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -43,7 +44,7 @@ func (r *PostgresUserRepository) Save(ctx context.Context, user *domain.User) er
 			}
 
 			insertQuery := `
-				INSERT INTO users(id, username, first_name, last_name, email, password, version, registartion_time)
+			INSERT INTO users(id, username, first_name, last_name, email, password, version, registartion_time)
 			VALUES($1, $2, $3, $4, $5, $6, $7, $8)
 			`
 			_, err := tx.Exec(
@@ -65,13 +66,14 @@ func (r *PostgresUserRepository) Save(ctx context.Context, user *domain.User) er
 			return fmt.Errorf("error locking user %s: %w", &user.ID, err)
 		}
 	} else {
-		if currentVersion != user.Version-1 {
+		expectedVersion := user.Version - 1
+		if currentVersion != expectedVersion {
 			return fmt.Errorf("concurrency conflict saving user %s: expected version %d, found version %d: %w", &user.ID, currentVersion, user.Version, err)
 		}
 
 		updateQuery := `
 			UPDATE users SET username=$1, first_name = $2, last_name = $3, email = $4, password = $5, version = $6
-		WHERE id = $7 and version = $8
+		WHERE id = $7 AND version = $8
 		`
 
 		cmdTag, err := tx.Exec(
@@ -84,7 +86,7 @@ func (r *PostgresUserRepository) Save(ctx context.Context, user *domain.User) er
 			user.PasswordHash.String(),
 			user.Version,
 			user.ID.String(),
-			currentVersion,
+			expectedVersion,
 		)
 		if err != nil {
 			return fmt.Errorf("error updating user %s: %w", &user.ID, err)

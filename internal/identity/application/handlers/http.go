@@ -51,6 +51,25 @@ type AuthenticateUserResponse struct {
 	//RefreshToken string `json:"refresh_token,omitempty"`
 }
 
+type UpdateProfileRequest struct {
+	Username  *string `json:"username" binding:"omitempty,max=255"`
+	FirstName *string `json:"first_name" binding:"omitempty,max=255"`
+	LastName  *string `json:"last_name" binding:"omitempty,max=255"`
+	Email     *string `json:"email" binding:"omitempty,email"`
+}
+
+type UpdatePasswordRequest struct {
+	NewPassword string `json:"new_password" binding:"required"`
+}
+
+type UpdateProfileResponse struct {
+	UserID    string `json:"user_id"`
+	Username  string `json:"username"`
+	Email     string `json:"email"`
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"`
+}
+
 // POST /api/v1/register
 func (h *HTTPHandler) handleRegisterRequest(ctx *gin.Context) {
 	var req RegisterUserRequest
@@ -131,27 +150,123 @@ func (h *HTTPHandler) handleGetCurrentUser(ctx *gin.Context) {
 		return
 	}
 
-	claims, claimsExist := auth.TokenClaimsFromContext(ctx.Request.Context())
-	if !claimsExist {
-		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: TokenClaims not found  in token."})
+	cmd := domain.GetUserCommand{
+		UserID: userId,
+	}
+
+	user, err := h.userService.GetUser(ctx, cmd)
+	if err != nil {
+		log.Printf("ERROR fetching user: %v", err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user, reason: " + err.Error()})
 		return
 	}
 
-	//TODO: fetch user from repository and return details
-	ctx.JSON(http.StatusOK, gin.H{
-		"userId": userId,
-		"email":  claims.Custom.Email})
+	response := RegisterUserResponse{
+		UserID:    user.ID.String(),
+		Username:  user.Username.String(),
+		Email:     user.Email.String(),
+		FirstName: user.FirstName,
+		LastName:  user.LastName,
+	}
+
+	ctx.JSON(http.StatusOK, response)
+}
+
+func (req *UpdateProfileRequest) HasAnyField() bool {
+	return req.Username != nil || req.FirstName != nil || req.LastName != nil || req.Email != nil
 }
 
 // PUT /api/v1/update-profile
-
 func (h *HTTPHandler) UpdateCurrentUser(ctx *gin.Context) {
-	//TODO: implement
-	ctx.JSON(http.StatusOK, gin.H{"message": "To be implemented"})
+	userId, exists := auth.UserIDFromContext(ctx.Request.Context())
+	if !exists {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: User ID not found in token"})
+		return
+	}
+
+	var req UpdateProfileRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if !req.HasAnyField() {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "At least one field must be provided to update profile"})
+	}
+
+	var cmd domain.UpdateUserProfileCommand
+	cmd.UserID = userId
+	if req.Username != nil {
+		cmd.NewUsername = req.Username
+	}
+	if req.FirstName != nil {
+		cmd.NewFirstName = req.FirstName
+	}
+	if req.LastName != nil {
+		cmd.NewLastName = req.LastName
+	}
+	if req.Email != nil {
+		cmd.NewEmail = req.Email
+	}
+
+	updatedUser, err := h.userService.UpdateUserProfile(ctx, cmd)
+	if err != nil {
+		log.Printf("ERROR updating user profile: %v", err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user profile, reason: " + err.Error()})
+		return
+	}
+
+	response := UpdateProfileResponse{
+		UserID:    updatedUser.ID.String(),
+		Username:  updatedUser.Username.String(),
+		Email:     updatedUser.Email.String(),
+		FirstName: updatedUser.FirstName,
+		LastName:  updatedUser.LastName,
+	}
+	ctx.JSON(http.StatusOK, response)
+}
+
+// PATCH /api/v1/me/password
+func (h *HTTPHandler) UpdateUserPassword(ctx *gin.Context) {
+	userId, exists := auth.UserIDFromContext(ctx.Request.Context())
+	if !exists {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: User ID not found in token"})
+		return
+	}
+	var req UpdatePasswordRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	cmd := domain.UpdateUserPasswordCommand{
+		UserID:      userId,
+		NewPassword: req.NewPassword,
+	}
+
+	err := h.userService.UpdateUserPassword(ctx, cmd)
+	if err != nil {
+		log.Printf("ERROR updating user password: %v", err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user password, reason: " + err.Error()})
+		return
+	}
+	ctx.Status(http.StatusAccepted)
 }
 
 // DELETE /api/v1/me
 func (h *HTTPHandler) DeleteCurrentUser(ctx *gin.Context) {
-	//TODO: implement
-	ctx.JSON(http.StatusOK, gin.H{"message": "To be implemented"})
+	userId, exists := auth.UserIDFromContext(ctx.Request.Context())
+	if !exists {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: User ID not found in token"})
+		return
+	}
+
+	cmd := domain.DeleteUserCommand{
+		UserID: userId,
+	}
+	err := h.userService.DeleteUser(ctx, cmd)
+	if err != nil {
+		log.Printf("ERROR deleting user: %v", err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete user, reason: " + err.Error()})
+		return
+	}
+	ctx.Status(http.StatusAccepted)
 }

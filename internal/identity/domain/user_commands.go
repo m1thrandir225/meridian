@@ -13,12 +13,16 @@ type AuthenticateUserCommand struct {
 	Password        string
 }
 
+type GetUserCommand struct {
+	UserID string
+}
+
 type UpdateUserProfileCommand struct {
 	UserID       string
-	NewEmail     string
-	NewUsername  string
-	NewFirstName string
-	NewLastName  string
+	NewEmail     *string
+	NewUsername  *string
+	NewFirstName *string
+	NewLastName  *string
 }
 
 type UpdateUserPasswordCommand struct {
