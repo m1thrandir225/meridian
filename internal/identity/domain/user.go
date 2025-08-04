@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"fmt"
 	"github.com/m1thrandir225/meridian/pkg/common"
 	"time"
 )
@@ -72,18 +73,47 @@ func (u *User) Authenticate(rawPassword string) error {
 	return nil
 }
 
-func (u *User) UpdateProfile(
-	newEmailStr,
-	newFirstNameStr,
-	newLastNameStr string) error {
+func (u *User) UpdatePassword(newPassword string) error {
+	if u.PasswordHash.Match(newPassword) {
+		return fmt.Errorf("new password is the same as the old one")
+	}
+	newPasswordHash, err := NewPasswordHash(newPassword)
+	if err != nil {
+		return err
+	}
+	u.PasswordHash = newPasswordHash
+	u.Version++
 
+	u.addEvent(UserProfileUpdatedEvent{
+		BaseDomainEvent: common.NewBaseDomainEvent("updated_user_password", u.ID.value, u.Version),
+		UserID:          u.ID.String(),
+		UpdatedFields:   map[string]any{"password": "REDACTED"},
+		Timestamp:       time.Now(),
+	})
+	return nil
+}
+
+func (u *User) UpdateProfile(newUsernameStr, newEmailStr, newFirstNameStr, newLastNameStr *string) error {
 	emailChanged := false
 	firstNameChanged := false
 	lastNameChanged := false
+	usernameChanged := false
 
-	if newEmailStr != "" {
+	if newUsernameStr != nil {
+		oldUsername := u.Username
+		newUsername, err := NewUsername(*newUsernameStr)
+		if err != nil {
+			return err
+		}
+		if newUsername != oldUsername {
+			u.Username = newUsername
+			usernameChanged = true
+		}
+	}
+
+	if newEmailStr != nil {
 		oldEmail := u.Email
-		newEmail, err := NewEmail(newEmailStr)
+		newEmail, err := NewEmail(*newEmailStr)
 		if err != nil {
 			return err
 		}
@@ -92,18 +122,18 @@ func (u *User) UpdateProfile(
 			emailChanged = true
 		}
 	}
-	if newFirstNameStr != "" {
+	if newFirstNameStr != nil {
 		oldFirstName := u.FirstName
-		if newFirstNameStr != oldFirstName {
-			u.FirstName = newFirstNameStr
+		if *newFirstNameStr != oldFirstName {
+			u.FirstName = *newFirstNameStr
 			firstNameChanged = true
 		}
 	}
 
-	if newLastNameStr != "" {
+	if newLastNameStr != nil {
 		oldLastName := u.LastName
-		if newLastNameStr != oldLastName {
-			u.LastName = newLastNameStr
+		if *newLastNameStr != oldLastName {
+			u.LastName = *newLastNameStr
 			lastNameChanged = true
 		}
 	}
@@ -118,6 +148,11 @@ func (u *User) UpdateProfile(
 	if lastNameChanged {
 		changedFields["last_name"] = u.LastName
 	}
+	if usernameChanged {
+		changedFields["username"] = u.Username
+	}
+
+	u.Version++
 
 	u.addEvent(UserProfileUpdatedEvent{
 		BaseDomainEvent: common.NewBaseDomainEvent("updated_user_profile", u.ID.value, u.Version),
@@ -125,5 +160,6 @@ func (u *User) UpdateProfile(
 		UpdatedFields:   changedFields,
 		Timestamp:       time.Now(),
 	})
+
 	return nil
 }

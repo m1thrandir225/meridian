@@ -162,36 +162,10 @@ func (s *IdentityService) UpdateUserProfile(ctx context.Context, cmd domain.Upda
 		return nil, fmt.Errorf("error retrieving user: %w", err)
 	}
 
-	if cmd.NewUsername != nil {
-		newUsername, err := domain.NewUsername(*cmd.NewUsername)
-		if err != nil {
-			return nil, err
-		}
-		existingUser, _ := s.repo.FindByUsername(ctx, newUsername.String())
-		if existingUser != nil {
-			return nil, domain.ErrUsernameTaken
-		}
-		user.Username = newUsername
+	err = user.UpdateProfile(cmd.NewUsername, cmd.NewEmail, cmd.NewFirstName, cmd.NewLastName)
+	if err != nil {
+		return nil, err
 	}
-	if cmd.NewEmail != nil {
-		newEmail, err := domain.NewEmail(*cmd.NewEmail)
-		if err != nil {
-			return nil, err
-		}
-		existingUser, _ := s.repo.FindByEmail(ctx, newEmail.String())
-		if existingUser != nil {
-			return nil, domain.ErrEmailTaken
-		}
-		user.Email = newEmail
-	}
-	if cmd.NewFirstName != nil {
-		user.FirstName = *cmd.NewFirstName
-	}
-	if cmd.NewLastName != nil {
-		user.LastName = *cmd.NewLastName
-	}
-
-	user.Version++
 
 	if err := s.repo.Save(ctx, user); err != nil {
 		return nil, fmt.Errorf("failed to save user: %w", err)
@@ -212,18 +186,10 @@ func (s *IdentityService) UpdateUserPassword(ctx context.Context, cmd domain.Upd
 		}
 	}
 
-	if user.PasswordHash.Match(cmd.NewPassword) {
-		return fmt.Errorf("new password is the same as the old one")
-	}
-
-	newPasswordHash, err := domain.NewPasswordHash(cmd.NewPassword)
+	err = user.UpdatePassword(cmd.NewPassword)
 	if err != nil {
 		return err
 	}
-
-	user.PasswordHash = newPasswordHash
-
-	user.Version++
 
 	if err := s.repo.Save(ctx, user); err != nil {
 		return fmt.Errorf("failed to save user: %w", err)
