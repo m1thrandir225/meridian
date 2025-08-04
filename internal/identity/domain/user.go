@@ -16,7 +16,7 @@ type User struct {
 	Version          int64
 	RegistrationTime time.Time
 
-	events []any
+	events []common.DomainEvent
 }
 
 func NewUser(usernameStr, emailStr, firstName, lastName, rawPassword string) (*User, error) {
@@ -49,16 +49,21 @@ func NewUser(usernameStr, emailStr, firstName, lastName, rawPassword string) (*U
 		PasswordHash:     passwordHash,
 		Version:          1,
 		RegistrationTime: time.Now(),
+		events:           make([]common.DomainEvent, 0),
 	}
+
+	event := CreateUserRegisteredEvent(&user)
+
+	user.addEvent(event)
 
 	return &user, nil
 }
 
-func (u *User) addEvent(event interface{}) {
+func (u *User) addEvent(event common.DomainEvent) {
 	u.events = append(u.events, event)
 }
 
-func (u *User) Events() []any {
+func (u *User) Events() []common.DomainEvent {
 	return u.events
 }
 
@@ -84,12 +89,9 @@ func (u *User) UpdatePassword(newPassword string) error {
 	u.PasswordHash = newPasswordHash
 	u.Version++
 
-	u.addEvent(UserProfileUpdatedEvent{
-		BaseDomainEvent: common.NewBaseDomainEvent("updated_user_password", u.ID.value, u.Version),
-		UserID:          u.ID.String(),
-		UpdatedFields:   map[string]any{"password": "REDACTED"},
-		Timestamp:       time.Now(),
-	})
+	event := CreateUserProfileUpdated(u, map[string]any{"password": "REDACTED"})
+	u.addEvent(event)
+
 	return nil
 }
 
@@ -154,12 +156,8 @@ func (u *User) UpdateProfile(newUsernameStr, newEmailStr, newFirstNameStr, newLa
 
 	u.Version++
 
-	u.addEvent(UserProfileUpdatedEvent{
-		BaseDomainEvent: common.NewBaseDomainEvent("updated_user_profile", u.ID.value, u.Version),
-		UserID:          u.ID.String(),
-		UpdatedFields:   changedFields,
-		Timestamp:       time.Now(),
-	})
+	event := CreateUserProfileUpdated(u, changedFields)
+	u.addEvent(event)
 
 	return nil
 }

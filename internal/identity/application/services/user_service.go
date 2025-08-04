@@ -78,6 +78,12 @@ func (s *IdentityService) RegisterUser(ctx context.Context, cmd domain.RegisterU
 		return nil, fmt.Errorf("failed to save user: %w", err)
 	}
 
+	if err := s.publisher.PublishEvents(ctx, user.Events()); err != nil {
+		log.Printf("ERROR publishing UserRegisteredEvent for %s: %v", user.ID.String(), err)
+	}
+
+	user.ClearEvents()
+
 	log.Printf("User registered: %s (%s)", user.Username, user.ID.String())
 	return user, nil
 }
@@ -119,18 +125,11 @@ func (s *IdentityService) AuthenticateUser(ctx context.Context, cmd domain.Authe
 		return "", nil, ErrTokenGeneration
 	}
 
-	authEvent := domain.UserAuthenticatedEvent{
-		UserID:              user.ID.String(),
-		Username:            user.Username.String(),
-		AuthenticationToken: tokenString,
-		Timestamp:           time.Now().UTC(),
-	}
-
-	if err := s.publisher.PublishEvent(ctx, authEvent); err != nil {
+	event := domain.CreateUserAuthenticatedEvent(user, tokenString)
+	if err := s.publisher.PublishEvent(ctx, event); err != nil {
 		log.Printf("ERROR publishing UserAuthenticatedEvent for %s: %v", user.ID.String(), err)
 	}
 
-	log.Printf("User authenticated: %s (%s)", user.Username, user.ID.String())
 	return tokenString, claims, nil
 }
 
@@ -170,6 +169,12 @@ func (s *IdentityService) UpdateUserProfile(ctx context.Context, cmd domain.Upda
 	if err := s.repo.Save(ctx, user); err != nil {
 		return nil, fmt.Errorf("failed to save user: %w", err)
 	}
+
+	if err := s.publisher.PublishEvents(ctx, user.Events()); err != nil {
+		log.Printf("ERROR publishing UserUpdatedEvent for %s: %v", user.ID.String(), err)
+	}
+	user.ClearEvents()
+
 	return user, nil
 }
 
@@ -195,6 +200,11 @@ func (s *IdentityService) UpdateUserPassword(ctx context.Context, cmd domain.Upd
 		return fmt.Errorf("failed to save user: %w", err)
 	}
 
+	if err := s.publisher.PublishEvents(ctx, user.Events()); err != nil {
+		log.Printf("ERROR publishing UserUpdatedEvent for %s: %v", user.ID.String(), err)
+	}
+	user.ClearEvents()
+
 	return nil
 }
 
@@ -204,13 +214,18 @@ func (s *IdentityService) DeleteUser(ctx context.Context, cmd domain.DeleteUserC
 		return fmt.Errorf("invalid user ID: %w", err)
 	}
 
-	_, err = s.repo.FindById(ctx, userId)
+	user, err := s.repo.FindById(ctx, userId)
 	if err != nil {
 		return err
 	}
 
 	if err := s.repo.Delete(ctx, userId); err != nil {
 		return fmt.Errorf("failed to delete user: %w", err)
+	}
+
+	event := domain.CreateUserDeletedEvent(user)
+	if err := s.publisher.PublishEvent(ctx, event); err != nil {
+		log.Printf("ERROR publishing UserDeletedEvent for %s: %v", user.ID.String(), err)
 	}
 	return nil
 }
