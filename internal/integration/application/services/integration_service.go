@@ -37,7 +37,7 @@ func (s *IntegrationService) RegisterIntegration(ctx context.Context, cmd domain
 		return nil, "", fmt.Errorf("failed to generate token: %w", err)
 	}
 
-	integration, err := domain.NewIntegration(cmd.ServiceName, creatorUserID, targetChannels, hashedToken, rawToken)
+	integration, err := domain.NewIntegration(cmd.ServiceName, creatorUserID, targetChannels, *hashedToken, rawToken)
 	if err != nil {
 		return nil, "", fmt.Errorf("registration validation failed: %w", err)
 	}
@@ -56,7 +56,9 @@ func (s *IntegrationService) ValidateApiToken(ctx context.Context, rawToken stri
 		return false, "", nil, errors.New("raw token cannot be empty")
 	}
 
-	integration, err := s.repo.FindByToken(ctx, rawToken)
+	tokenHash := domain.GenerateLookupHash(rawToken)
+
+	integration, err := s.repo.FindByTokenLookupHash(ctx, tokenHash)
 	if err != nil {
 		if errors.Is(err, domain.ErrIntegrationNotFound) {
 			return false, "", nil, nil

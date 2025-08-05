@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"errors"
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -63,4 +65,29 @@ func (h *HTTPHandler) handleRegisterIntegration(ctx *gin.Context) {
 }
 
 // DELETE /api/v1/integrations
-func (h *HTTPHandler) handleRevokeIntegration(ctx *gin.Context) {}
+func (h *HTTPHandler) handleRevokeIntegration(ctx *gin.Context) {
+	var req RevokeIntegrationRequest
+	if err := ctx.BindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	cmd := domain.RevokeTokenCommand{
+		IntegrationID: req.IntegrationID,
+		RequestorID:   "",
+	}
+
+	err := h.integrationService.RevokeToken(ctx, cmd)
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			ctx.JSON(http.StatusNotFound, gin.H{"error": "Integration not found"})
+		} else if errors.Is(err, domain.ErrForbidden) {
+			ctx.JSON(http.StatusForbidden, gin.H{"error": "Forbidden"})
+		} else {
+			log.Printf("ERROR: Failed to revoke integration: %v", err)
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
+		}
+		return
+	}
+	ctx.Status(http.StatusNoContent)
+}
