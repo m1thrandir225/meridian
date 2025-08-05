@@ -13,4 +13,5 @@ type UserRepository interface {
 	FindByUsername(ctx context.Context, username string) (*domain.User, error)
 	FindByEmail(ctx context.Context, email string) (*domain.User, error)
 	Delete(ctx context.Context, id uuid.UUID) error
+	FindByRefreshTokenHash(ctx context.Context, hash string) (*domain.User, error)
 }

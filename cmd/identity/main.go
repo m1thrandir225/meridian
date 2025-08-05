@@ -4,10 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/IBM/sarama"
-	"github.com/m1thrandir225/meridian/internal/identity/infrastructure/token_generator"
-	"github.com/m1thrandir225/meridian/pkg/auth"
-	"github.com/m1thrandir225/meridian/pkg/kafka"
 	"log"
 	"net/http"
 	"os"
@@ -16,6 +12,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/IBM/sarama"
+	"github.com/m1thrandir225/meridian/internal/identity/infrastructure/token_generator"
+	"github.com/m1thrandir225/meridian/pkg/auth"
+	"github.com/m1thrandir225/meridian/pkg/kafka"
+
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/m1thrandir225/meridian/internal/identity/application/handlers"
 	"github.com/m1thrandir225/meridian/internal/identity/application/services"
@@ -23,13 +24,14 @@ import (
 )
 
 type Config struct {
-	HTTPPort          string
-	KafkaBrokers      []string
-	DatabaseURL       string
-	PasetoPublicKey   string
-	PasetoPrivateKey  string
-	AuthTokenValidity time.Duration
-	KafkaDefaultTopic string
+	HTTPPort             string
+	KafkaBrokers         []string
+	DatabaseURL          string
+	PasetoPublicKey      string
+	PasetoPrivateKey     string
+	AuthTokenValidity    time.Duration
+	RefreshTokenValidity time.Duration
+	KafkaDefaultTopic    string
 }
 
 func loadConfig() (*Config, error) {
@@ -68,14 +70,23 @@ func loadConfig() (*Config, error) {
 		log.Printf("WARN: Invalid AUTH_TOKEN_VALIDITY_MINUTES '%s', using default %v", tokenValidityStr, tokenValidity)
 	}
 
+	refreshTokenValidityStr := os.Getenv("REFRESH_TOKEN_VALIDITY_MINUTES")
+	refreshTokenValidity := (24 * time.Hour) * 7
+	if val, err := time.ParseDuration(refreshTokenValidityStr + "h"); err == nil {
+		refreshTokenValidity = val
+	} else if refreshTokenValidityStr != "" {
+		log.Printf("WARN: Invalid REFRESH_TOKEN_VALIDITY_MINUTES '%s', using default %v", refreshTokenValidityStr, refreshTokenValidity)
+	}
+
 	return &Config{
-		DatabaseURL:       dbURL,
-		KafkaBrokers:      strings.Split(kafkaBrokerStr, ","),
-		HTTPPort:          httpPort,
-		PasetoPrivateKey:  privKey,
-		PasetoPublicKey:   pubKey,
-		AuthTokenValidity: tokenValidity,
-		KafkaDefaultTopic: kafkaDefaultTopic,
+		DatabaseURL:          dbURL,
+		KafkaBrokers:         strings.Split(kafkaBrokerStr, ","),
+		HTTPPort:             httpPort,
+		PasetoPrivateKey:     privKey,
+		PasetoPublicKey:      pubKey,
+		AuthTokenValidity:    tokenValidity,
+		KafkaDefaultTopic:    kafkaDefaultTopic,
+		RefreshTokenValidity: refreshTokenValidity,
 	}, nil
 }
 
@@ -118,7 +129,7 @@ func main() {
 	}
 	eventPublisher := kafka.NewSaramaEventPublisher(syncProducer, cfg.KafkaDefaultTopic)
 
-	service := services.NewUserService(repository, pasetoGenerator, cfg.AuthTokenValidity, eventPublisher)
+	service := services.NewUserService(repository, pasetoGenerator, cfg.AuthTokenValidity, cfg.RefreshTokenValidity, eventPublisher)
 
 	tokenVerifier, err := auth.NewPasetoTokenVerifier()
 

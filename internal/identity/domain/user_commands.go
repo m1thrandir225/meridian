@@ -11,6 +11,8 @@ type RegisterUserCommand struct {
 type AuthenticateUserCommand struct {
 	LoginIdentifier string
 	Password        string
+	IPAddress       string
+	Device          string
 }
 
 type GetUserCommand struct {
@@ -32,4 +34,10 @@ type UpdateUserPasswordCommand struct {
 
 type DeleteUserCommand struct {
 	UserID string
+}
+
+type RefreshTokenCommand struct {
+	RawRefreshToken string
+	Device          string
+	IPAddress       string
 }

@@ -1,10 +1,11 @@
 package handlers
 
 import (
+	"log"
+
 	"github.com/gin-gonic/gin"
 	"github.com/m1thrandir225/meridian/internal/identity/application/services"
 	"github.com/m1thrandir225/meridian/pkg/auth"
-	"log"
 )
 
 func SetupIdentityRouter(service *services.IdentityService, tokenVerifier auth.TokenVerifier) *gin.Engine {
@@ -24,9 +25,10 @@ func SetupIdentityRouter(service *services.IdentityService, tokenVerifier auth.T
 		me.Use(AuthenticationMiddleware(tokenVerifier))
 		{
 			me.GET("", handler.handleGetCurrentUser)
-			me.DELETE("", handler.DeleteCurrentUser)
-			me.PUT("/update-profile", handler.UpdateCurrentUser)
-			me.PUT("/password", handler.UpdateUserPassword)
+			me.DELETE("", handler.handleDeleteUserRequest)
+			me.PUT("/update-profile", handler.handleUpdateCurrentUserRequest)
+			me.PUT("/password", handler.handleUpdateUserPasswordRequest)
+			me.POST("/refresh-token", handler.handleRefreshTokenRequest)
 		}
 	}
 	log.Println("Identity HTTP Router configured")

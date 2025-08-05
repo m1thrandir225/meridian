@@ -2,13 +2,13 @@ package handlers
 
 import (
 	"errors"
+	"log"
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 	"github.com/m1thrandir225/meridian/internal/identity/application/services"
 	"github.com/m1thrandir225/meridian/internal/identity/domain"
 	"github.com/m1thrandir225/meridian/pkg/auth"
-	"log"
-	"net/http"
-	"time"
 )
 
 type HTTPHandler struct {
@@ -42,13 +42,17 @@ type AuthenticateUserRequest struct {
 	Password string `json:"password" binding:"required"`
 }
 
+type AuthenticateTokensResponse struct {
+	AccessToken  string `json:"access_token"`
+	TokenType    string `json:"token_type"`
+	ExpiresIn    int64  `json:"expires_in"`
+	RefreshToken string `json:"refresh_token"`
+}
+
 type AuthenticateUserResponse struct {
-	UserID         string    `json:"user_id"`
-	Username       string    `json:"username"`
-	AccessToken    string    `json:"access_token"`
-	TokenType      string    `json:"token_type"`
-	ExpirationDate time.Time `json:"expiration_date"`
-	//RefreshToken string `json:"refresh_token,omitempty"`
+	UserID   string                     `json:"user_id"`
+	Username string                     `json:"username"`
+	Tokens   AuthenticateTokensResponse `json:"tokens"`
 }
 
 type UpdateProfileRequest struct {
@@ -68,6 +72,10 @@ type UpdateProfileResponse struct {
 	Email     string `json:"email"`
 	FirstName string `json:"first_name"`
 	LastName  string `json:"last_name"`
+}
+
+type RefreshTokenRequest struct {
+	RefreshToken string `json:"refresh_token" binding:"required"`
 }
 
 // POST /api/v1/register
@@ -120,7 +128,7 @@ func (h *HTTPHandler) handleLoginRequest(ctx *gin.Context) {
 		Password:        req.Password,
 	}
 
-	tokenString, claims, err := h.userService.AuthenticateUser(ctx, cmd)
+	accessToken, refreshToken, claims, err := h.userService.AuthenticateUser(ctx, cmd)
 	if err != nil {
 		if errors.Is(err, domain.ErrAuthFailed) {
 			ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
@@ -132,11 +140,14 @@ func (h *HTTPHandler) handleLoginRequest(ctx *gin.Context) {
 	}
 
 	resp := AuthenticateUserResponse{
-		UserID:         claims.Custom.UserID,
-		Username:       claims.Custom.Email,
-		AccessToken:    tokenString,
-		TokenType:      "bearer",
-		ExpirationDate: claims.ExpirationDate,
+		UserID:   claims.Custom.UserID,
+		Username: claims.Custom.Email,
+		Tokens: AuthenticateTokensResponse{
+			AccessToken:  accessToken,
+			RefreshToken: refreshToken,
+			TokenType:    "bearer",
+			ExpiresIn:    int64(h.userService.AuthTokenValidity.Seconds()),
+		},
 	}
 
 	ctx.JSON(http.StatusOK, resp)
@@ -177,7 +188,7 @@ func (req *UpdateProfileRequest) HasAnyField() bool {
 }
 
 // PUT /api/v1/update-profile
-func (h *HTTPHandler) UpdateCurrentUser(ctx *gin.Context) {
+func (h *HTTPHandler) handleUpdateCurrentUserRequest(ctx *gin.Context) {
 	userId, exists := auth.UserIDFromContext(ctx.Request.Context())
 	if !exists {
 		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: User ID not found in token"})
@@ -226,7 +237,7 @@ func (h *HTTPHandler) UpdateCurrentUser(ctx *gin.Context) {
 }
 
 // PATCH /api/v1/me/password
-func (h *HTTPHandler) UpdateUserPassword(ctx *gin.Context) {
+func (h *HTTPHandler) handleUpdateUserPasswordRequest(ctx *gin.Context) {
 	userId, exists := auth.UserIDFromContext(ctx.Request.Context())
 	if !exists {
 		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: User ID not found in token"})
@@ -252,7 +263,7 @@ func (h *HTTPHandler) UpdateUserPassword(ctx *gin.Context) {
 }
 
 // DELETE /api/v1/me
-func (h *HTTPHandler) DeleteCurrentUser(ctx *gin.Context) {
+func (h *HTTPHandler) handleDeleteUserRequest(ctx *gin.Context) {
 	userId, exists := auth.UserIDFromContext(ctx.Request.Context())
 	if !exists {
 		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: User ID not found in token"})
@@ -269,4 +280,33 @@ func (h *HTTPHandler) DeleteCurrentUser(ctx *gin.Context) {
 		return
 	}
 	ctx.Status(http.StatusAccepted)
+}
+
+// POST /api/v1/me/refresh-token
+func (h *HTTPHandler) handleRefreshTokenRequest(ctx *gin.Context) {
+	var req RefreshTokenRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	}
+
+	cmd := domain.RefreshTokenCommand{
+		Device:          ctx.Request.UserAgent(),
+		IPAddress:       ctx.ClientIP(),
+		RawRefreshToken: req.RefreshToken,
+	}
+
+	newAccessToken, newRefreshToken, err := h.userService.RefreshAuthentication(ctx, cmd)
+	if err != nil {
+		log.Printf("Refresh token failed: %v", err)
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid refresh token"})
+		return
+	}
+
+	resp := AuthenticateTokensResponse{
+		AccessToken:  newAccessToken,
+		TokenType:    "bearer",
+		ExpiresIn:    int64(h.userService.AuthTokenValidity.Seconds()),
+		RefreshToken: newRefreshToken,
+	}
+	ctx.JSON(http.StatusOK, resp)
 }

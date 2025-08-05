@@ -2,13 +2,16 @@ package services
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/google/uuid"
-	"github.com/m1thrandir225/meridian/pkg/kafka"
 	"log"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/m1thrandir225/meridian/pkg/kafka"
 
 	"github.com/m1thrandir225/meridian/internal/identity/domain"
 	"github.com/m1thrandir225/meridian/internal/identity/infrastructure/persistence"
@@ -23,23 +26,26 @@ var (
 )
 
 type IdentityService struct {
-	repo              persistence.UserRepository
-	tokenGenerator    AuthTokenGenerator
-	authTokenValidity time.Duration
-	publisher         kafka.EventPublisher
+	repo                 persistence.UserRepository
+	tokenGenerator       AuthTokenGenerator
+	AuthTokenValidity    time.Duration
+	RefreshTokenValidity time.Duration
+	publisher            kafka.EventPublisher
 }
 
 func NewUserService(
 	repository persistence.UserRepository,
 	tokenGenerator AuthTokenGenerator,
 	tokenValidity time.Duration,
+	refreshTokenValidity time.Duration,
 	eventPublisher kafka.EventPublisher,
 ) *IdentityService {
 	return &IdentityService{
-		repo:              repository,
-		tokenGenerator:    tokenGenerator,
-		authTokenValidity: tokenValidity,
-		publisher:         eventPublisher,
+		repo:                 repository,
+		tokenGenerator:       tokenGenerator,
+		AuthTokenValidity:    tokenValidity,
+		RefreshTokenValidity: refreshTokenValidity,
+		publisher:            eventPublisher,
 	}
 }
 
@@ -88,49 +94,57 @@ func (s *IdentityService) RegisterUser(ctx context.Context, cmd domain.RegisterU
 	return user, nil
 }
 
-func (s *IdentityService) AuthenticateUser(ctx context.Context, cmd domain.AuthenticateUserCommand) (string, *auth.TokenClaims, error) {
+func (s *IdentityService) AuthenticateUser(ctx context.Context, cmd domain.AuthenticateUserCommand) (accessToken string, refreshToken string, claims *auth.TokenClaims, err error) {
 	var user *domain.User
-	var err error
 
 	trimmedIdentifier := strings.TrimSpace(cmd.LoginIdentifier)
 
 	if strings.Contains(trimmedIdentifier, "@") {
 		email, mailErr := domain.NewEmail(trimmedIdentifier)
 		if mailErr != nil {
-			return "", nil, domain.ErrEmailInvalid
+			return "", "", nil, domain.ErrEmailInvalid
 		}
 		user, err = s.repo.FindByEmail(ctx, email.String())
 	} else {
 		username, nameErr := domain.NewUsername(trimmedIdentifier)
 		if nameErr != nil {
-			return "", nil, domain.ErrUsernameInvalid
+			return "", "", nil, domain.ErrUsernameInvalid
 		}
 		user, err = s.repo.FindByUsername(ctx, username.String())
 	}
 
 	if err != nil {
 		if errors.Is(err, domain.ErrUserNotFound) {
-			return "", nil, ErrAuthFailed
+			return "", "", nil, ErrAuthFailed
 		}
-		return "", nil, fmt.Errorf("error retrieving user: %w", err)
+		return "", "", nil, fmt.Errorf("error retrieving user: %w", err)
 	}
 
 	if err := user.Authenticate(cmd.Password); err != nil {
-		return "", nil, ErrAuthFailed
+		return "", "", nil, ErrAuthFailed
 	}
 
-	tokenString, claims, err := s.tokenGenerator.GenerateToken(user, s.authTokenValidity)
+	accessToken, claims, err = s.tokenGenerator.GenerateToken(user, s.AuthTokenValidity)
 	if err != nil {
 		log.Printf("ERROR generating token for user %s: %v", user.ID.String(), err)
-		return "", nil, ErrTokenGeneration
+		return "", "", nil, ErrTokenGeneration
 	}
 
-	event := domain.CreateUserAuthenticatedEvent(user, tokenString)
+	refreshToken, err = user.IssueRefreshToken(cmd.Device, cmd.IPAddress, s.RefreshTokenValidity)
+	if err != nil {
+		return "", "", nil, err
+	}
+
+	if err := s.repo.Save(ctx, user); err != nil {
+		return "", "", nil, fmt.Errorf("failed to save user state after token refresh: %w", err)
+	}
+
+	event := domain.CreateUserAuthenticatedEvent(user, accessToken)
 	if err := s.publisher.PublishEvent(ctx, event); err != nil {
 		log.Printf("ERROR publishing UserAuthenticatedEvent for %s: %v", user.ID.String(), err)
 	}
 
-	return tokenString, claims, nil
+	return accessToken, refreshToken, claims, nil
 }
 
 func (s *IdentityService) GetUser(ctx context.Context, cmd domain.GetUserCommand) (*domain.User, error) {
@@ -228,4 +242,37 @@ func (s *IdentityService) DeleteUser(ctx context.Context, cmd domain.DeleteUserC
 		log.Printf("ERROR publishing UserDeletedEvent for %s: %v", user.ID.String(), err)
 	}
 	return nil
+}
+
+func (s *IdentityService) RefreshAuthentication(ctx context.Context, cmd domain.RefreshTokenCommand) (newAccessToken string, newRefreshToken string, err error) {
+	hash := sha256.Sum256([]byte(cmd.RawRefreshToken))
+	tokenHash := hex.EncodeToString(hash[:])
+
+	user, err := s.repo.FindByRefreshTokenHash(ctx, tokenHash)
+	if err != nil {
+		if errors.Is(err, domain.ErrUserNotFound) {
+			log.Printf("SECURITY: Attempt to use invalid or revoked refresh token. Hash: %s", tokenHash)
+			return "", "", ErrAuthFailed
+		}
+		return "", "", fmt.Errorf("error finding user by refresh token: %w", err)
+	}
+	if _, err := user.UseRefreshToken(cmd.RawRefreshToken); err != nil {
+		log.Printf("SECURITY: Failed to use valid refresh token for user %s. Possible race or expiry. Error: %v", user.ID.String(), err)
+		return "", "", ErrAuthFailed
+	}
+	newAccessToken, _, err = s.tokenGenerator.GenerateToken(user, s.AuthTokenValidity)
+	if err != nil {
+		return "", "", err
+	}
+
+	newRefreshToken, err = user.IssueRefreshToken(cmd.Device, cmd.IPAddress, s.RefreshTokenValidity)
+	if err != nil {
+		return "", "", err
+	}
+
+	if err := s.repo.Save(ctx, user); err != nil {
+		return "", "", fmt.Errorf("failed to save user state after token refresh: %w", err)
+	}
+
+	return newAccessToken, newRefreshToken, nil
 }

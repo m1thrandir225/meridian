@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/google/uuid"
@@ -96,6 +97,31 @@ func (r *PostgresUserRepository) Save(ctx context.Context, user *domain.User) er
 			return fmt.Errorf("user %s update affected %d rows, expected 1( possible lost update): %w", &user.ID, cmdTag.RowsAffected(), common.ErrConcurrency)
 		}
 	}
+	deleteTokensSQL := `DELETE FROM refresh_tokens WHERE user_id = $1`
+	_, err = tx.Exec(ctx, deleteTokensSQL, user.ID.String())
+	if err != nil {
+		return fmt.Errorf("failed to clear existing refresh tokens: %w", err)
+	}
+	for _, rt := range user.RefreshTokens {
+		insertTokenSQL := `
+			INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at, is_revoked, created_at, device, ip_address)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`
+		_, err := tx.Exec(
+			ctx,
+			insertTokenSQL,
+			rt.ID.String(),
+			rt.UserID.String(),
+			rt.TokenHash,
+			rt.ExpiresAt,
+			rt.IsRevoked,
+			rt.CreatedAt,
+			rt.Device,
+			rt.IPAddress,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to insert refresh token %s: %w", rt.ID, err)
+		}
+	}
 
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("error committing transaction: %w", err)
@@ -128,6 +154,26 @@ func (r *PostgresUserRepository) Delete(ctx context.Context, id uuid.UUID) error
 	}
 
 	return nil
+}
+
+func (r *PostgresUserRepository) FindByRefreshTokenHash(ctx context.Context, hash string) (*domain.User, error) {
+	query := `
+		SELECT u.id FROM users u
+		JOIN refresh_tokens rt ON u.id = rt.user_id
+		WHERE rt.token_hash = $1 AND rt.is_revoked = FALSE AND rt.expires_at > NOW()`
+	var userId uuid.UUID
+	err := r.db.QueryRow(ctx, query, hash).Scan(&userId)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.ErrUserNotFound
+		}
+		return nil, fmt.Errorf("failed to find user by refresh token hash: %w", err)
+	}
+
+	if userId == uuid.Nil {
+		return nil, domain.ErrUserIDInvalid
+	}
+	return r.FindById(ctx, userId)
 }
 
 func (r *PostgresUserRepository) findByField(ctx context.Context, fieldName string, value any) (*domain.User, error) {
@@ -181,5 +227,26 @@ func (r *PostgresUserRepository) scanUser(row pgx.Row) (*domain.User, error) {
 	user.Username = domUsername
 	user.PasswordHash = domPassHash
 	user.RegistrationTime = regTime
+
+	tokensQuery := `SELECT id, user_id, token_hash, expires_at, is_revoked, created_at, device, ip_address
+	                FROM refresh_tokens WHERE user_id = $1 AND is_revoked = FALSE`
+	rows, err := r.db.Query(context.Background(), tokensQuery, user.ID.String())
+
+	defer rows.Close()
+	var tokens []*domain.RefreshToken
+	for rows.Next() {
+		var rt domain.RefreshToken
+		var userID uuid.UUID
+		err := rows.Scan(&rt.ID, &userID, &rt.TokenHash, &rt.ExpiresAt, &rt.IsRevoked, &rt.CreatedAt, &rt.Device, &rt.IPAddress)
+		if err != nil {
+			log.Printf("ERROR: Failed to scan refresh token row for user %s: %v", user.ID.String(), err)
+			continue
+		}
+		userIDVO, _ := domain.UserIDFromString(userID.String())
+
+		rt.UserID = *userIDVO
+		tokens = append(tokens, &rt)
+	}
+	user.RefreshTokens = tokens
 	return &user, nil
 }
