@@ -1,13 +1,32 @@
+networks:
+  meridian_network:
+    driver: bridge
+volumes:
+  messaging_postgres_data:
+  identity_postgres_data:
+  integration_postgres_data:
+  zookeeper_data:
+  kafka_data:
+  traefik_logs:
+
 services:
-#  nginx_proxy:
-#    image: nginx:latest
-#    container_name: meridian_reverse_proxy
-#    ports:
-#      - "80:80"
-#    volumes:
-#      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-#    depends_on:
-#      - messaging
+  traefik:
+    image: traefik:latest
+    container_name: meridian_traefik
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "./traefik/traefik.yaml:/etc/traefik/traefik.yml:ro"
+      - "./traefik/dynamic.yaml:/etc/traefik/dynamic.yml:ro"
+      - "traefik_logs:/var/log/traefik"
+    networks:
+      - meridian_network
+    labels:
+      - "traefik.enable=true"
   zookeeper:
     image: bitnami/zookeeper:latest
     container_name: meridian_zookeeper
@@ -111,10 +130,13 @@ services:
       MESSAGING_HTTP_PORT: ":${MESSAGING_HTTP_PORT}"
       MESSAGING_KAFKA_BROKERS: "${KAFKA_BROKERS}"
       MESSAGING_KAFKA_DEFAULT_TOPIC: "${MESSAGING_KAFKA_DEFAULT_TOPIC}"
+      MESSAGING_GRPC_PORT: "${MESSAGING_GRPC_PORT}"
+      IDENTITY_GRPC_URL: "${IDENTITY_GRPC_URL}"
     networks:
       - meridian_network
-    ports:
-      - "${MESSAGING_HTTP_PORT}:${MESSAGING_HTTP_PORT}"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.services.messaging.loadbalancer.server.port=8082"
     restart: unless-stopped
   identity_postgres:
     image: postgres:alpine
@@ -163,6 +185,9 @@ services:
         condition: service_completed_successfully
       identity_postgres:
         condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.services.identity.loadbalancer.server.port=8081"
     environment:
       IDENTITY_HTTP_PORT: ":${IDENTITY_HTTP_PORT}"
       IDENTITY_DB_URL: "${IDENTITY_DB_URL}"
@@ -171,8 +196,7 @@ services:
       IDENTITY_PASETO_PRIVATE_KEY: "${IDENTITY_PASETO_PRIVATE_KEY}"
       IDENTITY_PASETO_PUBLIC_KEY: "${IDENTITY_PASETO_PUBLIC_KEY}"
       AUTH_TOKEN_VALIDITY_MINUTES: "${AUTH_TOKEN_VALIDITY_MINUTES}"
-    ports:
-      - "${IDENTITY_HTTP_PORT}:${IDENTITY_HTTP_PORT}"
+      INTEGRATION_GRPC_URL: "${INTEGRATION_GRPC_URL}"
     restart: unless-stopped
   integration_postgres:
     image: postgres:alpine
@@ -226,15 +250,10 @@ services:
       INTEGRATION_DB_URL: "${INTEGRATION_DB_URL}"
       INTEGRATION_KAFKA_BROKERS: "${KAFKA_BROKERS}"
       INTEGRATION_KAFKA_DEFAULT_TOPIC: "${INTEGRATION_KAFKA_DEFAULT_TOPIC}"
-    ports:
-      - "${INTEGRATION_HTTP_PORT}:${INTEGRATION_HTTP_PORT}"
+      INTEGRATION_GRPC_PORT: "${INTEGRATION_GRPC_PORT}"
+      MESSAGING_GRPC_URL: "${MESSAGING_GRPC_URL}"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.services.integration.loadbalancer.server.port=8083"
     restart: unless-stopped
-networks:
-  meridian_network:
-    driver: bridge
-volumes:
-  messaging_postgres_data:
-  identity_postgres_data:
-  integration_postgres_data:
-  zookeeper_data:
-  kafka_data:
+

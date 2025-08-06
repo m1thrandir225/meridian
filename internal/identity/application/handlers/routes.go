@@ -8,18 +8,25 @@ import (
 	"github.com/m1thrandir225/meridian/pkg/auth"
 )
 
-func SetupIdentityRouter(service *services.IdentityService, tokenVerifier auth.TokenVerifier) *gin.Engine {
+func SetupIdentityRouter(
+	service *services.IdentityService,
+	tokenVerifier auth.TokenVerifier,
+	integrationGrpcURL string,
+) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
 	router.Use(gin.Logger())
 	router.Use(gin.Recovery())
 
 	handler := NewHTTPHandler(service)
+	authHandler := NewAuthHandler(service, tokenVerifier, integrationGrpcURL)
 
 	apiV1 := router.Group("/api/v1")
 	{
 		apiV1.POST("/register", handler.handleRegisterRequest)
 		apiV1.POST("/login", handler.handleLoginRequest)
+
+		apiV1.POST("/validate-token", authHandler.ValidateToken)
 
 		me := apiV1.Group("/me")
 		me.Use(AuthenticationMiddleware(tokenVerifier))

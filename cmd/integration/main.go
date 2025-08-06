@@ -25,6 +25,8 @@ type Config struct {
 	KafkaBrokers      []string
 	KafkaDefaultTopic string
 	DatabaseURL       string
+	GRPCPort          string
+	MessagingGRPCURL  string
 }
 
 func loadConfig() (*Config, error) {
@@ -45,12 +47,23 @@ func loadConfig() (*Config, error) {
 	if httpPort == "" {
 		return nil, fmt.Errorf("missing INTEGRATION_HTTP_PORT")
 	}
+	grpcPort := os.Getenv("INTEGRATION_GRPC_PORT")
+	if grpcPort == "" {
+		return nil, fmt.Errorf("missing INTEGRATION_GRPC_PORT")
+	}
+
+	messagingGRPCURL := os.Getenv("MESSAGING_GRPC_URL")
+	if messagingGRPCURL == "" {
+		return nil, fmt.Errorf("missing MESSAGING_GRPC_URL")
+	}
 
 	return &Config{
 		HTTPPort:          httpPort,
 		KafkaBrokers:      strings.Split(kafkaBrokerStr, ","),
 		KafkaDefaultTopic: kafkaDefaultTopic,
 		DatabaseURL:       dbURL,
+		GRPCPort:          grpcPort,
+		MessagingGRPCURL:  messagingGRPCURL,
 	}, nil
 }
 
@@ -94,6 +107,13 @@ func main() {
 		WriteTimeout: 10 * time.Second,
 	}
 	errChan := make(chan error, 1)
+
+	go func() {
+		log.Printf("Starting gRPC Server on %s", cfg.GRPCPort)
+		if err := handlers.StartGRPCServer(service, cfg.GRPCPort); err != nil {
+			errChan <- fmt.Errorf("gRPC server error: %w", err)
+		}
+	}()
 
 	go func() {
 		log.Printf("Starting Identity HTTP server on %s", cfg.HTTPPort)

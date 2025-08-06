@@ -32,6 +32,7 @@ type Config struct {
 	AuthTokenValidity    time.Duration
 	RefreshTokenValidity time.Duration
 	KafkaDefaultTopic    string
+	IntegrationGRPCURL   string
 }
 
 func loadConfig() (*Config, error) {
@@ -62,6 +63,10 @@ func loadConfig() (*Config, error) {
 	if pubKey == "" {
 		return nil, fmt.Errorf("missing IDENTITY_PASETO_PUBLIC_KEY")
 	}
+	integrationGRPCURL := os.Getenv("INTEGRATION_GRPC_URL")
+	if integrationGRPCURL == "" {
+		return nil, fmt.Errorf("missing INTEGRATION_GRPC_URL")
+	}
 	tokenValidityStr := os.Getenv("AUTH_TOKEN_VALIDITY_MINUTES")
 	tokenValidity := 15 * time.Minute
 	if val, err := time.ParseDuration(tokenValidityStr + "m"); err == nil {
@@ -87,6 +92,7 @@ func loadConfig() (*Config, error) {
 		AuthTokenValidity:    tokenValidity,
 		KafkaDefaultTopic:    kafkaDefaultTopic,
 		RefreshTokenValidity: refreshTokenValidity,
+		IntegrationGRPCURL:   integrationGRPCURL,
 	}, nil
 }
 
@@ -133,7 +139,7 @@ func main() {
 
 	tokenVerifier, err := auth.NewPasetoTokenVerifier()
 
-	router := handlers.SetupIdentityRouter(service, tokenVerifier)
+	router := handlers.SetupIdentityRouter(service, tokenVerifier, cfg.IntegrationGRPCURL)
 	httpServer := &http.Server{
 		Addr:         cfg.HTTPPort,
 		Handler:      router,

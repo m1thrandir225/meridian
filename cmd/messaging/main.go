@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/m1thrandir225/meridian/pkg/kafka"
 	"log"
 	"net/http"
 	"os"
@@ -12,6 +11,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/m1thrandir225/meridian/pkg/kafka"
 
 	"github.com/IBM/sarama"
 	"github.com/gin-gonic/gin"
@@ -27,6 +28,8 @@ type Config struct {
 	DatabaseURL       string
 	KafkaBrokers      []string
 	KafkaDefaultTopic string
+	GRPCPort          string
+	IdentityGRPCURL   string
 }
 
 func loadConfig() (*Config, error) {
@@ -50,11 +53,23 @@ func loadConfig() (*Config, error) {
 		return nil, fmt.Errorf("missing MESSAGING_DB_URL")
 	}
 
+	grpcPort := os.Getenv("MESSAGING_GRPC_PORT")
+	if grpcPort == "" {
+		return nil, fmt.Errorf("missing MESSAGING_GRPC_PORT")
+	}
+
+	identityGRPCURL := os.Getenv("IDENTITY_GRPC_URL")
+	if identityGRPCURL == "" {
+		return nil, fmt.Errorf("missing IDENTITY_GRPC_URL")
+	}
+
 	return &Config{
 		HTTPPort:          httpPort,
+		DatabaseURL:       dbURL,
 		KafkaBrokers:      strings.Split(kafkaBrokerStr, ","),
 		KafkaDefaultTopic: kafkaDefaultTopic,
-		DatabaseURL:       dbURL,
+		GRPCPort:          grpcPort,
+		IdentityGRPCURL:   identityGRPCURL,
 	}, nil
 }
 
@@ -119,6 +134,13 @@ func main() {
 		Addr:    cfg.HTTPPort,
 		Handler: router,
 	}
+
+	go func() {
+		logger.Printf("Starting gRPC server on %s", cfg.GRPCPort)
+		if err := handlers.StartGRPCServer(cfg.GRPCPort, service); err != nil {
+			logger.Fatalf("Failed to start gRPC server: %v", err)
+		}
+	}()
 
 	go func() {
 		logger.Printf("HTTP Server listening on %s", cfg.HTTPPort)
