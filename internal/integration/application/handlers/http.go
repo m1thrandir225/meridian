@@ -37,6 +37,11 @@ type RevokeIntegrationRequest struct {
 
 // POST /api/v1/integrations
 func (h *HTTPHandler) handleRegisterIntegration(ctx *gin.Context) {
+	creatorID := ctx.GetHeader("X-User-ID")
+	if creatorID == "" {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
 	var req RegisterIntegrationRequest
 	if err := ctx.BindJSON(&req); err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -45,7 +50,7 @@ func (h *HTTPHandler) handleRegisterIntegration(ctx *gin.Context) {
 
 	cmd := domain.RegisterIntegrationCommand{
 		ServiceName:    req.ServiceName,
-		CreatorUserID:  "",
+		CreatorUserID:  creatorID,
 		TargetChannels: req.TargetChannelIDs,
 	}
 
@@ -66,6 +71,12 @@ func (h *HTTPHandler) handleRegisterIntegration(ctx *gin.Context) {
 
 // DELETE /api/v1/integrations
 func (h *HTTPHandler) handleRevokeIntegration(ctx *gin.Context) {
+	requestorID := ctx.GetHeader("X-User-ID")
+	if requestorID == "" {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
 	var req RevokeIntegrationRequest
 	if err := ctx.BindJSON(&req); err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -74,7 +85,7 @@ func (h *HTTPHandler) handleRevokeIntegration(ctx *gin.Context) {
 
 	cmd := domain.RevokeTokenCommand{
 		IntegrationID: req.IntegrationID,
-		RequestorID:   "",
+		RequestorID:   requestorID,
 	}
 
 	err := h.integrationService.RevokeToken(ctx, cmd)
