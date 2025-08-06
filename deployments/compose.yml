@@ -198,6 +198,8 @@ services:
       context: ../
       dockerfile: deployments/migrate/Dockerfile
     container_name: meridian_integration_migrate
+    networks:
+      - meridian_network
     depends_on:
       integration_postgres:
           condition: service_healthy

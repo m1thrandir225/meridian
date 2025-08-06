@@ -1,0 +1,75 @@
+syntax = "proto3";
+
+package messaging.v1;
+
+option go_package = "github.com/m1thrandir225/meridian/internal/messaging/infrastructure/api;messagingpb";
+
+
+service MessagingService {
+  rpc SendMessage(SendMessageRequest) returns (SendMessageResponse);
+  rpc GetMessages(GetMessagesRequest) returns (GetMessagesResponse);
+  rpc GetMessage(GetMessageRequest) returns (GetMessageResponse);
+
+}
+
+message SendMessageRequest {
+  string content = 1;
+  string sender_id = 2;
+  string sender_type = 3; // "user" or "integration"
+  string sender_name = 4;
+  repeated string target_channel_ids = 5;
+  string message_type = 6; // "direct", "integration_webhook", etc.
+  map<string, string> metadata = 7;
+}
+
+message SendMessageResponse {
+  bool success = 1;
+  string message_id = 2;
+  string error = 3;
+}
+
+message GetMessagesRequest {
+  string user_id = 1;
+  int32 limit = 2;
+  int32 offset = 3;
+  string message_type = 4;
+}
+
+message GetMessagesResponse {
+  repeated Message messages = 1;
+  int32 total_count = 2;
+}
+
+message GetMessageRequest {
+  string message_id = 1;
+}
+
+message GetMessageResponse {
+  Message message = 1;
+}
+
+message Message {
+  string id = 1;
+  string channel_id = 2;
+  string sender_user_id = 3;
+  string integration_id = 4;
+  MessageContent content = 5;
+  string created_at = 6;
+  string parent_message_id = 7;
+  repeated Reaction reactions = 8;
+}
+
+message MessageContent {
+  string text = 1;
+  repeated string mentions = 2;
+  repeated string links = 3;
+  bool formatted = 4;
+}
+
+message Reaction {
+  string id = 1;
+  string message_id = 2;
+  string user_id = 3;
+  string reaction_type = 4;
+  string created_at = 5;
+}

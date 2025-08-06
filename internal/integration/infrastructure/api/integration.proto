@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package integration.v1;
+
+option go_package = "github.com/m1thrandir225/meridian/internal/integration/infrastructure/api;integrationpb";
+
+service IntegrationService {
+  rpc ValidateAPIToken(ValidateAPITokenRequest) returns (ValidateAPITokenResponse);
+  rpc GetIntegration(GetIntegrationRequest) returns (GetIntegrationResponse);
+}
+
+message ValidateAPITokenRequest {
+  string token = 1;
+}
+
+message ValidateAPITokenResponse {
+  bool valid = 1;
+  string integration_id = 2;
+  string integration_name = 3;
+  string error = 5;
+}
+
+message GetIntegrationRequest {
+  string integration_id = 1;
+}
+
+message GetIntegrationResponse {
+  Integration integration = 1;
+}
+
+message Integration {
+  string id = 1;
+  string service_name = 2;
+  string creator_user_id = 3;
+  string hashed_api_token = 4;
+  string token_lookup_hash = 5;
+  string created_at = 6;
+  bool is_revoked = 7;
+  repeated string target_channel_ids = 8;
+}
