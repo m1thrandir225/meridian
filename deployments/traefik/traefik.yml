@@ -13,7 +13,7 @@ providers:
     exposedByDefault: false
     network: meridian_network
   file:
-    filename: /etc/traefik/dynamic.yaml
+    filename: /etc/traefik/dynamic.yml
     watch: true
 
 accessLog:
@@ -21,6 +21,6 @@ accessLog:
   format: json
 
 log:
-  level: INFO
+  level: DEBUG
   filePath: "/var/log/traefik/traefik.log"
   format: json

@@ -2,7 +2,7 @@ http:
   middlewares:
     identity-auth:
       forwardAuth:
-        address: "http://identity:8081/api/v1/auth/validate"
+        address: "http://identity:8081/api/v1/auth/validate-token"
         authResponseHeaders:
           - "X-User-Id"
           - "X-User-Email"
@@ -14,7 +14,8 @@ http:
           - "Authorization"
           - "X-Forwarded-Uri"
           - "X-Forwarded-Method"
-    cors:
+        trustForwardHeader: true
+    cors-headers:
       headers:
         accessControlAllowMethods:
           - GET
@@ -23,8 +24,7 @@ http:
           - DELETE
           - OPTIONS
         accessControlAllowOriginList:
-          - "http://localhost:3000"
-          - "http://localhost:8080"
+          - "*"
         accessControlAllowHeaders:
           - "Authorization"
           - "Content-Type"
@@ -53,17 +53,18 @@ http:
       service: api@internal
       entryPoints:
         - web
+
     identity-public:
-      rule: "Host(`api.localhost`) && PathPrefix(`/api/v1/auth`) && (Path(`/api/v1/auth/login`) || Path(`/api/v1/auth/register`) || Path(`/api/v1/auth/validate`))"
+      rule: "Host(`api.localhost`) && PathPrefix(`/api/v1/auth`) && (Path(`/api/v1/auth/login`) || Path(`/api/v1/auth/register`) || Path(`/api/v1/auth/validate-token`))"
       service: identity-service
       entryPoints:
         - web
       middlewares:
         - cors-headers
-        - security-headers
-      priority: 200
+      priority: 300
+
     identity-protected:
-      rule: "Host(`api.localhost`) && PathPrefix(`/api/v1/auth`) && !(Path(`/api/v1/auth/login`) || Path(`/api/v1/auth/register`) || Path(`/api/v1/auth/validate`))"
+      rule: "Host(`api.localhost`) && PathPrefix(`/api/v1/auth`) && !Path(`/api/v1/auth/login`) && !Path(`/api/v1/auth/register`) && !Path(`/api/v1/auth/validate-token`)"
       service: identity-service
       entryPoints:
         - web
@@ -72,7 +73,8 @@ http:
         - security-headers
         - identity-auth
         - rate-limit
-      priority: 150
+      priority: 200
+
     messaging:
       rule: "Host(`api.localhost`) && PathPrefix(`/api/v1/messages`)"
       service: messaging-service
@@ -84,6 +86,7 @@ http:
         - identity-auth
         - rate-limit
       priority: 100
+
     integration-management:
       rule: "Host(`api.localhost`) && PathPrefix(`/api/v1/integrations`) && !PathPrefix(`/api/v1/integrations/webhook`) && !PathPrefix(`/api/v1/integrations/callback`)"
       service: integration-service
@@ -94,22 +97,11 @@ http:
         - security-headers
         - identity-auth
         - rate-limit
-      priority: 150
-    integration-webhooks:
-      rule: "Host(`api.localhost`) && (PathPrefix(`/api/v1/integrations/webhook`) || PathPrefix(`/api/v1/integrations/callback`))"
-      service: integration-service
-      entryPoints:
-        - web
-      middlewares:
-        - cors-headers
-        - security-headers
-        - identity-auth  # This will validate API tokens
-        - rate-limit
       priority: 200
 
-    notification:
-      rule: "Host(`api.localhost`) && PathPrefix(`/api/v1/notifications`)"
-      service: notification-service
+    integration-webhooks:
+      rule: "Host(`api.localhost`) && PathPrefix(`/api/v1/integrations/webhook`) || PathPrefix(`/api/v1/integrations/callback`)"
+      service: integration-service
       entryPoints:
         - web
       middlewares:
@@ -117,17 +109,46 @@ http:
         - security-headers
         - identity-auth
         - rate-limit
-      priority: 100
+      priority: 300
+
+    health-checks:
+      rule: "Host(`api.localhost`) && Path(`/health`)"
+      service: identity-service
+      entryPoints:
+        - web
+      priority: 400
+
+
+  #    notification:
+#      rule: "Host(`api.localhost`) && PathPrefix(`/api/v1/notifications`)"
+#      service: notification-service
+#      entryPoints:
+#        - web
+#      middlewares:
+#        - cors-headers
+#        - security-headers
+#        - identity-auth
+#        - rate-limit
+#      priority: 100
+
   services:
     identity-service:
       loadBalancer:
         servers:
           - url: "http://identity:8081"
+        healthCheck:
+          path: "/health"
+          interval: "30s"
+          timeout: "5s"
 
     messaging-service:
       loadBalancer:
         servers:
-          - url: "http://messaging:8080"
+          - url: "http://messaging:8082"
+        healthCheck:
+          path: "/health"
+          interval: "30s"
+          timeout: "5s"
 
     integration-service:
       loadBalancer:
@@ -137,11 +158,11 @@ http:
           path: "/health"
           interval: "30s"
           timeout: "5s"
-    notification-service:
-      loadBalancer:
-        servers:
-          - url: "http://notification:8084"
-        healthCheck:
-          path: "/health"
-          interval: "30s"
-          timeout: "5s"
+#    notification-service:
+#      loadBalancer:
+#        servers:
+#          - url: "http://notification:8084"
+#        healthCheck:
+#          path: "/health"
+#          interval: "30s"
+#          timeout: "5s"

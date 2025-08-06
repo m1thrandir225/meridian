@@ -20,8 +20,8 @@ services:
       - "8080:8080"
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
-      - "./traefik/traefik.yaml:/etc/traefik/traefik.yml:ro"
-      - "./traefik/dynamic.yaml:/etc/traefik/dynamic.yml:ro"
+      - "./traefik/traefik.yml:/etc/traefik/traefik.yml:ro"
+      - "./traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro"
       - "traefik_logs:/var/log/traefik"
     networks:
       - meridian_network
@@ -61,6 +61,12 @@ services:
       - ALLOW_PLAINTEXT_LISTENER=yes
     volumes:
       - kafka_data:/bitnami/kafka
+    healthcheck:
+      test: [ "CMD-SHELL", "kafka-topics.sh --bootstrap-server localhost:9092 --list || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 45s
     depends_on:
       - zookeeper
     restart: unless-stopped
@@ -125,6 +131,8 @@ services:
         condition: service_healthy
       messaging_redis:
         condition: service_started
+      kafka:
+        condition: service_healthy
     environment:
       MESSAGING_DB_URL: "${MESSAGING_DB_URL}"
       MESSAGING_HTTP_PORT: ":${MESSAGING_HTTP_PORT}"
@@ -137,6 +145,12 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.services.messaging.loadbalancer.server.port=8082"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${MESSAGING_HTTP_PORT}/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
     restart: unless-stopped
   identity_postgres:
     image: postgres:alpine
@@ -185,6 +199,8 @@ services:
         condition: service_completed_successfully
       identity_postgres:
         condition: service_healthy
+      kafka:
+        condition: service_healthy
     labels:
       - "traefik.enable=true"
       - "traefik.http.services.identity.loadbalancer.server.port=8081"
@@ -198,6 +214,12 @@ services:
       AUTH_TOKEN_VALIDITY_MINUTES: "${AUTH_TOKEN_VALIDITY_MINUTES}"
       INTEGRATION_GRPC_URL: "${INTEGRATION_GRPC_URL}"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${IDENTITY_HTTP_PORT}/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
   integration_postgres:
     image: postgres:alpine
     container_name: meridian_postgres_integration
@@ -245,6 +267,8 @@ services:
         condition: service_completed_successfully
       integration_postgres:
         condition: service_healthy
+      kafka:
+        condition: service_healthy
     environment:
       INTEGRATION_HTTP_PORT: ":${INTEGRATION_HTTP_PORT}"
       INTEGRATION_DB_URL: "${INTEGRATION_DB_URL}"
@@ -255,5 +279,11 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.services.integration.loadbalancer.server.port=8083"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${INTEGRATION_HTTP_PORT}/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
     restart: unless-stopped
 

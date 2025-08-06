@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"log"
+	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/m1thrandir225/meridian/internal/identity/application/services"
@@ -21,12 +22,16 @@ func SetupIdentityRouter(
 	handler := NewHTTPHandler(service)
 	authHandler := NewAuthHandler(service, tokenVerifier, integrationGrpcURL)
 
-	apiV1 := router.Group("/api/v1")
+	router.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "healthy", "service": "identity"})
+	})
+
+	apiV1 := router.Group("/api/v1/auth")
 	{
 		apiV1.POST("/register", handler.handleRegisterRequest)
 		apiV1.POST("/login", handler.handleLoginRequest)
 
-		apiV1.POST("/validate-token", authHandler.ValidateToken)
+		apiV1.GET("/validate-token", authHandler.ValidateToken)
 
 		me := apiV1.Group("/me")
 		me.Use(AuthenticationMiddleware(tokenVerifier))

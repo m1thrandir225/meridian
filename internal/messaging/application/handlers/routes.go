@@ -1,8 +1,17 @@
 package handlers
 
-import "github.com/gin-gonic/gin"
+import (
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+)
 
 func SetupRoutes(router *gin.Engine, httpHandler *HTTPHandler) {
+
+	router.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "healthy", "service": "messaging"})
+	})
+
 	apiV1 := router.Group("/api/v1")
 	{
 		channelsGroup := apiV1.Group("/channels")

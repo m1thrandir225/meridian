@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"log"
+	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/m1thrandir225/meridian/internal/integration/application/services"
@@ -15,6 +16,10 @@ func SetupIntegrationRouter(service *services.IntegrationService) *gin.Engine {
 	router.Use(gin.Recovery())
 
 	handler := NewHttpHandler(service)
+
+	router.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "healthy", "service": "integration"})
+	})
 
 	apiV1 := router.Group("/api/v1")
 	{
