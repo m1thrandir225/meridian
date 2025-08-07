@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { BadgeCheck, Bell, ChevronsUpDown, CreditCard, LogOut, Sparkles } from 'lucide-vue-next'
+import { ChevronsUpDown, LogOut, Settings } from 'lucide-vue-next'
+import { useRouter } from 'vue-router'
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
@@ -27,6 +28,11 @@ const props = defineProps<{
 }>()
 
 const { isMobile } = useSidebar()
+const router = useRouter()
+
+const navigateToSettings = () => {
+  router.push('/settings/profile')
+}
 </script>
 
 <template>
@@ -69,24 +75,9 @@ const { isMobile } = useSidebar()
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuGroup>
-            <DropdownMenuItem>
-              <Sparkles />
-              Upgrade to Pro
-            </DropdownMenuItem>
-          </DropdownMenuGroup>
-          <DropdownMenuSeparator />
-          <DropdownMenuGroup>
-            <DropdownMenuItem>
-              <BadgeCheck />
-              Account
-            </DropdownMenuItem>
-            <DropdownMenuItem>
-              <CreditCard />
-              Billing
-            </DropdownMenuItem>
-            <DropdownMenuItem>
-              <Bell />
-              Notifications
+            <DropdownMenuItem @click="navigateToSettings">
+              <Settings />
+              Settings
             </DropdownMenuItem>
           </DropdownMenuGroup>
           <DropdownMenuSeparator />

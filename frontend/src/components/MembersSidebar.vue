@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { Users, Crown, Bot, Plus } from 'lucide-vue-next'
 import { RouterLink } from 'vue-router'
 
-import { Sidebar, SidebarContent, SidebarRail } from '@/components/ui/sidebar'
+import { Sidebar, SidebarContent } from '@/components/ui/sidebar'
 
 const props = withDefaults(defineProps<SidebarProps>(), {
   collapsible: 'icon',
@@ -228,6 +228,5 @@ const getRoleIcon = (role: string) => {
         </div>
       </div>
     </SidebarContent>
-    <SidebarRail />
   </Sidebar>
 </template>

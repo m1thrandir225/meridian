@@ -1,5 +1,5 @@
 @import 'tailwindcss';
-@import "tw-animate-css";
+@import 'tw-animate-css';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -111,6 +111,9 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(0.269 0 0);
   --sidebar-ring: oklch(0.439 0 0);
+
+  /* Font size variables */
+  --font-size-base: 16px;
 }
 
 @layer base {
@@ -119,5 +122,6 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-size: var(--font-size-base);
   }
 }

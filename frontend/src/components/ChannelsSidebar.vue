@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { SidebarProps } from '@/components/ui/sidebar'
 import { Settings, Plus, Waves } from 'lucide-vue-next'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,13 +17,8 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarHeader,
-  SidebarFooter,
-  SidebarRail,
-} from '@/components/ui/sidebar'
+import { Sidebar, SidebarContent, SidebarHeader, SidebarFooter } from '@/components/ui/sidebar'
+import NavUser from './NavUser.vue'
 
 const props = withDefaults(defineProps<SidebarProps>(), {
   collapsible: 'icon',
@@ -60,6 +54,7 @@ const channels = ref([
 const user = {
   name: 'John Doe',
   username: 'johndoe',
+  email: 'john.doe@example.com',
   avatar: '/avatars/user.png',
 }
 
@@ -161,25 +156,7 @@ const createChannel = () => {
     </SidebarContent>
 
     <SidebarFooter>
-      <div class="flex items-center gap-2 px-2 py-2 bg-accent/50 rounded-lg mx-2 mb-2">
-        <Avatar class="h-8 w-8">
-          <AvatarImage :src="user.avatar" :alt="user.name" />
-          <AvatarFallback>{{
-            user.name
-              .split(' ')
-              .map((n) => n[0])
-              .join('')
-          }}</AvatarFallback>
-        </Avatar>
-        <div class="flex-1 min-w-0">
-          <p class="text-sm font-medium truncate">{{ user.name }}</p>
-          <p class="text-xs text-muted-foreground truncate">@{{ user.username }}</p>
-        </div>
-        <Button variant="ghost" size="icon" class="h-6 w-6">
-          <Settings class="h-4 w-4" />
-        </Button>
-      </div>
+      <NavUser :user="user" />
     </SidebarFooter>
-    <SidebarRail />
   </Sidebar>
 </template>
