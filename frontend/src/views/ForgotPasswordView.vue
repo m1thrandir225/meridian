@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import RegisterForm from '@/components/RegisterForm.vue'
+import ForgotPasswordForm from '@/components/ForgotPasswordForm.vue'
 import AuthLayout from '@/layouts/AuthLayout.vue'
 </script>
 
 <template>
   <AuthLayout>
-    <RegisterForm />
+    <ForgotPasswordForm />
   </AuthLayout>
 </template>

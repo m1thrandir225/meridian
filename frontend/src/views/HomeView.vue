@@ -1,48 +1,55 @@
 <script setup lang="ts">
-import AppSidebar from '@/components/AppSidebar.vue'
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from '@/components/ui/breadcrumb'
-import { Separator } from '@/components/ui/separator'
-import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
+import ChannelsSidebar from '@/components/ChannelsSidebar.vue'
+import MembersSidebar from '@/components/MembersSidebar.vue'
+import ChatArea from '@/components/ChatArea.vue'
+import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
+import { ref } from 'vue'
+
+const isChannelsSidebarOpen = ref(true)
+const isMembersSidebarOpen = ref(true)
+
+const toggleChannelsSidebar = () => {
+  isChannelsSidebarOpen.value = !isChannelsSidebarOpen.value
+}
+
+const toggleMembersSidebar = () => {
+  isMembersSidebarOpen.value = !isMembersSidebarOpen.value
+}
 </script>
 
 <template>
-  <SidebarProvider>
-    <AppSidebar />
-    <SidebarInset>
-      <header
-        class="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12"
+  <div class="flex h-screen">
+    <SidebarProvider>
+      <Transition
+        name="slide-left"
+        enter-active-class="transition-all duration-300 ease-out"
+        leave-active-class="transition-all duration-300 ease-in"
+        enter-from-class="-translate-x-full opacity-0"
+        enter-to-class="translate-x-0 opacity-100"
+        leave-from-class="translate-x-0 opacity-100"
+        leave-to-class="-translate-x-full opacity-0"
       >
-        <div class="flex items-center gap-2 px-4">
-          <SidebarTrigger class="-ml-1" />
-          <Separator orientation="vertical" class="mr-2 h-4" />
-          <Breadcrumb>
-            <BreadcrumbList>
-              <BreadcrumbItem class="hidden md:block">
-                <BreadcrumbLink href="#"> Building Your Application </BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator class="hidden md:block" />
-              <BreadcrumbItem>
-                <BreadcrumbPage>Data Fetching</BreadcrumbPage>
-              </BreadcrumbItem>
-            </BreadcrumbList>
-          </Breadcrumb>
-        </div>
-      </header>
-      <div class="flex flex-1 flex-col gap-4 p-4 pt-0">
-        <div class="grid auto-rows-min gap-4 md:grid-cols-3">
-          <div class="aspect-video rounded-xl bg-muted/50" />
-          <div class="aspect-video rounded-xl bg-muted/50" />
-          <div class="aspect-video rounded-xl bg-muted/50" />
-        </div>
-        <div class="min-h-[100vh] flex-1 rounded-xl bg-muted/50 md:min-h-min" />
-      </div>
-    </SidebarInset>
-  </SidebarProvider>
+        <ChannelsSidebar v-if="isChannelsSidebarOpen" />
+      </Transition>
+      <SidebarInset>
+        <ChatArea
+          :is-channels-sidebar-open="isChannelsSidebarOpen"
+          :is-members-sidebar-open="isMembersSidebarOpen"
+          @toggle-channels-sidebar="toggleChannelsSidebar"
+          @toggle-members-sidebar="toggleMembersSidebar"
+        />
+      </SidebarInset>
+      <Transition
+        name="slide-right"
+        enter-active-class="transition-all duration-300 ease-out"
+        leave-active-class="transition-all duration-300 ease-in"
+        enter-from-class="translate-x-full opacity-0"
+        enter-to-class="translate-x-0 opacity-100"
+        leave-from-class="translate-x-0 opacity-100"
+        leave-to-class="translate-x-full opacity-0"
+      >
+        <MembersSidebar v-if="isMembersSidebarOpen" />
+      </Transition>
+    </SidebarProvider>
+  </div>
 </template>

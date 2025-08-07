@@ -17,8 +17,9 @@ const props = defineProps<{
       <CardContent class="grid p-0 md:grid-cols-2">
         <div class="bg-muted relative hidden md:block">
           <img
+            src="/register.jpg"
             alt="Image"
-            class="absolute inset-0 h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
+            class="absolute inset-0 h-full w-full object-right object-cover dark:brightness-[0.2] dark:grayscale"
           />
         </div>
         <form class="p-6 md:p-8">
@@ -45,7 +46,7 @@ const props = defineProps<{
             </div>
             <div class="grid gap-3">
               <Label for="password">Password</Label>
-              <Input id="password" type="password" required />
+              <Input id="password" type="password" required placeholder="**********" />
             </div>
             <Button type="submit" class="w-full"> Register </Button>
 

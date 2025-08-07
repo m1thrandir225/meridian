@@ -28,11 +28,14 @@ const props = defineProps<{
             <div class="grid gap-3">
               <div class="flex items-center">
                 <Label for="password">Password</Label>
-                <a href="#" class="ml-auto text-sm underline-offset-2 hover:underline">
+                <RouterLink
+                  to="/forgot-password"
+                  class="ml-auto text-sm underline-offset-2 hover:underline"
+                >
                   Forgot your password?
-                </a>
+                </RouterLink>
               </div>
-              <Input id="password" type="password" required />
+              <Input id="password" type="password" required placeholder="**********" />
             </div>
             <Button type="submit" class="w-full"> Login </Button>
 
@@ -44,6 +47,7 @@ const props = defineProps<{
         </form>
         <div class="bg-muted relative hidden md:block">
           <img
+            src="/login.jpg"
             alt="Image"
             class="absolute inset-0 h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
           />
