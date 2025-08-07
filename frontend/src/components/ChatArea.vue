@@ -1,9 +1,13 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { Hash, Users, Send, Smile, Menu } from 'lucide-vue-next'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { useAppearanceStore } from '@/stores/appearance'
+
+// Appearance store
+const appearanceStore = useAppearanceStore()
 
 // Props and emits
 interface Props {
@@ -20,6 +24,39 @@ const emit = defineEmits<{
   toggleChannelsSidebar: []
   toggleMembersSidebar: []
 }>()
+
+// Computed styles based on appearance settings
+const messageContainerClasses = computed(() => {
+  const baseClasses = 'flex gap-3 group transition-all duration-200 rounded-lg hover:bg-accent/5'
+  const sizeClasses = appearanceStore.messageDisplayMode === 'compact' ? 'px-2 py-1' : 'px-3 py-2'
+
+  return `${baseClasses} ${sizeClasses}`
+})
+
+const getMessageBorderStyle = (hovered: boolean) => {
+  if (!hovered) return {}
+
+  return {
+    borderLeft: `4px solid hsl(${appearanceStore.accentColorClass})`,
+    marginLeft: '4px',
+    paddingLeft: '8px',
+  }
+}
+
+const messageTextClasses = computed(() => {
+  const baseClasses = 'leading-relaxed mb-2'
+  const sizeClasses = appearanceStore.messageDisplayMode === 'compact' ? 'text-sm' : 'text-base'
+
+  return `${baseClasses} ${sizeClasses}`
+})
+
+const avatarSize = computed(() => {
+  return appearanceStore.messageDisplayMode === 'compact' ? 'h-6 w-6' : 'h-8 w-8'
+})
+
+const messageSpacing = computed(() => {
+  return appearanceStore.messageDisplayMode === 'compact' ? 'space-y-1' : 'space-y-4'
+})
 
 const currentChannel = {
   id: '1',
@@ -127,6 +164,24 @@ const toggleReaction = (messageId: string, emoji: string) => {
 }
 
 const quickReactions = ['👍', '❤️', '😂', '😮', '😢', '😡']
+
+// Track hover state for messages
+const hoveredMessageId = ref<string | null>(null)
+
+const setHoveredMessage = (messageId: string | null) => {
+  hoveredMessageId.value = messageId
+}
+
+const getMessageStyle = (messageId: string) => {
+  const isHovered = hoveredMessageId.value === messageId
+  if (!isHovered) return {}
+
+  return {
+    borderLeft: `4px solid hsl(${appearanceStore.accentColorClass})`,
+    marginLeft: '4px',
+    paddingLeft: '8px',
+  }
+}
 </script>
 
 <template>
@@ -163,9 +218,16 @@ const quickReactions = ['👍', '❤️', '😂', '😮', '😢', '😡']
     </header>
 
     <!-- Messages Area -->
-    <div class="flex-1 overflow-y-auto p-4 space-y-4">
-      <div v-for="message in messages" :key="message.id" class="flex gap-3 group">
-        <Avatar class="h-8 w-8 mt-1">
+    <div class="flex-1 overflow-y-auto p-4" :class="messageSpacing">
+      <div
+        v-for="message in messages"
+        :key="message.id"
+        :class="messageContainerClasses"
+        :style="getMessageStyle(message.id)"
+        @mouseenter="setHoveredMessage(message.id)"
+        @mouseleave="setHoveredMessage(null)"
+      >
+        <Avatar :class="`${avatarSize} mt-1`">
           <AvatarImage :src="message.author.avatar" :alt="message.author.name" />
           <AvatarFallback>{{
             message.author.name
@@ -176,10 +238,24 @@ const quickReactions = ['👍', '❤️', '😂', '😮', '😢', '😡']
         </Avatar>
         <div class="flex-1 min-w-0">
           <div class="flex items-baseline gap-2 mb-1">
-            <span class="font-medium text-sm">{{ message.author.name }}</span>
-            <span class="text-xs text-muted-foreground">{{ formatTime(message.timestamp) }}</span>
+            <span
+              :class="
+                appearanceStore.messageDisplayMode === 'compact'
+                  ? 'font-medium text-xs'
+                  : 'font-medium text-sm'
+              "
+              >{{ message.author.name }}</span
+            >
+            <span
+              :class="
+                appearanceStore.messageDisplayMode === 'compact'
+                  ? 'text-xs text-muted-foreground'
+                  : 'text-xs text-muted-foreground'
+              "
+              >{{ formatTime(message.timestamp) }}</span
+            >
           </div>
-          <div class="text-sm leading-relaxed mb-2">
+          <div :class="messageTextClasses">
             {{ message.content }}
           </div>
 

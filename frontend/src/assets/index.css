@@ -125,3 +125,18 @@
     font-size: var(--font-size-base);
   }
 }
+
+/* Custom message hover effects */
+@layer components {
+  .message-hover-border {
+    transition: all 0.2s ease-in-out;
+    border-radius: 8px;
+  }
+
+  .message-hover-border:hover {
+    background-color: hsl(var(--accent) / 0.05);
+    border-left: 4px solid var(--hover-border-color, hsl(220 91% 56%));
+    margin-left: 4px;
+    padding-left: 8px;
+  }
+}
