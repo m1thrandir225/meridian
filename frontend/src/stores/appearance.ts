@@ -54,74 +54,44 @@ export const useAppearanceStore = defineStore(
         // Primary colors
         primary: `${baseHue} 91% ${isDark ? '65%' : '56%'}`,
         primaryForeground: isDark ? '0 0% 98%' : '0 0% 2%',
-        
+
         // Background colors - tinted with accent
-        background: isDark 
-          ? `${baseHue} 15% 4%`   // Very dark with subtle accent tint
-          : `${baseHue} 25% 98%`,  // Very light with subtle accent tint
-        foreground: isDark 
-          ? `${baseHue} 5% 95%`    // Light text with subtle accent
-          : `${baseHue} 15% 8%`,   // Dark text with subtle accent
-        
+        background: isDark
+          ? `${baseHue} 15% 4%` // Very dark with subtle accent tint
+          : `${baseHue} 25% 98%`, // Very light with subtle accent tint
+        foreground: isDark
+          ? `${baseHue} 5% 95%` // Light text with subtle accent
+          : `${baseHue} 15% 8%`, // Dark text with subtle accent
+
         // Card colors
-        card: isDark 
-          ? `${baseHue} 20% 6%` 
-          : `${baseHue} 30% 97%`,
-        cardForeground: isDark 
-          ? `${baseHue} 5% 90%` 
-          : `${baseHue} 15% 12%`,
-        
+        card: isDark ? `${baseHue} 20% 6%` : `${baseHue} 30% 97%`,
+        cardForeground: isDark ? `${baseHue} 5% 90%` : `${baseHue} 15% 12%`,
+
         // Secondary colors
-        secondary: isDark 
-          ? `${baseHue} 25% 12%` 
-          : `${baseHue} 35% 92%`,
-        secondaryForeground: isDark 
-          ? `${baseHue} 8% 85%` 
-          : `${baseHue} 20% 18%`,
-        
+        secondary: isDark ? `${baseHue} 25% 12%` : `${baseHue} 35% 92%`,
+        secondaryForeground: isDark ? `${baseHue} 8% 85%` : `${baseHue} 20% 18%`,
+
         // Muted colors
-        muted: isDark 
-          ? `${baseHue} 20% 10%` 
-          : `${baseHue} 30% 94%`,
-        mutedForeground: isDark 
-          ? `${baseHue} 8% 60%` 
-          : `${baseHue} 15% 45%`,
-        
+        muted: isDark ? `${baseHue} 20% 10%` : `${baseHue} 30% 94%`,
+        mutedForeground: isDark ? `${baseHue} 8% 60%` : `${baseHue} 15% 45%`,
+
         // Accent colors
-        accent: isDark 
-          ? `${baseHue} 30% 15%` 
-          : `${baseHue} 40% 90%`,
-        accentForeground: isDark 
-          ? `${baseHue} 10% 80%` 
-          : `${baseHue} 25% 25%`,
-        
+        accent: isDark ? `${baseHue} 30% 15%` : `${baseHue} 40% 90%`,
+        accentForeground: isDark ? `${baseHue} 10% 80%` : `${baseHue} 25% 25%`,
+
         // Border and input
-        border: isDark 
-          ? `${baseHue} 15% 18%` 
-          : `${baseHue} 25% 85%`,
-        input: isDark 
-          ? `${baseHue} 15% 18%` 
-          : `${baseHue} 25% 85%`,
+        border: isDark ? `${baseHue} 15% 18%` : `${baseHue} 25% 85%`,
+        input: isDark ? `${baseHue} 15% 18%` : `${baseHue} 25% 85%`,
         ring: `${baseHue} 91% ${isDark ? '65%' : '56%'}`,
-        
+
         // Sidebar colors
-        sidebar: isDark 
-          ? `${baseHue} 25% 8%` 
-          : `${baseHue} 35% 95%`,
-        sidebarForeground: isDark 
-          ? `${baseHue} 8% 88%` 
-          : `${baseHue} 18% 15%`,
+        sidebar: isDark ? `${baseHue} 25% 8%` : `${baseHue} 35% 95%`,
+        sidebarForeground: isDark ? `${baseHue} 8% 88%` : `${baseHue} 18% 15%`,
         sidebarPrimary: `${baseHue} 91% ${isDark ? '65%' : '56%'}`,
         sidebarPrimaryForeground: isDark ? '0 0% 98%' : '0 0% 2%',
-        sidebarAccent: isDark 
-          ? `${baseHue} 30% 20%` 
-          : `${baseHue} 40% 88%`,
-        sidebarAccentForeground: isDark 
-          ? `${baseHue} 10% 85%` 
-          : `${baseHue} 25% 20%`,
-        sidebarBorder: isDark 
-          ? `${baseHue} 20% 15%` 
-          : `${baseHue} 30% 82%`,
+        sidebarAccent: isDark ? `${baseHue} 30% 20%` : `${baseHue} 40% 88%`,
+        sidebarAccentForeground: isDark ? `${baseHue} 10% 85%` : `${baseHue} 25% 20%`,
+        sidebarBorder: isDark ? `${baseHue} 20% 15%` : `${baseHue} 30% 82%`,
         sidebarRing: `${baseHue} 91% ${isDark ? '65%' : '56%'}`,
       }
     })
@@ -172,7 +142,7 @@ export const useAppearanceStore = defineStore(
 
         // Update color-scheme for better browser integration
         root.style.colorScheme = themeClass.value
-        
+
         // Reapply colors when theme changes since palette depends on theme
         applyAccentColor()
       }
@@ -183,7 +153,7 @@ export const useAppearanceStore = defineStore(
       if (typeof document !== 'undefined') {
         const root = document.documentElement
         const palette = colorPalette.value
-        
+
         // Apply all color variables
         root.style.setProperty('--primary', `hsl(${palette.primary})`)
         root.style.setProperty('--primary-foreground', `hsl(${palette.primaryForeground})`)
@@ -200,14 +170,20 @@ export const useAppearanceStore = defineStore(
         root.style.setProperty('--border', `hsl(${palette.border})`)
         root.style.setProperty('--input', `hsl(${palette.input})`)
         root.style.setProperty('--ring', `hsl(${palette.ring})`)
-        
+
         // Apply sidebar colors
         root.style.setProperty('--sidebar', `hsl(${palette.sidebar})`)
         root.style.setProperty('--sidebar-foreground', `hsl(${palette.sidebarForeground})`)
         root.style.setProperty('--sidebar-primary', `hsl(${palette.sidebarPrimary})`)
-        root.style.setProperty('--sidebar-primary-foreground', `hsl(${palette.sidebarPrimaryForeground})`)
+        root.style.setProperty(
+          '--sidebar-primary-foreground',
+          `hsl(${palette.sidebarPrimaryForeground})`,
+        )
         root.style.setProperty('--sidebar-accent', `hsl(${palette.sidebarAccent})`)
-        root.style.setProperty('--sidebar-accent-foreground', `hsl(${palette.sidebarAccentForeground})`)
+        root.style.setProperty(
+          '--sidebar-accent-foreground',
+          `hsl(${palette.sidebarAccentForeground})`,
+        )
         root.style.setProperty('--sidebar-border', `hsl(${palette.sidebarBorder})`)
         root.style.setProperty('--sidebar-ring', `hsl(${palette.sidebarRing})`)
       }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, nextTick, watch, onMounted } from 'vue'
 import { Hash, Users, Send, Smile, Menu } from 'lucide-vue-next'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -8,6 +8,11 @@ import { useAppearanceStore } from '@/stores/appearance'
 
 // Appearance store
 const appearanceStore = useAppearanceStore()
+
+// Chat scroll management
+const messagesContainer = ref<HTMLElement | null>(null)
+const isUserInteracting = ref(false)
+const scrollToBottomTimeout = ref<number | null>(null)
 
 // Props and emits
 interface Props {
@@ -134,6 +139,13 @@ const sendMessage = () => {
       reactions: [],
     })
     newMessage.value = ''
+
+    // Force scroll to bottom when user sends a message
+    nextTick(() => {
+      if (messagesContainer.value) {
+        messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
+      }
+    })
   }
 }
 
@@ -182,6 +194,59 @@ const getMessageStyle = (messageId: string) => {
     paddingLeft: '8px',
   }
 }
+
+// Auto-scroll functionality
+const scrollToBottom = () => {
+  if (messagesContainer.value && !isUserInteracting.value) {
+    nextTick(() => {
+      messagesContainer.value!.scrollTop = messagesContainer.value!.scrollHeight
+    })
+  }
+}
+
+const handleScrollInteraction = () => {
+  isUserInteracting.value = true
+
+  if (scrollToBottomTimeout.value) {
+    clearTimeout(scrollToBottomTimeout.value)
+  }
+
+  // Resume auto-scroll after user stops scrolling for 3 seconds
+  scrollToBottomTimeout.value = window.setTimeout(() => {
+    isUserInteracting.value = false
+  }, 3000)
+}
+
+const handleMessageHover = (hovering: boolean) => {
+  if (hovering) {
+    isUserInteracting.value = true
+  } else {
+    // Short delay before resuming auto-scroll when user stops hovering
+    if (scrollToBottomTimeout.value) {
+      clearTimeout(scrollToBottomTimeout.value)
+    }
+    scrollToBottomTimeout.value = window.setTimeout(() => {
+      isUserInteracting.value = false
+    }, 1000)
+  }
+}
+
+// Watch for new messages and auto-scroll
+watch(
+  () => messages.value.length,
+  () => {
+    nextTick(() => {
+      scrollToBottom()
+    })
+  },
+)
+
+// Initial scroll to bottom on mount
+onMounted(() => {
+  nextTick(() => {
+    scrollToBottom()
+  })
+})
 </script>
 
 <template>
@@ -218,14 +283,20 @@ const getMessageStyle = (messageId: string) => {
     </header>
 
     <!-- Messages Area -->
-    <div class="flex-1 overflow-y-auto p-4" :class="messageSpacing">
+    <div
+      ref="messagesContainer"
+      class="flex-1 overflow-y-auto p-4"
+      :class="messageSpacing"
+      @scroll="handleScrollInteraction"
+      @wheel="handleScrollInteraction"
+    >
       <div
         v-for="message in messages"
         :key="message.id"
         :class="messageContainerClasses"
         :style="getMessageStyle(message.id)"
-        @mouseenter="setHoveredMessage(message.id)"
-        @mouseleave="setHoveredMessage(null)"
+        @mouseenter="(setHoveredMessage(message.id), handleMessageHover(true))"
+        @mouseleave="(setHoveredMessage(null), handleMessageHover(false))"
       >
         <Avatar :class="`${avatarSize} mt-1`">
           <AvatarImage :src="message.author.avatar" :alt="message.author.name" />
