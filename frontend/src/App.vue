@@ -2,7 +2,8 @@
 import { RouterView } from 'vue-router'
 import { onMounted } from 'vue'
 import { useAppearanceStore } from '@/stores/appearance'
-
+import { Toaster } from './components/ui/sonner'
+import 'vue-sonner/style.css'
 const appearanceStore = useAppearanceStore()
 
 onMounted(() => {
@@ -13,4 +14,5 @@ onMounted(() => {
 
 <template>
   <RouterView />
+  <Toaster />
 </template>

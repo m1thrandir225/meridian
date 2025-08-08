@@ -32,21 +32,11 @@ const emit = defineEmits<{
 
 // Computed styles based on appearance settings
 const messageContainerClasses = computed(() => {
-  const baseClasses = 'flex gap-3 group transition-all duration-200 rounded-lg hover:bg-accent/5'
+  const baseClasses = 'flex gap-3 group transition-all duration-200 rounded-lg hover:bg-accent/25'
   const sizeClasses = appearanceStore.messageDisplayMode === 'compact' ? 'px-2 py-1' : 'px-3 py-2'
 
   return `${baseClasses} ${sizeClasses}`
 })
-
-const getMessageBorderStyle = (hovered: boolean) => {
-  if (!hovered) return {}
-
-  return {
-    borderLeft: `4px solid hsl(${appearanceStore.accentColorClass})`,
-    marginLeft: '4px',
-    paddingLeft: '8px',
-  }
-}
 
 const messageTextClasses = computed(() => {
   const baseClasses = 'leading-relaxed mb-2'
@@ -186,10 +176,13 @@ const setHoveredMessage = (messageId: string | null) => {
 
 const getMessageStyle = (messageId: string) => {
   const isHovered = hoveredMessageId.value === messageId
-  if (!isHovered) return {}
+  if (!isHovered)
+    return {
+      border: '2px solid transparent',
+    }
 
   return {
-    borderLeft: `4px solid hsl(${appearanceStore.accentColorClass})`,
+    border: `2px solid hsl(${appearanceStore.accentColorClass})`,
     marginLeft: '4px',
     paddingLeft: '8px',
   }
@@ -349,8 +342,8 @@ onMounted(() => {
           </div>
 
           <!-- Quick Reaction Buttons (appear on hover) -->
-          <div class="opacity-0 group-hover:opacity-100 transition-opacity">
-            <div class="flex gap-1 mt-1">
+          <div class="opacity-0 group-hover:opacity-100 transition-opacity w-auto">
+            <div class="flex gap-1 mt-1 px-4 py-2 w-fit border border-primary/50 rounded-xl">
               <button
                 v-for="emoji in quickReactions"
                 :key="emoji"

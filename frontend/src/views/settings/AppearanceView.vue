@@ -5,6 +5,10 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAppearanceStore } from '@/stores/appearance'
 import type { Theme, AccentColor, FontSize, MessageDisplayMode } from '@/stores/appearance'
+import { ref } from 'vue'
+import { toast } from 'vue-sonner'
+
+const scrollContainer = ref<HTMLDivElement | null>(null)
 
 const appearanceStore = useAppearanceStore()
 
@@ -32,6 +36,26 @@ const messageDisplayModes: { value: MessageDisplayMode; label: string; descripti
   { value: 'cozy', label: 'Cozy', description: 'Modern and comfortable spacing' },
   { value: 'compact', label: 'Compact', description: 'Fit more messages on screen' },
 ]
+
+const scrollToTopContainer = () => {
+  if (scrollContainer.value) {
+    scrollContainer.value.scrollTo({
+      top: 0,
+      behavior: 'smooth',
+    })
+  }
+}
+
+const handleReset = () => {
+  appearanceStore.resetToDefaults()
+  scrollToTopContainer()
+  toast.success('Appearance settings reset to defaults')
+}
+
+const onSave = () => {
+  toast.success('Appearance settings saved')
+  scrollToTopContainer()
+}
 </script>
 
 <template>
@@ -48,7 +72,7 @@ const messageDisplayModes: { value: MessageDisplayMode; label: string; descripti
       </header>
 
       <!-- Content -->
-      <div class="flex-1 overflow-y-auto p-6">
+      <div class="flex-1 overflow-y-auto p-6" ref="scrollContainer">
         <div class="max-w-2xl mx-auto space-y-6">
           <!-- Theme -->
           <Card>
@@ -184,10 +208,8 @@ const messageDisplayModes: { value: MessageDisplayMode; label: string; descripti
 
           <!-- Actions -->
           <div class="flex justify-end gap-2">
-            <Button variant="outline" @click="appearanceStore.resetToDefaults"
-              >Reset to Default</Button
-            >
-            <Button @click="() => {}">Save Changes</Button>
+            <Button variant="outline" @click="handleReset">Reset to Default</Button>
+            <Button @click="onSave">Save Changes</Button>
           </div>
         </div>
       </div>
