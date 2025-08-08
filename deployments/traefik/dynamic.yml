@@ -54,6 +54,13 @@ http:
       entryPoints:
         - web
 
+    frontend:
+      rule: "Host(`app.localhost`)"
+      service: frontend-service
+      entryPoints:
+        - web
+      priority: 50
+
     identity-public:
       rule: "Host(`api.localhost`) && PathPrefix(`/api/v1/auth`) && (Path(`/api/v1/auth/login`) || Path(`/api/v1/auth/register`) || Path(`/api/v1/auth/validate-token`))"
       service: identity-service
@@ -132,6 +139,10 @@ http:
 #      priority: 100
 
   services:
+    frontend-service:
+      loadBalancer:
+        servers:
+          - url: "http://frontend:80"
     identity-service:
       loadBalancer:
         servers:
