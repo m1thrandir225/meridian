@@ -1,6 +1,10 @@
 package domain
 
-import "github.com/google/uuid"
+import (
+	"regexp"
+
+	"github.com/google/uuid"
+)
 
 // NOTE: might be redundant
 type MessageContent struct {
@@ -10,12 +14,23 @@ type MessageContent struct {
 	formatted bool
 }
 
-func newMessageContent(text string, mentions []uuid.UUID, links []string, formatted bool) MessageContent {
+var (
+	urlRegex     = regexp.MustCompile(`https?:\/\/[^\s]+`)
+	mentionRegex = regexp.MustCompile(`@[\w-]+`)
+)
+
+func NewMessageContent(message string) MessageContent {
+	foundLinks := urlRegex.FindAllString(message, -1)
+	//foundUsernames := mentionRegex.FindAllString(message, -1)
+
+	if foundLinks == nil {
+		foundLinks = []string{}
+	}
 	return MessageContent{
-		text:      text,
-		mentions:  mentions,
-		links:     links,
-		formatted: formatted,
+		text:      message,
+		mentions:  make([]uuid.UUID, 0),
+		links:     foundLinks,
+		formatted: true,
 	}
 }
 

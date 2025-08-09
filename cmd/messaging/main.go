@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/m1thrandir225/meridian/pkg/kafka"
+	"github.com/redis/go-redis/v9"
 
 	"github.com/IBM/sarama"
 	"github.com/gin-gonic/gin"
@@ -30,6 +31,7 @@ type Config struct {
 	KafkaDefaultTopic string
 	GRPCPort          string
 	IdentityGRPCURL   string
+	RedisURL          string
 }
 
 func loadConfig() (*Config, error) {
@@ -63,6 +65,11 @@ func loadConfig() (*Config, error) {
 		return nil, fmt.Errorf("missing IDENTITY_GRPC_URL")
 	}
 
+	redisURL := os.Getenv("MESSAGING_REDIS_URL")
+	if redisURL == "" {
+		return nil, fmt.Errorf("missing MESSAGING_REDIS_URL")
+	}
+
 	return &Config{
 		HTTPPort:          httpPort,
 		DatabaseURL:       dbURL,
@@ -70,6 +77,7 @@ func loadConfig() (*Config, error) {
 		KafkaDefaultTopic: kafkaDefaultTopic,
 		GRPCPort:          grpcPort,
 		IdentityGRPCURL:   identityGRPCURL,
+		RedisURL:          redisURL,
 	}, nil
 }
 
@@ -87,6 +95,12 @@ func main() {
 	if err != nil {
 	}
 	defer dbPool.Close()
+
+	redisClient := redis.NewClient(&redis.Options{
+		Addr: cfg.RedisURL,
+		DB:   0,
+	})
+	defer redisClient.Close()
 
 	// --- Kafka Producers ---
 	config := sarama.NewConfig()
@@ -119,6 +133,9 @@ func main() {
 	httpHandler := handlers.NewHttpHandler(service)
 	logger.Println("HTTP Handler initialized")
 
+	wsHandler := handlers.NewWebSocketHandler(service, redisClient)
+	logger.Println("WebSocket Handler initialized")
+
 	// -- GIN ROUTE SETUP --
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.Default()
@@ -126,7 +143,7 @@ func main() {
 	router.Use(gin.Logger())
 	router.Use(gin.Recovery())
 
-	handlers.SetupRoutes(router, httpHandler)
+	handlers.SetupRoutes(router, httpHandler, wsHandler)
 	logger.Println("HTTP Routes initialized")
 
 	// -- HTTP SERVER  --

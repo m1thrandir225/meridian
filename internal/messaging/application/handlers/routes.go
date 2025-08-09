@@ -6,14 +6,17 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func SetupRoutes(router *gin.Engine, httpHandler *HTTPHandler) {
-
+func SetupRoutes(router *gin.Engine, httpHandler *HTTPHandler, wsHandler *WebSocketHandler) {
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "healthy", "service": "messaging"})
 	})
 
-	apiV1 := router.Group("/api/v1")
+	apiV1 := router.Group("/api/v1/messages")
 	{
+		apiV1.GET("/ws", func(c *gin.Context) {
+			wsHandler.HandleWebSocket(c)
+		})
+
 		channelsGroup := apiV1.Group("/channels")
 		{
 			channelsGroup.POST("/", httpHandler.CreateChannel)
