@@ -140,6 +140,7 @@ func main() {
 	tokenVerifier, err := auth.NewPasetoTokenVerifier()
 
 	router := handlers.SetupIdentityRouter(service, tokenVerifier, cfg.IntegrationGRPCURL)
+
 	httpServer := &http.Server{
 		Addr:         cfg.HTTPPort,
 		Handler:      router,
