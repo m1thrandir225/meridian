@@ -60,7 +60,7 @@ type MessageResponse struct {
 	ContentText     string    `json:"content_text"`
 	CreatedAt       time.Time `json:"created_at"`
 	ParentMessageID *string
-	// Reactions       []ReactionResponse `json:"reactions,omitempty"`
+	Reactions       []ReactionResponse `json:"reactions,omitempty"`
 }
 
 func ToMessageResponse(message *domain.Message) MessageResponse {
@@ -80,6 +80,11 @@ func ToMessageResponse(message *domain.Message) MessageResponse {
 		parentId = &pId
 	}
 
+	reactionsDTO := make([]ReactionResponse, len(message.GetReactions()))
+	for i, reaction := range message.GetReactions() {
+		reactionsDTO[i] = ToReactionResponse(&reaction)
+	}
+
 	return MessageResponse{
 		ID:              message.GetId().String(),
 		ChannelID:       message.GetChannelId().String(),
@@ -88,6 +93,7 @@ func ToMessageResponse(message *domain.Message) MessageResponse {
 		ContentText:     message.GetContent().GetText(),
 		CreatedAt:       message.GetCreatedAt(),
 		ParentMessageID: parentId,
+		Reactions:       reactionsDTO,
 	}
 }
 

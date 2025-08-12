@@ -7,9 +7,6 @@ option go_package = "github.com/m1thrandir225/meridian/internal/messaging/infras
 
 service MessagingService {
   rpc SendMessage(SendMessageRequest) returns (SendMessageResponse);
-  rpc GetMessages(GetMessagesRequest) returns (GetMessagesResponse);
-  rpc GetMessage(GetMessageRequest) returns (GetMessageResponse);
-
 }
 
 message SendMessageRequest {
@@ -34,37 +31,6 @@ message MessageResponse {
 message SendMessageResponse {
   bool success = 1;
   repeated MessageResponse responses = 2;
-}
-
-message GetMessagesRequest {
-  string user_id = 1;
-  int32 limit = 2;
-  int32 offset = 3;
-  string message_type = 4;
-}
-
-message GetMessagesResponse {
-  repeated Message messages = 1;
-  int32 total_count = 2;
-}
-
-message GetMessageRequest {
-  string message_id = 1;
-}
-
-message GetMessageResponse {
-  Message message = 1;
-}
-
-message Message {
-  string id = 1;
-  string channel_id = 2;
-  string sender_user_id = 3;
-  string integration_id = 4;
-  MessageContent content = 5;
-  string created_at = 6;
-  string parent_message_id = 7;
-  repeated Reaction reactions = 8;
 }
 
 message MessageContent {

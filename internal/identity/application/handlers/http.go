@@ -29,7 +29,7 @@ type RegisterUserRequest struct {
 	LastName  string `json:"last_name" binding:"required"`
 }
 
-type RegisterUserResponse struct {
+type UserResponse struct {
 	UserID    string `json:"user_id"`
 	Username  string `json:"username"`
 	Email     string `json:"email"`
@@ -50,9 +50,8 @@ type AuthenticateTokensResponse struct {
 }
 
 type AuthenticateUserResponse struct {
-	UserID   string                     `json:"user_id"`
-	Username string                     `json:"username"`
-	Tokens   AuthenticateTokensResponse `json:"tokens"`
+	User   UserResponse               `json:"user"`
+	Tokens AuthenticateTokensResponse `json:"tokens"`
 }
 
 type UpdateProfileRequest struct {
@@ -64,14 +63,6 @@ type UpdateProfileRequest struct {
 
 type UpdatePasswordRequest struct {
 	NewPassword string `json:"new_password" binding:"required"`
-}
-
-type UpdateProfileResponse struct {
-	UserID    string `json:"user_id"`
-	Username  string `json:"username"`
-	Email     string `json:"email"`
-	FirstName string `json:"first_name"`
-	LastName  string `json:"last_name"`
 }
 
 type RefreshTokenRequest struct {
@@ -106,7 +97,7 @@ func (h *HTTPHandler) handleRegisterRequest(ctx *gin.Context) {
 		return
 	}
 
-	response := RegisterUserResponse{
+	response := UserResponse{
 		UserID:    user.ID.String(),
 		Username:  user.Username.String(),
 		Email:     user.Email.String(),
@@ -139,9 +130,25 @@ func (h *HTTPHandler) handleLoginRequest(ctx *gin.Context) {
 		return
 	}
 
+	getUserCMD := domain.GetUserCommand{
+		UserID: claims.Custom.UserID,
+	}
+
+	user, err := h.userService.GetUser(ctx, getUserCMD)
+	if err != nil {
+		log.Printf("ERROR fetching user: %v", err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user, reason: " + err.Error()})
+		return
+	}
+
 	resp := AuthenticateUserResponse{
-		UserID:   claims.Custom.UserID,
-		Username: claims.Custom.Email,
+		User: UserResponse{
+			UserID:    user.ID.String(),
+			Username:  user.Username.String(),
+			Email:     user.Email.String(),
+			FirstName: user.FirstName,
+			LastName:  user.LastName,
+		},
 		Tokens: AuthenticateTokensResponse{
 			AccessToken:  accessToken,
 			RefreshToken: refreshToken,
@@ -172,7 +179,7 @@ func (h *HTTPHandler) handleGetCurrentUser(ctx *gin.Context) {
 		return
 	}
 
-	response := RegisterUserResponse{
+	response := UserResponse{
 		UserID:    user.ID.String(),
 		Username:  user.Username.String(),
 		Email:     user.Email.String(),
@@ -226,7 +233,7 @@ func (h *HTTPHandler) handleUpdateCurrentUserRequest(ctx *gin.Context) {
 		return
 	}
 
-	response := UpdateProfileResponse{
+	response := UserResponse{
 		UserID:    updatedUser.ID.String(),
 		Username:  updatedUser.Username.String(),
 		Email:     updatedUser.Email.String(),

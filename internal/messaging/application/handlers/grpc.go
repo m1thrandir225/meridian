@@ -13,20 +13,20 @@ import (
 	"google.golang.org/grpc"
 )
 
-type GRPCHandler struct {
+type GRPCServer struct {
 	messagingService *services.ChannelService
 	messagingpb.UnimplementedMessagingServiceServer
 	wsHandler *WebSocketHandler
 }
 
-func NewGRPCHandler(service *services.ChannelService, wsHandler *WebSocketHandler) *GRPCHandler {
-	return &GRPCHandler{
+func NewGRPCHandler(service *services.ChannelService, wsHandler *WebSocketHandler) *GRPCServer {
+	return &GRPCServer{
 		messagingService: service,
 		wsHandler:        wsHandler,
 	}
 }
 
-func (h *GRPCHandler) SendMessage(ctx context.Context, req *messagingpb.SendMessageRequest) (*messagingpb.SendMessageResponse, error) {
+func (h *GRPCServer) SendMessage(ctx context.Context, req *messagingpb.SendMessageRequest) (*messagingpb.SendMessageResponse, error) {
 	if req.Content == "" {
 		return nil, fmt.Errorf("content is required")
 	}
@@ -121,11 +121,6 @@ func (h *GRPCHandler) SendMessage(ctx context.Context, req *messagingpb.SendMess
 	}, nil
 
 }
-
-func (h *GRPCHandler) GetMessages(ctx context.Context, req *messagingpb.GetMessagesRequest) (*messagingpb.GetMessagesResponse, error) {
-	return nil, nil
-}
-
 func StartGRPCServer(port string, service *services.ChannelService, wsHandler *WebSocketHandler) error {
 	lis, err := net.Listen("tcp", ":"+port)
 	if err != nil {
