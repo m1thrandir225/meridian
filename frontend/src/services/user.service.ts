@@ -7,7 +7,7 @@ import {
   type UpdateUserRequest,
 } from '@/types/responses/user'
 
-const userServiceAPI = `${config.apiUrl}/api/v1/auth/me`
+const userServiceAPI = `${config.apiUrl}/auth/me`
 
 const userService = {
   getCurrentUser: () =>

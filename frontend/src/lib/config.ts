@@ -1,6 +1,8 @@
 const baseUrl = import.meta.env.VITE_BACKEND_URL
 
-const apiUrl = `${baseUrl}/api/v1`
+const apiVersion = import.meta.env.VITE_BACKEND_API_VERSION
+
+const apiUrl = `${baseUrl}/api/${apiVersion}`
 
 export default {
   apiUrl,

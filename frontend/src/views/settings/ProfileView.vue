@@ -3,23 +3,29 @@ import SettingsLayout from '@/layouts/SettingsLayout.vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { ref } from 'vue'
+import { watch } from 'vue'
+import { useAuthStore } from '@/stores/auth'
+import { useQuery } from '@tanstack/vue-query'
+import userService from '@/services/user.service'
 
-// Form data
-const profile = ref({
-  displayName: 'John Doe',
-  username: 'johndoe',
-  email: 'john.doe@example.com',
-  bio: 'Software developer passionate about creating amazing user experiences.',
-  avatar: '/avatars/user.png',
+const authStore = useAuthStore()
+
+const { data, error, status, refetch, isSuccess } = useQuery({
+  queryKey: ['profile'],
+  queryFn: () => userService.getCurrentUser(),
+})
+
+watch(isSuccess, (newValue) => {
+  if (newValue) {
+    authStore.setUser(data.value!)
+  }
 })
 
 const saveProfile = () => {
   // Save profile logic would go here
-  console.log('Saving profile:', profile.value)
+  console.log('Saving profile:')
 }
 </script>
 
@@ -48,20 +54,14 @@ const saveProfile = () => {
             <CardContent>
               <div class="flex items-center gap-4">
                 <Avatar class="h-20 w-20">
-                  <AvatarImage :src="profile.avatar" :alt="profile.displayName" />
                   <AvatarFallback class="text-lg">{{
-                    profile.displayName
+                    authStore
+                      .userDisplayName()
                       .split(' ')
                       .map((n) => n[0])
                       .join('')
                   }}</AvatarFallback>
                 </Avatar>
-                <div class="space-y-2">
-                  <Button variant="outline">Change Avatar</Button>
-                  <p class="text-xs text-muted-foreground">
-                    Recommended: Square image, at least 128x128px
-                  </p>
-                </div>
               </div>
             </CardContent>
           </Card>
@@ -76,34 +76,16 @@ const saveProfile = () => {
               <div class="grid grid-cols-2 gap-4">
                 <div class="space-y-2">
                   <Label for="display-name">Display Name</Label>
-                  <Input
-                    id="display-name"
-                    v-model="profile.displayName"
-                    placeholder="Your display name"
-                  />
+                  <Input />
                 </div>
                 <div class="space-y-2">
                   <Label for="username">Username</Label>
-                  <Input id="username" v-model="profile.username" placeholder="Your username" />
+                  <Input id="username" placeholder="Your username" />
                 </div>
               </div>
               <div class="space-y-2">
                 <Label for="email">Email</Label>
-                <Input
-                  id="email"
-                  v-model="profile.email"
-                  type="email"
-                  placeholder="Your email address"
-                />
-              </div>
-              <div class="space-y-2">
-                <Label for="bio">Bio</Label>
-                <Textarea
-                  id="bio"
-                  v-model="profile.bio"
-                  placeholder="Tell us a bit about yourself..."
-                  :rows="3"
-                />
+                <Input id="email" type="email" placeholder="Your email address" />
               </div>
             </CardContent>
           </Card>

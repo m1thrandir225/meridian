@@ -9,7 +9,7 @@ import {
   type RefreshTokenResponse,
 } from '@/types/responses/auth'
 
-const authURL = `${config.apiUrl}/api/v1/auth`
+const authURL = `${config.apiUrl}/auth`
 
 const authService = {
   login: (input: LoginRequest) =>

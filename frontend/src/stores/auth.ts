@@ -36,8 +36,21 @@ export const useAuthStore = defineStore(
       accessTokenExpirationTime.value = null
     }
 
+    const userDisplayName = () => {
+      if (!user.value) {
+        return ''
+      }
+      return `${user.value?.first_name} ${user.value?.last_name}`
+    }
+
     const checkAuth = () => {
-      if (!refreshToken.value || !accessToken.value) {
+      const now = new Date()
+
+      if (
+        !refreshToken.value ||
+        !accessTokenExpirationTime.value ||
+        now > accessTokenExpirationTime.value
+      ) {
         logout()
         return false
       }
@@ -51,6 +64,7 @@ export const useAuthStore = defineStore(
       refreshToken,
       accessTokenExpirationTime,
       checkAuth,
+      userDisplayName,
       logout,
       login,
       setUser,
