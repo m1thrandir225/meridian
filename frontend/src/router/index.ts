@@ -8,6 +8,7 @@ import BotRegistrationView from '@/views/BotRegistrationView.vue'
 import ProfileView from '@/views/settings/ProfileView.vue'
 import PasswordView from '@/views/settings/PasswordView.vue'
 import AppearanceView from '@/views/settings/AppearanceView.vue'
+import { useAuthStore } from '@/stores/auth'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -17,55 +18,74 @@ const router = createRouter({
       path: '/',
       name: 'home',
       component: ChatView,
+      meta: { requiresAuth: true },
     },
     {
       path: '/channel/:id',
       name: 'channel',
       component: ChatView,
+      meta: { requiresAuth: true },
     },
     {
       path: '/bot-registration',
       name: 'bot-registration',
       component: BotRegistrationView,
+      meta: { requiresAuth: true },
     },
     // Settings routes
     {
       path: '/settings/profile',
       name: 'settings-profile',
       component: ProfileView,
+      meta: { requiresAuth: true },
     },
     {
       path: '/settings/password',
       name: 'settings-password',
       component: PasswordView,
+      meta: { requiresAuth: true },
     },
     {
       path: '/settings/appearance',
       name: 'settings-appearance',
       component: AppearanceView,
+      meta: { requiresAuth: true },
     },
     // Redirect /settings to profile
     {
       path: '/settings',
       redirect: '/settings/profile',
+      meta: { requiresAuth: true },
     },
     // Auth routes
     {
       path: '/login',
       name: 'login',
       component: LoginView,
+      meta: { requiresAuth: false },
     },
     {
       path: '/register',
       name: 'register',
       component: RegisterView,
+      meta: { requiresAuth: false },
     },
     {
       path: '/forgot-password',
       name: 'forgot-password',
       component: ForgotPasswordView,
+      meta: { requiresAuth: false },
     },
   ],
+})
+
+router.beforeEach((to, from, next) => {
+  const isAuthenticated = useAuthStore().checkAuth()
+  if (to.meta.requiresAuth && !isAuthenticated) {
+    next({ name: 'login' })
+  } else {
+    next()
+  }
 })
 
 export default router

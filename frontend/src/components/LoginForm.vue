@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 
 const props = defineProps<{
   class?: HTMLAttributes['class']
+  isLoading: boolean
 }>()
 </script>
 
