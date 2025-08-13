@@ -62,7 +62,7 @@ http:
       priority: 50
 
     identity-public:
-      rule: "Host(`api.localhost`) && PathPrefix(`/api/v1/auth`) && (Path(`/api/v1/auth/login`) || Path(`/api/v1/auth/register`) || Path(`/api/v1/auth/validate-token`))"
+      rule: "Host(`api.localhost`) && PathPrefix(`/api/v1/auth`) && (Path(`/api/v1/auth/login`) || Path(`/api/v1/auth/register`) || Path(`/api/v1/auth/validate-token`) || Path(`/api/v1/auth/refresh-token`))"
       service: identity-service
       entryPoints:
         - web
@@ -71,14 +71,14 @@ http:
       priority: 300
 
     identity-protected:
-      rule: "Host(`api.localhost`) && PathPrefix(`/api/v1/auth`) && !Path(`/api/v1/auth/login`) && !Path(`/api/v1/auth/register`) && !Path(`/api/v1/auth/validate-token`)"
+      rule: "Host(`api.localhost`) && PathPrefix(`/api/v1/auth`) && !Path(`/api/v1/auth/login`) && !Path(`/api/v1/auth/register`) && !Path(`/api/v1/auth/validate-token`) && !Path(`/api/v1/auth/refresh-token`)"
       service: identity-service
       entryPoints:
         - web
       middlewares:
         - cors-headers
-        - security-headers
         - identity-auth
+        - security-headers
         - rate-limit
       priority: 200
 
@@ -125,18 +125,17 @@ http:
         - web
       priority: 400
 
-
   #    notification:
-#      rule: "Host(`api.localhost`) && PathPrefix(`/api/v1/notifications`)"
-#      service: notification-service
-#      entryPoints:
-#        - web
-#      middlewares:
-#        - cors-headers
-#        - security-headers
-#        - identity-auth
-#        - rate-limit
-#      priority: 100
+  #      rule: "Host(`api.localhost`) && PathPrefix(`/api/v1/notifications`)"
+  #      service: notification-service
+  #      entryPoints:
+  #        - web
+  #      middlewares:
+  #        - cors-headers
+  #        - security-headers
+  #        - identity-auth
+  #        - rate-limit
+  #      priority: 100
 
   services:
     frontend-service:
