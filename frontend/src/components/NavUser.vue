@@ -2,7 +2,7 @@
 import { ChevronsUpDown, LogOut, Settings } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,21 +18,30 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from '@/components/ui/sidebar'
-
-const props = defineProps<{
-  user: {
-    name: string
-    email: string
-    avatar: string
-  }
-}>()
+import { useAuthStore } from '@/stores/auth'
+import { computed } from 'vue'
 
 const { isMobile } = useSidebar()
 const router = useRouter()
 
+const authStore = useAuthStore()
+
 const navigateToSettings = () => {
   router.push('/settings/profile')
 }
+
+const handleLogout = () => {
+  authStore.logout()
+  router.push('/login')
+}
+
+const userInitials = computed(() => {
+  return authStore
+    .userDisplayName()
+    .split(' ')
+    .map((n) => n[0])
+    .join('')
+})
 </script>
 
 <template>
@@ -45,12 +54,13 @@ const navigateToSettings = () => {
             class="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
           >
             <Avatar class="h-8 w-8 rounded-lg">
-              <AvatarImage :src="user.avatar" :alt="user.name" />
-              <AvatarFallback class="rounded-lg"> CN </AvatarFallback>
+              <AvatarFallback class="rounded-lg">
+                {{ userInitials }}
+              </AvatarFallback>
             </Avatar>
             <div class="grid flex-1 text-left text-sm leading-tight">
-              <span class="truncate font-medium">{{ user.name }}</span>
-              <span class="truncate text-xs">{{ user.email }}</span>
+              <span class="truncate font-medium">{{ authStore.userDisplayName() }}</span>
+              <span class="truncate text-xs">{{ authStore.user?.email }}</span>
             </div>
             <ChevronsUpDown class="ml-auto size-4" />
           </SidebarMenuButton>
@@ -64,12 +74,11 @@ const navigateToSettings = () => {
           <DropdownMenuLabel class="p-0 font-normal">
             <div class="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
               <Avatar class="h-8 w-8 rounded-lg">
-                <AvatarImage :src="user.avatar" :alt="user.name" />
-                <AvatarFallback class="rounded-lg"> CN </AvatarFallback>
+                <AvatarFallback class="rounded-lg"> {{ userInitials }}</AvatarFallback>
               </Avatar>
               <div class="grid flex-1 text-left text-sm leading-tight">
-                <span class="truncate font-semibold">{{ user.name }}</span>
-                <span class="truncate text-xs">{{ user.email }}</span>
+                <span class="truncate font-semibold">{{ authStore.userDisplayName() }}</span>
+                <span class="truncate text-xs">{{ authStore.user?.email }}</span>
               </div>
             </div>
           </DropdownMenuLabel>
@@ -81,7 +90,7 @@ const navigateToSettings = () => {
             </DropdownMenuItem>
           </DropdownMenuGroup>
           <DropdownMenuSeparator />
-          <DropdownMenuItem>
+          <DropdownMenuItem @click="handleLogout">
             <LogOut />
             Log out
           </DropdownMenuItem>

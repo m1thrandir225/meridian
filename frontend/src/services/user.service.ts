@@ -25,7 +25,7 @@ const userService = {
       params: undefined,
       method: 'PUT',
       protected: true,
-      url: userServiceAPI,
+      url: `${userServiceAPI}/update-profile`,
       responseType: 'json',
       data: input,
     }),
@@ -33,7 +33,7 @@ const userService = {
     apiRequest({
       method: 'PUT',
       protected: true,
-      url: userServiceAPI,
+      url: `${userServiceAPI}/password`,
       responseType: 'json',
       data: input,
       headers: undefined,

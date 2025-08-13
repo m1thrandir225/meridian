@@ -51,13 +51,6 @@ const channels = ref([
   { id: '12', name: 'showcase', unread: 2 },
 ])
 
-const user = {
-  name: 'John Doe',
-  username: 'johndoe',
-  email: 'john.doe@example.com',
-  avatar: '/avatars/user.png',
-}
-
 const createChannel = () => {
   if (newChannelName.value.trim()) {
     const newChannel = {
@@ -156,7 +149,7 @@ const createChannel = () => {
     </SidebarContent>
 
     <SidebarFooter>
-      <NavUser :user="user" />
+      <NavUser />
     </SidebarFooter>
   </Sidebar>
 </template>
