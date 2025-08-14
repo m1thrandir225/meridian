@@ -68,7 +68,7 @@ const createApiInstance = (): AxiosInstance => {
 
       const status = error.response?.status
 
-      if (status === 401 && !originalRequest.url?.includes('/auth/refresh')) {
+      if (status === 401 && !originalRequest.url?.includes('/auth/refresh-token')) {
         originalRequest._isRetry = true
 
         if (isRefreshing) {

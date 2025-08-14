@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ChevronsUpDown, LogOut, Settings } from 'lucide-vue-next'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import {
@@ -22,6 +22,7 @@ import { useAuthStore } from '@/stores/auth'
 import { computed } from 'vue'
 
 const { isMobile } = useSidebar()
+const route = useRoute()
 const router = useRouter()
 
 const authStore = useAuthStore()
@@ -41,6 +42,10 @@ const userInitials = computed(() => {
     .split(' ')
     .map((n) => n[0])
     .join('')
+})
+
+const shouldShowSettings = computed(() => {
+  return !route.name?.toString().includes('settings')
 })
 </script>
 
@@ -83,13 +88,13 @@ const userInitials = computed(() => {
             </div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuGroup>
+          <DropdownMenuGroup v-if="shouldShowSettings">
             <DropdownMenuItem @click="navigateToSettings">
               <Settings />
               Settings
             </DropdownMenuItem>
           </DropdownMenuGroup>
-          <DropdownMenuSeparator />
+          <DropdownMenuSeparator v-if="shouldShowSettings" />
           <DropdownMenuItem @click="handleLogout">
             <LogOut />
             Log out

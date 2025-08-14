@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Settings, User, Lock, Palette, ArrowLeft } from 'lucide-vue-next'
 import { RouterLink } from 'vue-router'
 import { ref } from 'vue'
@@ -12,15 +11,9 @@ import {
   SidebarFooter,
   SidebarRail,
 } from '@/components/ui/sidebar'
+import NavUser from '@/components/NavUser.vue'
 
 const isSettingsSidebarOpen = ref(true)
-
-// Sample user data
-const user = {
-  name: 'John Doe',
-  username: 'johndoe',
-  avatar: '/avatars/user.png',
-}
 
 const settingsNavigation = [
   {
@@ -91,21 +84,7 @@ const settingsNavigation = [
           </SidebarContent>
 
           <SidebarFooter>
-            <div class="flex items-center gap-2 px-2 py-2 bg-accent/50 rounded-lg mx-2 mb-2">
-              <Avatar class="h-8 w-8">
-                <AvatarImage :src="user.avatar" :alt="user.name" />
-                <AvatarFallback>{{
-                  user.name
-                    .split(' ')
-                    .map((n) => n[0])
-                    .join('')
-                }}</AvatarFallback>
-              </Avatar>
-              <div class="flex-1 min-w-0">
-                <p class="text-sm font-medium truncate">{{ user.name }}</p>
-                <p class="text-xs text-muted-foreground truncate">@{{ user.username }}</p>
-              </div>
-            </div>
+            <NavUser />
           </SidebarFooter>
           <SidebarRail />
         </Sidebar>
