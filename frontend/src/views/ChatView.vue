@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import ChatLayout from '@/layouts/ChatLayout.vue'
 import ChatArea from '@/components/ChatArea.vue'
-import { ref, watch } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useMessageStore } from '@/stores/message'
 import { useChannelStore } from '@/stores/channel'
@@ -14,12 +14,21 @@ const channelStore = useChannelStore()
 const isChannelsSidebarOpen = ref(true)
 const isMembersSidebarOpen = ref(true)
 
+onMounted(async () => {
+  if (!channelStore.channels.length) {
+    await channelStore.fetchChannels()
+  }
+  if (route.params.id) {
+    channelStore.setCurrentChannel(route.params.id as string)
+    messageStore.fetchMessages(route.params.id as string)
+  }
+})
 watch(
-  () => route.params.id,
-  (id) => {
-    if (id) {
-      messageStore.fetchMessages(id as string)
+  [() => route.params.id, () => channelStore.channels.length],
+  ([id, channelsLength], [oldId, oldChannelsLength]) => {
+    if (id && channelsLength > 0) {
       channelStore.setCurrentChannel(id as string)
+      messageStore.fetchMessages(id as string)
     }
   },
   { immediate: true },
