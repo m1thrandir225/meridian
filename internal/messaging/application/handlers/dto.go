@@ -16,9 +16,8 @@ type MessageIDUri struct {
 }
 
 type CreateChannelRequest struct {
-	Name          string `json:"name"  binding:"required"`
-	Topic         string `json:"topic" `
-	CreatorUserID string `json:"creator_user_id" binding:"required,uuid"`
+	Name  string `json:"name"  binding:"required"`
+	Topic string `json:"topic" `
 }
 
 type ChannelResponse struct {
@@ -47,7 +46,6 @@ func ToChannelResponse(channel *domain.Channel) ChannelResponse {
 
 type SendMessageRequest struct {
 	ContentText          string  `json:"content_text" binding:"required"`
-	SenderUserID         string  `json:"user_id" binding:"required,uuid"`
 	IsIntegrationMessage *bool   `json:"is_integration_message" binding:"required"`
 	ParentMessageID      *string `json:"parent_message_id,omitempty" binding:"omitempty"`
 }

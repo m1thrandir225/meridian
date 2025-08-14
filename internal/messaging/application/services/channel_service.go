@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+
 	"github.com/m1thrandir225/meridian/pkg/kafka"
 
 	"github.com/m1thrandir225/meridian/internal/messaging/domain"
@@ -18,6 +19,15 @@ func NewChannelService(repo persistence.ChannelRepository, eventPub kafka.EventP
 		repo:     repo,
 		eventPub: eventPub,
 	}
+}
+
+func (s *ChannelService) HandleGetUserChannels(ctx context.Context, cmd domain.GetUserChannelsCommand) ([]*domain.Channel, error) {
+	channels, err := s.repo.FindUserChannels(ctx, cmd.UserID)
+	if err != nil {
+		return nil, err
+	}
+
+	return channels, nil
 }
 
 func (s *ChannelService) HandleCreateChannel(ctx context.Context, cmd domain.CreateChannelCommand) (*domain.Channel, error) {

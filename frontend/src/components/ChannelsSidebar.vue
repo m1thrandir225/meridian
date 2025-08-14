@@ -1,12 +1,5 @@
 <script setup lang="ts">
-import type { SidebarProps } from '@/components/ui/sidebar'
-import { Settings, Plus, Waves } from 'lucide-vue-next'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { RouterLink } from 'vue-router'
-import { ref } from 'vue'
 import {
   Dialog,
   DialogContent,
@@ -16,56 +9,72 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import type { SidebarProps } from '@/components/ui/sidebar'
+import { Loader2, Plus, Settings, Waves } from 'lucide-vue-next'
+import { onMounted, ref } from 'vue'
+import { RouterLink, useRouter } from 'vue-router'
 
-import { Sidebar, SidebarContent, SidebarHeader, SidebarFooter } from '@/components/ui/sidebar'
+import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader } from '@/components/ui/sidebar'
+import channelService from '@/services/channel.service'
+import type { CreateChannelRequest } from '@/types/responses/channel'
+import { useMutation } from '@tanstack/vue-query'
+import { toTypedSchema } from '@vee-validate/zod'
+import { useForm } from 'vee-validate'
+import * as z from 'zod'
 import NavUser from './NavUser.vue'
+import { FormControl, FormField, FormItem, FormLabel } from './ui/form'
+import { toast } from 'vue-sonner'
+import { useChannelStore } from '@/stores/channel'
 
 const props = withDefaults(defineProps<SidebarProps>(), {
   collapsible: 'icon',
   side: 'left',
 })
 
-const isNewChannelDialogOpen = ref(false)
-const newChannelName = ref('')
-const newChannelDescription = ref('')
+const router = useRouter()
+const channelStore = useChannelStore()
 
-// Sample server/workspace data
+const isNewChannelDialogOpen = ref(false)
+
+onMounted(() => channelStore.fetchChannels())
+
 const server = {
   name: 'Meridian',
   avatar: '/server-avatar.png',
 }
 
-// Simplified channels data - only text channels
-const channels = ref([
-  { id: '1', name: 'general', unread: 0 },
-  { id: '2', name: 'random', unread: 3 },
-  { id: '3', name: 'development', unread: 0 },
-  { id: '4', name: 'design', unread: 1 },
-  { id: '5', name: 'announcements', unread: 0 },
-  { id: '6', name: 'bug-reports', unread: 2 },
-  { id: '7', name: 'feature-requests', unread: 0 },
-  { id: '8', name: 'testing', unread: 1 },
-  { id: '9', name: 'documentation', unread: 0 },
-  { id: '10', name: 'off-topic', unread: 5 },
-  { id: '11', name: 'help', unread: 0 },
-  { id: '12', name: 'showcase', unread: 2 },
-])
+const createChannelSchema = toTypedSchema(
+  z.object({
+    name: z.string().min(5),
+    topic: z.string().min(5),
+  }),
+)
 
-const createChannel = () => {
-  if (newChannelName.value.trim()) {
-    const newChannel = {
-      id: String(channels.value.length + 1),
-      name: newChannelName.value.toLowerCase().replace(/\s+/g, '-'),
-      unread: 0,
-    }
-    channels.value.push(newChannel)
+const { isFieldDirty, handleSubmit } = useForm({
+  validationSchema: createChannelSchema,
+})
 
-    // Reset form
-    newChannelName.value = ''
-    newChannelDescription.value = ''
+const { mutateAsync, status } = useMutation({
+  mutationKey: ['createChannel'],
+  mutationFn: (input: CreateChannelRequest) => channelService.createChannel(input),
+  onSuccess: (response) => {
     isNewChannelDialogOpen.value = false
-  }
-}
+    toast.success('Sucessfully created a new channel')
+    router.push({
+      name: 'channel',
+      params: { id: response.id },
+    })
+  },
+  onError: (error) => {
+    toast.error(error.message)
+  },
+})
+
+const createChannel = handleSubmit(async (values) => {
+  const { name, topic } = values
+  await mutateAsync({ name, topic })
+})
 </script>
 
 <template>
@@ -84,7 +93,6 @@ const createChannel = () => {
 
     <SidebarContent class="flex flex-col">
       <div class="p-2 flex-1 flex flex-col min-h-0">
-        <!-- Channels Section -->
         <div class="flex-1 flex flex-col min-h-0">
           <div class="flex items-center justify-between px-2 py-1 mb-2 flex-shrink-0">
             <h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -104,44 +112,50 @@ const createChannel = () => {
                     descriptive.
                   </DialogDescription>
                 </DialogHeader>
-                <div class="grid gap-4 py-4">
-                  <div class="grid grid-cols-4 items-center gap-4">
-                    <Label for="channel-name" class="text-right"> Name </Label>
-                    <Input
-                      id="channel-name"
-                      v-model="newChannelName"
-                      placeholder="e.g. general-chat"
-                      class="col-span-3"
-                    />
-                  </div>
-                  <div class="grid grid-cols-4 items-center gap-4">
-                    <Label for="channel-description" class="text-right"> Description </Label>
-                    <Input
-                      id="channel-description"
-                      v-model="newChannelDescription"
-                      placeholder="Brief description (optional)"
-                      class="col-span-3"
-                    />
-                  </div>
-                </div>
+                <form id="channelForm" class="grid gap-4 py-4" @submit="createChannel">
+                  <FormField
+                    v-slot="{ componentField }"
+                    name="name"
+                    :validate-on-blur="!isFieldDirty"
+                  >
+                    <FormItem>
+                      <FormLabel for="password">Name</FormLabel>
+                      <FormControl>
+                        <Input type="text" placeholder="meridian-chats" v-bind="componentField" />
+                      </FormControl>
+                    </FormItem>
+                  </FormField>
+                  <FormField
+                    v-slot="{ componentField }"
+                    name="topic"
+                    :validate-on-blur="!isFieldDirty"
+                  >
+                    <FormItem>
+                      <FormLabel for="topic">Topic</FormLabel>
+                      <FormControl>
+                        <Input type="text" placeholder="general" v-bind="componentField" />
+                      </FormControl>
+                    </FormItem>
+                  </FormField>
+                </form>
                 <DialogFooter>
-                  <Button type="submit" @click="createChannel">Create Channel</Button>
+                  <Button type="submit" form="channelForm">
+                    <Loader2 v-if="status === 'pending'" class="mr-2 h-4 w-4 animate-spin" />
+                    <span v-else>Create Channel</span>
+                  </Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>
           </div>
           <div class="space-y-0.5 overflow-y-auto flex-1 pr-2">
             <RouterLink
-              v-for="channel in channels"
+              v-for="channel in channelStore.channels"
               :key="channel.id"
               :to="`/channel/${channel.id}`"
               class="flex items-center gap-2 px-2 py-1.5 rounded text-sm transition-colors hover:bg-accent/50"
               active-class="bg-accent text-accent-foreground"
             >
               <span class="flex-1 truncate">{{ channel.name }}</span>
-              <Badge v-if="channel.unread > 0" variant="destructive" class="h-4 text-xs px-1">
-                {{ channel.unread }}
-              </Badge>
             </RouterLink>
           </div>
         </div>

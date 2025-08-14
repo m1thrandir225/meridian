@@ -10,6 +10,7 @@ import (
 type ChannelRepository interface {
 	Save(ctx context.Context, channel *models.Channel) error
 	FindById(ctx context.Context, id uuid.UUID) (*models.Channel, error)
+	FindUserChannels(ctx context.Context, userID uuid.UUID) ([]*models.Channel, error)
 	FindMessages(ctx context.Context, channelID uuid.UUID, limit int, offset int) ([]models.Message, error)
 	Delete(ctx context.Context, id uuid.UUID) error
 	SaveMessage(ctx context.Context, message *models.Message) error

@@ -7,10 +7,3 @@ export interface Message {
   parent_message_id?: string
   created_at: string
 }
-
-export type MessageCreateRequest = {
-  content_text: string
-  sender_user_id: string
-  is_integration_message?: boolean
-  parent_message_id?: string
-}

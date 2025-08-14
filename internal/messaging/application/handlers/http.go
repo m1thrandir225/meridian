@@ -19,21 +19,58 @@ func NewHttpHandler(service *services.ChannelService) *HTTPHandler {
 	}
 }
 
+func (h *HTTPHandler) GetUserChannels(ctx *gin.Context) {
+	userIDStr := ctx.GetHeader("X-User-ID")
+	if userIDStr == "" {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "user id not valid"})
+		return
+	}
+
+	cmd := domain.GetUserChannelsCommand{
+		UserID: userID,
+	}
+
+	channels, err := h.channelService.HandleGetUserChannels(ctx, cmd)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "something went wrong: " + err.Error()})
+		return
+	}
+
+	channelsResponse := make([]ChannelResponse, len(channels))
+	for i, channel := range channels {
+		channelsResponse[i] = ToChannelResponse(channel)
+	}
+
+	ctx.JSON(http.StatusOK, channelsResponse)
+}
+
 // POST /api/v1/channels/
 func (h *HTTPHandler) CreateChannel(ctx *gin.Context) {
+	creatorID := ctx.GetHeader("X-User-ID")
+	if creatorID == "" {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
 	var req CreateChannelRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		ctx.JSON(http.StatusBadRequest, errorResponse(err))
 		return
 	}
-	creatorUserId, err := uuid.Parse(req.CreatorUserID)
+
+	creatorUserID, err := uuid.Parse(creatorID)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, errorResponse(err))
 		return
 	}
 
 	channel, err := h.channelService.HandleCreateChannel(ctx, domain.CreateChannelCommand{
-		CreatorUserID: creatorUserId,
+		CreatorUserID: creatorUserID,
 		Name:          req.Name,
 		Topic:         req.Topic,
 	})
@@ -139,6 +176,11 @@ func (h *HTTPHandler) JoinChannel(ctx *gin.Context) {
 
 // POST /api/v1/channels/:channelId/messages
 func (h *HTTPHandler) SendMessage(ctx *gin.Context) {
+	userID := ctx.GetHeader("X-User-ID")
+	if userID == "" {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
 	var req SendMessageRequest
 	var uriReq ChannelIDUri
 
@@ -158,7 +200,7 @@ func (h *HTTPHandler) SendMessage(ctx *gin.Context) {
 		return
 	}
 
-	userId, err := uuid.Parse(req.SenderUserID)
+	senderID, err := uuid.Parse(userID)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, errorResponse(err))
 		return
@@ -176,7 +218,7 @@ func (h *HTTPHandler) SendMessage(ctx *gin.Context) {
 
 	message, err := h.channelService.HandleMessageSent(ctx, domain.SendMessageCommand{
 		ChannelID:       channelId,
-		SenderUserID:    userId,
+		SenderUserID:    senderID,
 		ParentMessageID: parentMessageID,
 		Content:         domain.MessageContent{},
 	})

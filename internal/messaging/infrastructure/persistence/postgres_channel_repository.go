@@ -105,6 +105,96 @@ func (r *PostgresChannelRepository) Save(ctx context.Context, channel *models.Ch
 	return nil
 }
 
+func (r *PostgresChannelRepository) FindUserChannels(ctx context.Context, userID uuid.UUID) ([]*models.Channel, error) {
+	query := `
+		SELECT id, name, topic, creator_user_id, creation_time, last_message_time, is_archived, version
+		FROM channels
+		WHERE creator_user_id = $1
+	`
+	rows, err := r.pool.Query(ctx, query, userID)
+	if err != nil {
+		return nil, fmt.Errorf("error querying for channels for user %s: %w", userID, err)
+	}
+
+	defer rows.Close()
+	var channels []*models.Channel
+
+	for rows.Next() {
+		var channel models.Channel
+		var topic *string
+		var lastMsgTime *time.Time
+
+		err := rows.Scan(
+			&channel.ID,
+			&channel.Name,
+			&topic,
+			&channel.CreatorUserID,
+			&channel.CreationTime,
+			&lastMsgTime,
+			&channel.IsArchived,
+			&channel.Version,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("error scanning channel for user %s: %w", userID, err)
+		}
+
+		if topic != nil {
+			channel.Topic = *topic
+		}
+		if lastMsgTime != nil {
+			channel.LastMessageTime = *lastMsgTime
+		}
+
+		// load members for each channel
+		memberQuery := `
+			SELECT user_id, role, joined_at, last_read
+			FROM members
+			WHERE channel_id = $1
+		`
+		memberRows, err := r.pool.Query(ctx, memberQuery, channel.ID)
+		if err != nil {
+			return nil, fmt.Errorf("error querying members for channel %s: %w", channel.ID, err)
+		}
+
+		var rehydratedMembers []models.Member
+		for memberRows.Next() {
+			var memberUserID uuid.UUID
+			var memberRole string
+			var memberJoinedAt time.Time
+			var memberLastRead sql.NullTime
+
+			if err := memberRows.Scan(&memberUserID, &memberRole, &memberJoinedAt, &memberLastRead); err != nil {
+				memberRows.Close()
+				return nil, fmt.Errorf("error scanning member for channel %s: %w", channel.ID, err)
+			}
+
+			var actualLastRead time.Time
+			if memberLastRead.Valid {
+				actualLastRead = memberLastRead.Time
+			}
+
+			member := models.RehydrateMember(memberUserID, memberRole, memberJoinedAt, actualLastRead)
+			rehydratedMembers = append(rehydratedMembers, member)
+		}
+		memberRows.Close()
+
+		if err := memberRows.Err(); err != nil {
+			return nil, fmt.Errorf("error iterating members for channel %s: %w", channel.ID, err)
+		}
+
+		channel.Members = rehydratedMembers
+		channel.Messages = []models.Message{} // don't load them
+
+		channels = append(channels, &channel)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating channels for user %s: %w", userID, err)
+	}
+
+	return channels, nil
+}
+
 func (r *PostgresChannelRepository) FindById(ctx context.Context, id uuid.UUID) (*models.Channel, error) {
 	queryChannel := `
 		SELECT id, name, topic, creator_user_id, creation_time, last_message_time, is_archived, version

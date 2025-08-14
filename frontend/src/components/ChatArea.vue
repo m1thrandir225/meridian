@@ -1,14 +1,16 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, watch, onMounted } from 'vue'
 import { Hash, Users, Send, Smile, Menu } from 'lucide-vue-next'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useAppearanceStore } from '@/stores/appearance'
+import { useChannelStore } from '@/stores/channel'
+import { useMessageStore } from '@/stores/message'
 
 // Appearance store
 const appearanceStore = useAppearanceStore()
-
+const channelStore = useChannelStore()
 // Chat scroll management
 const messagesContainer = ref<HTMLElement | null>(null)
 const isUserInteracting = ref(false)
@@ -53,12 +55,7 @@ const messageSpacing = computed(() => {
   return appearanceStore.messageDisplayMode === 'compact' ? 'space-y-1' : 'space-y-4'
 })
 
-const currentChannel = {
-  id: '1',
-  name: 'general',
-  description: 'General discussion channel',
-  type: 'text',
-}
+const messagesFromStore = useMessageStore().messages
 
 const messages = ref([
   {
@@ -259,8 +256,8 @@ onMounted(() => {
         </Button>
         <Hash class="h-5 w-5 text-muted-foreground" />
         <div>
-          <h1 class="font-semibold">{{ currentChannel.name }}</h1>
-          <p class="text-sm text-muted-foreground">{{ currentChannel.description }}</p>
+          <h1 class="font-semibold">{{ channelStore.currentChannel?.name }}</h1>
+          <p class="text-sm text-muted-foreground">{{ channelStore.currentChannel?.topic }}</p>
         </div>
       </div>
       <div class="flex items-center gap-2">
@@ -284,7 +281,7 @@ onMounted(() => {
       @wheel="handleScrollInteraction"
     >
       <div
-        v-for="message in messages"
+        v-for="message in messagesFromStore"
         :key="message.id"
         :class="messageContainerClasses"
         :style="getMessageStyle(message.id)"
@@ -292,9 +289,8 @@ onMounted(() => {
         @mouseleave="(setHoveredMessage(null), handleMessageHover(false))"
       >
         <Avatar :class="`${avatarSize} mt-1`">
-          <AvatarImage :src="message.author.avatar" :alt="message.author.name" />
           <AvatarFallback>{{
-            message.author.name
+            message.content_text
               .split(' ')
               .map((n) => n[0])
               .join('')
@@ -308,7 +304,7 @@ onMounted(() => {
                   ? 'font-medium text-xs'
                   : 'font-medium text-sm'
               "
-              >{{ message.author.name }}</span
+              >{{ message.content_text }}</span
             >
             <span
               :class="
@@ -316,15 +312,15 @@ onMounted(() => {
                   ? 'text-xs text-muted-foreground'
                   : 'text-xs text-muted-foreground'
               "
-              >{{ formatTime(message.timestamp) }}</span
+              >{{ formatTime(message.created_at) }}</span
             >
           </div>
           <div :class="messageTextClasses">
-            {{ message.content }}
+            {{ message.content_text }}
           </div>
 
           <!-- Reactions Display -->
-          <div v-if="message.reactions.length > 0" class="flex flex-wrap gap-1 mb-2">
+          <!-- <div v-if="message.reactions.length > 0" class="flex flex-wrap gap-1 mb-2">
             <button
               v-for="reaction in message.reactions"
               :key="reaction.emoji"
@@ -339,7 +335,7 @@ onMounted(() => {
               <span>{{ reaction.emoji }}</span>
               <span>{{ reaction.count }}</span>
             </button>
-          </div>
+          </div> -->
 
           <!-- Quick Reaction Buttons (appear on hover) -->
           <div class="opacity-0 group-hover:opacity-100 transition-opacity w-auto">

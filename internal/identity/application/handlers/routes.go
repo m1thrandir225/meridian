@@ -32,6 +32,7 @@ func SetupIdentityRouter(
 		apiV1.POST("/login", handler.handleLoginRequest)
 
 		apiV1.GET("/validate-token", authHandler.ValidateToken)
+		apiV1.POST("/refresh-token", handler.handleRefreshTokenRequest)
 
 		me := apiV1.Group("/me")
 		me.Use(AuthenticationMiddleware(tokenVerifier))
@@ -40,7 +41,6 @@ func SetupIdentityRouter(
 			me.DELETE("", handler.handleDeleteUserRequest)
 			me.PUT("/update-profile", handler.handleUpdateCurrentUserRequest)
 			me.PUT("/password", handler.handleUpdateUserPasswordRequest)
-			me.POST("/refresh-token", handler.handleRefreshTokenRequest)
 		}
 	}
 	log.Println("Identity HTTP Router configured")

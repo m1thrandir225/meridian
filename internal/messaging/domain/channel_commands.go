@@ -8,6 +8,14 @@ type Command interface {
 	CommandName() string
 }
 
+type GetUserChannelsCommand struct {
+	UserID uuid.UUID
+}
+
+func (c GetUserChannelsCommand) CommandName() string {
+	return "GetUserChannels"
+}
+
 type CreateChannelCommand struct {
 	Name          string
 	Topic         string

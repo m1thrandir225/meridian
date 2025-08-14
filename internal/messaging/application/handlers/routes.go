@@ -19,6 +19,7 @@ func SetupRoutes(router *gin.Engine, httpHandler *HTTPHandler, wsHandler *WebSoc
 
 		channelsGroup := apiV1.Group("/channels")
 		{
+			channelsGroup.GET("/", httpHandler.GetUserChannels)
 			channelsGroup.POST("/", httpHandler.CreateChannel)
 			channelsGroup.GET("/:channelId", httpHandler.GetChannel)
 			channelsGroup.POST("/:channelId/join", httpHandler.JoinChannel)
