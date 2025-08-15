@@ -14,15 +14,17 @@ import (
 )
 
 type GRPCServer struct {
-	messagingService *services.ChannelService
+	channelService *services.ChannelService
+	messageService *services.MessageService
 	messagingpb.UnimplementedMessagingServiceServer
 	wsHandler *WebSocketHandler
 }
 
-func NewGRPCHandler(service *services.ChannelService, wsHandler *WebSocketHandler) *GRPCServer {
+func NewGRPCHandler(channelService *services.ChannelService, messageService *services.MessageService, wsHandler *WebSocketHandler) *GRPCServer {
 	return &GRPCServer{
-		messagingService: service,
-		wsHandler:        wsHandler,
+		channelService: channelService,
+		messageService: messageService,
+		wsHandler:      wsHandler,
 	}
 }
 
@@ -74,9 +76,9 @@ func (h *GRPCServer) SendMessage(ctx context.Context, req *messagingpb.SendMessa
 
 		var message *domain.Message
 		if notifCmd, ok := cmd.(domain.SendNotificationCommand); ok {
-			message, err = h.messagingService.HandleNotificationSent(ctx, notifCmd)
+			message, err = h.messageService.HandleNotificationSent(ctx, notifCmd)
 		} else if msgCmd, ok := cmd.(domain.SendMessageCommand); ok {
-			message, err = h.messagingService.HandleMessageSent(ctx, msgCmd)
+			message, err = h.messageService.HandleMessageSent(ctx, msgCmd)
 		}
 
 		if err != nil {
@@ -121,14 +123,14 @@ func (h *GRPCServer) SendMessage(ctx context.Context, req *messagingpb.SendMessa
 	}, nil
 
 }
-func StartGRPCServer(port string, service *services.ChannelService, wsHandler *WebSocketHandler) error {
+func StartGRPCServer(port string, channelService *services.ChannelService, messageService *services.MessageService, wsHandler *WebSocketHandler) error {
 	lis, err := net.Listen("tcp", ":"+port)
 	if err != nil {
 		return err
 	}
 
 	s := grpc.NewServer()
-	grpcHandler := NewGRPCHandler(service, wsHandler)
+	grpcHandler := NewGRPCHandler(channelService, messageService, wsHandler)
 	messagingpb.RegisterMessagingServiceServer(s, grpcHandler)
 
 	log.Printf("Messaging gRPC server listening on port %s", port)

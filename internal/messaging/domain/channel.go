@@ -287,3 +287,19 @@ func (c *Channel) RemoveReaction(messageID, userID uuid.UUID, reactionType strin
 	c.addEvent(CreateReactionRemovedEvent(c, messageID, userID, reactionType))
 	return &reaction, nil
 }
+
+func (c *Channel) AddBotMember(integrationID uuid.UUID) error {
+	for _, member := range c.Members {
+		if member.GetId() == integrationID {
+			return errors.New("bot is already a member of the channel")
+		}
+	}
+
+	now := time.Now().UTC()
+	member := newMember(integrationID, "bot", now, now)
+	c.Members = append(c.Members, member)
+
+	c.addEvent(CreateBotJoinedChannelEvent(c, member))
+	c.Version++
+	return nil
+}

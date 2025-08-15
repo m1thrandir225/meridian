@@ -179,3 +179,12 @@ func SuccessWithData(data any) CommandResultWithData {
 		data:          data,
 	}
 }
+
+type AddBotToChannelCommand struct {
+	ChannelID     uuid.UUID
+	IntegrationID uuid.UUID
+}
+
+func (c AddBotToChannelCommand) CommandName() string {
+	return "AddBotToChannel"
+}

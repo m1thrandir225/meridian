@@ -76,6 +76,13 @@ type ChannelTopicChangedEvent struct {
 	ChangedBy string
 }
 
+type BotJoinedChannelEvent struct {
+	common.BaseDomainEvent
+	ChannelID uuid.UUID
+	Member    Member
+	Timestamp time.Time
+}
+
 func CreateChannelCreatedEvent(channel *Channel) ChannelCreatedEvent {
 	base := common.NewBaseDomainEvent("ChannelCreated", channel.ID, channel.Version)
 	return ChannelCreatedEvent{
@@ -197,5 +204,16 @@ func CreateChannelUnarchivedEvent(channel *Channel, unarchivedBy uuid.UUID) Chan
 	return ChannelUnarchivedEvent{
 		BaseDomainEvent: base,
 		UnarchivedBy:    unarchivedBy.String(),
+	}
+}
+
+func CreateBotJoinedChannelEvent(channel *Channel, member Member) BotJoinedChannelEvent {
+	base := common.NewBaseDomainEvent("BotJoinedChannel", channel.ID, channel.Version)
+
+	return BotJoinedChannelEvent{
+		BaseDomainEvent: base,
+		ChannelID:       channel.ID,
+		Member:          member,
+		Timestamp:       time.Now().UTC(),
 	}
 }

@@ -15,7 +15,6 @@ type Message struct {
 	createdAt       time.Time
 	parentMessageId *uuid.UUID
 	reactions       []Reaction
-	senderUser      *User
 }
 
 func newMessage(id uuid.UUID, channelId uuid.UUID, senderUserId, integrationId, parentMessageId *uuid.UUID, content MessageContent, reactions []Reaction, timestamp time.Time) Message {
@@ -28,7 +27,6 @@ func newMessage(id uuid.UUID, channelId uuid.UUID, senderUserId, integrationId, 
 		content:         content,
 		reactions:       reactions,
 		createdAt:       timestamp,
-		senderUser:      nil,
 	}
 }
 
@@ -43,7 +41,6 @@ func RehydrateMessage(id uuid.UUID, channelId uuid.UUID, senderUserId, integrati
 		content:         content,
 		reactions:       reactions,
 		createdAt:       timestamp,
-		senderUser:      nil,
 	}
 }
 
@@ -117,12 +114,4 @@ func (m *Message) SetLoadedReactions(loadedReactions []Reaction) {
 		return
 	}
 	m.reactions = loadedReactions
-}
-
-func (m *Message) GetSenderUser() *User {
-	return m.senderUser
-}
-
-func (m *Message) SetSenderUser(user *User) {
-	m.senderUser = user
 }

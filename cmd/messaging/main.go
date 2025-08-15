@@ -25,13 +25,14 @@ import (
 )
 
 type Config struct {
-	HTTPPort          string
-	DatabaseURL       string
-	KafkaBrokers      []string
-	KafkaDefaultTopic string
-	GRPCPort          string
-	IdentityGRPCURL   string
-	RedisURL          string
+	HTTPPort           string
+	DatabaseURL        string
+	KafkaBrokers       []string
+	KafkaDefaultTopic  string
+	GRPCPort           string
+	IdentityGRPCURL    string
+	IntegrationGRPCURL string
+	RedisURL           string
 }
 
 func loadConfig() (*Config, error) {
@@ -70,14 +71,20 @@ func loadConfig() (*Config, error) {
 		return nil, fmt.Errorf("missing MESSAGING_REDIS_URL")
 	}
 
+	integrationGRPCURL := os.Getenv("INTEGRATION_GRPC_URL")
+	if integrationGRPCURL == "" {
+		return nil, fmt.Errorf("missing INTEGRATION_GRPC_URL")
+	}
+
 	return &Config{
-		HTTPPort:          httpPort,
-		DatabaseURL:       dbURL,
-		KafkaBrokers:      strings.Split(kafkaBrokerStr, ","),
-		KafkaDefaultTopic: kafkaDefaultTopic,
-		GRPCPort:          grpcPort,
-		IdentityGRPCURL:   identityGRPCURL,
-		RedisURL:          redisURL,
+		HTTPPort:           httpPort,
+		DatabaseURL:        dbURL,
+		KafkaBrokers:       strings.Split(kafkaBrokerStr, ","),
+		KafkaDefaultTopic:  kafkaDefaultTopic,
+		GRPCPort:           grpcPort,
+		IdentityGRPCURL:    identityGRPCURL,
+		RedisURL:           redisURL,
+		IntegrationGRPCURL: integrationGRPCURL,
 	}, nil
 }
 
@@ -133,13 +140,22 @@ func main() {
 	}
 	defer identityClient.Close()
 
-	service := services.NewChannelService(repository, eventPublisher, identityClient)
+	integrationClient, err := services.NewIntegrationClient(cfg.IntegrationGRPCURL)
+	if err != nil {
+		logger.Fatalf("Failed to create integration client: %v", err)
+	}
+	defer integrationClient.Close()
+
+	channelService := services.NewChannelService(repository, eventPublisher, identityClient, integrationClient)
 	logger.Println("Channel service initialized.")
 
-	httpHandler := handlers.NewHttpHandler(service)
+	messageService := services.NewMessageService(repository, eventPublisher, identityClient, integrationClient)
+	logger.Println("Message service initialized.")
+
+	httpHandler := handlers.NewHttpHandler(channelService, messageService)
 	logger.Println("HTTP Handler initialized")
 
-	wsHandler := handlers.NewWebSocketHandler(service, redisClient, identityClient)
+	wsHandler := handlers.NewWebSocketHandler(channelService, messageService, redisClient, identityClient)
 	logger.Println("WebSocket Handler initialized")
 
 	// -- GIN ROUTE SETUP --
@@ -160,7 +176,7 @@ func main() {
 
 	go func() {
 		logger.Printf("Starting gRPC server on %s", cfg.GRPCPort)
-		if err := handlers.StartGRPCServer(cfg.GRPCPort, service, wsHandler); err != nil {
+		if err := handlers.StartGRPCServer(cfg.GRPCPort, channelService, messageService, wsHandler); err != nil {
 			logger.Fatalf("Failed to start gRPC server: %v", err)
 		}
 	}()

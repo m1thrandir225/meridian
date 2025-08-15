@@ -23,36 +23,12 @@ type WebSocketHandler struct {
 	clients        map[string]*websocket.Conn
 	mu             sync.RWMutex
 	channelService *services.ChannelService
+	messageService *services.MessageService
 	redisClient    *redis.Client
 	identityClient *services.IdentityClient
 }
 
-type WebSocketMessage struct {
-	Type    string      `json:"type"`
-	Payload interface{} `json:"payload"`
-}
-
-type IncomingMessagePayload struct {
-	Content         string `json:"content"`
-	ChannelID       string `json:"channel_id"`
-	ParentMessageID string `json:"parent_message_id,omitempty"`
-}
-
-type OutgoingMessagePayload struct {
-	ID              string    `json:"id"`
-	Content         string    `json:"content"`
-	SenderID        string    `json:"sender_id"`
-	ChannelID       string    `json:"channel_id"`
-	ParentMessageID string    `json:"parent_message_id,omitempty"`
-	Timestamp       time.Time `json:"timestamp"`
-}
-
-type TypingPayload struct {
-	ChannelID string `json:"channel_id"`
-	UserID    string `json:"user_id"`
-}
-
-func NewWebSocketHandler(channelService *services.ChannelService, redisClient *redis.Client, identityClient *services.IdentityClient) *WebSocketHandler {
+func NewWebSocketHandler(channelService *services.ChannelService, messageService *services.MessageService, redisClient *redis.Client, identityClient *services.IdentityClient) *WebSocketHandler {
 	handler := &WebSocketHandler{
 		upgrader: websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool {
@@ -61,6 +37,7 @@ func NewWebSocketHandler(channelService *services.ChannelService, redisClient *r
 		},
 		clients:        make(map[string]*websocket.Conn),
 		channelService: channelService,
+		messageService: messageService,
 		redisClient:    redisClient,
 		identityClient: identityClient,
 	}
@@ -196,7 +173,7 @@ func (h *WebSocketHandler) handleIncomingMessage(senderID string, payload interf
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	message, err := h.channelService.HandleMessageSent(ctx, cmd)
+	message, err := h.messageService.HandleMessageSent(ctx, cmd)
 	if err != nil {
 		return fmt.Errorf("failed to send message: %w", err)
 	}

@@ -3,7 +3,10 @@ package services
 import (
 	"context"
 	"fmt"
+	"log"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/m1thrandir225/meridian/pkg/kafka"
 
 	"github.com/m1thrandir225/meridian/internal/messaging/domain"
@@ -11,19 +14,22 @@ import (
 )
 
 type ChannelService struct {
-	repo           persistence.ChannelRepository
-	eventPub       kafka.EventPublisher
-	identityClient *IdentityClient
+	repo              persistence.ChannelRepository
+	eventPub          kafka.EventPublisher
+	identityClient    *IdentityClient
+	integrationClient *IntegrationClient
 }
 
-func NewChannelService(repo persistence.ChannelRepository, eventPub kafka.EventPublisher, identityClient *IdentityClient) *ChannelService {
+func NewChannelService(repo persistence.ChannelRepository, eventPub kafka.EventPublisher, identityClient *IdentityClient, integrationClient *IntegrationClient) *ChannelService {
 	return &ChannelService{
-		repo:           repo,
-		eventPub:       eventPub,
-		identityClient: identityClient,
+		repo:              repo,
+		eventPub:          eventPub,
+		identityClient:    identityClient,
+		integrationClient: integrationClient,
 	}
 }
 
+// HandleGetUserChannels returns the channels for a user
 func (s *ChannelService) HandleGetUserChannels(ctx context.Context, cmd domain.GetUserChannelsCommand) ([]*domain.Channel, error) {
 	channels, err := s.repo.FindUserChannels(ctx, cmd.UserID)
 	if err != nil {
@@ -48,9 +54,11 @@ func (s *ChannelService) HandleCreateChannel(ctx context.Context, cmd domain.Cre
 		return nil, err
 	}
 	channel.ClearPendingEvents()
-	return channel, err
+
+	return channel, nil
 }
 
+// handleGetChannel returns the channel and publishes the events
 func (s *ChannelService) HandleGetChannel(ctx context.Context, cmd domain.GetChannelCommand) (*domain.Channel, error) {
 	channel, err := s.repo.FindById(ctx, cmd.ChannelID)
 	if err != nil {
@@ -66,23 +74,21 @@ func (s *ChannelService) HandleGetChannel(ctx context.Context, cmd domain.GetCha
 	return channel, nil
 }
 
-func (s *ChannelService) HandleListMessages(ctx context.Context, cmd domain.ListMessagesForChannelCommand) (*domain.Channel, error) {
+// HandleAddBotToChannel adds a bot to a channel and publishes the events
+func (s *ChannelService) HandleAddBotToChannel(ctx context.Context, cmd domain.AddBotToChannelCommand) (*domain.Channel, error) {
 	channel, err := s.repo.FindById(ctx, cmd.ChannelID)
 	if err != nil {
 		return nil, err
 	}
 
-	messages, err := s.repo.FindMessages(context.Background(), cmd.ChannelID, cmd.Limit, cmd.Offset)
+	err = channel.AddBotMember(cmd.IntegrationID)
 	if err != nil {
 		return nil, err
 	}
 
-	messages, err = s.enrichMessagesWithUserInfo(ctx, messages)
-	if err != nil {
+	if err := s.repo.Save(ctx, channel); err != nil {
 		return nil, err
 	}
-
-	channel.Messages = messages
 
 	err = s.eventPub.PublishEvents(ctx, channel.GetPendingEvents())
 	if err != nil {
@@ -104,16 +110,17 @@ func (s *ChannelService) HandleJoinChannel(ctx context.Context, cmd domain.JoinC
 	}
 
 	if err := s.repo.Save(ctx, channel); err != nil {
-		return nil, err
 	}
+
 	err = s.eventPub.PublishEvents(ctx, channel.GetPendingEvents())
 	if err != nil {
 		return nil, err
 	}
 	channel.ClearPendingEvents()
-	return channel, err
+	return channel, nil
 }
 
+// HandleLeaveChannel leaves a channel
 func (s *ChannelService) HandleLeaveChannel(ctx context.Context, cmd domain.LeaveChannelCommand) (*domain.Channel, error) {
 	channel, err := s.repo.FindById(ctx, cmd.ChannelID)
 	if err != nil {
@@ -137,111 +144,7 @@ func (s *ChannelService) HandleLeaveChannel(ctx context.Context, cmd domain.Leav
 	return channel, nil
 }
 
-func (s *ChannelService) HandleMessageSent(ctx context.Context, cmd domain.SendMessageCommand) (*domain.Message, error) {
-	channel, err := s.repo.FindById(ctx, cmd.ChannelID)
-	if err != nil {
-		return nil, err
-	}
-	message, err := channel.PostMessage(cmd.SenderUserID, cmd.Content, cmd.ParentMessageID)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := s.repo.SaveMessage(ctx, message); err != nil {
-		return nil, err
-	}
-
-	err = s.eventPub.PublishEvents(ctx, channel.GetPendingEvents())
-	if err != nil {
-		return nil, err
-	}
-	channel.ClearPendingEvents()
-	return message, err
-}
-
-func (s *ChannelService) HandleNotificationSent(ctx context.Context, cmd domain.SendNotificationCommand) (*domain.Message, error) {
-	channel, err := s.repo.FindById(ctx, cmd.ChannelID)
-	if err != nil {
-		return nil, err
-	}
-	message, err := channel.PostNotification(cmd.IntegrationID, cmd.Content)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := s.repo.SaveMessage(ctx, message); err != nil {
-		return nil, err
-	}
-
-	err = s.eventPub.PublishEvents(ctx, channel.GetPendingEvents())
-	if err != nil {
-		return nil, err
-	}
-	channel.ClearPendingEvents()
-
-	return message, err
-}
-
-func (s *ChannelService) HandleAddReaction(ctx context.Context, cmd domain.AddReactionCommand) (*domain.Reaction, error) {
-	channel, err := s.repo.FindById(ctx, cmd.ChannelID)
-	if err != nil {
-		return nil, err
-	}
-
-	// FIXME:  should the channel return all the messages??
-	messages, err := s.repo.FindMessages(ctx, cmd.ChannelID, 100, 0)
-	if err != nil {
-		return nil, err
-	}
-	channel.Messages = messages
-
-	newReaction, err := channel.AddReaction(cmd.MessageID, cmd.UserID, cmd.ReactionType)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := s.repo.SaveReaction(ctx, newReaction); err != nil {
-		return nil, err
-	}
-
-	err = s.eventPub.PublishEvents(ctx, channel.GetPendingEvents())
-	if err != nil {
-		return nil, err
-	}
-	channel.ClearPendingEvents()
-	return newReaction, nil
-}
-
-func (s *ChannelService) HandleRemoveReaction(ctx context.Context, cmd domain.RemoveReactionCommand) (*domain.Reaction, error) {
-	channel, err := s.repo.FindById(ctx, cmd.ChannelID)
-	if err != nil {
-		return nil, err
-	}
-
-	messages, err := s.repo.FindMessages(ctx, cmd.ChannelID, 100, 0)
-	if err != nil {
-		return nil, err
-	}
-
-	channel.Messages = messages
-
-	reaction, err := channel.RemoveReaction(cmd.MessageID, cmd.UserID, cmd.ReactionType)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := s.repo.DeleteReaction(ctx, cmd.MessageID, cmd.UserID, cmd.ReactionType); err != nil {
-		return nil, err
-	}
-
-	err = s.eventPub.PublishEvents(ctx, channel.GetPendingEvents())
-	if err != nil {
-		return nil, err
-	}
-	channel.ClearPendingEvents()
-	return reaction, nil
-}
-
+// HandleSetChannelTopic sets the topic of a channel
 func (s *ChannelService) HandleSetChannelTopic(ctx context.Context, cmd domain.SetChannelTopicCommand) (*domain.Channel, error) {
 	channel, err := s.repo.FindById(ctx, cmd.ChannelID)
 	if err != nil {
@@ -262,6 +165,7 @@ func (s *ChannelService) HandleSetChannelTopic(ctx context.Context, cmd domain.S
 	return channel, err
 }
 
+// HandleArchiveChannel archives a channel
 func (s *ChannelService) HandleArchiveChannel(ctx context.Context, cmd domain.ArchiveChannelCommand) (*domain.Channel, error) {
 	channel, err := s.repo.FindById(ctx, cmd.ChannelID)
 	if err != nil {
@@ -285,6 +189,7 @@ func (s *ChannelService) HandleArchiveChannel(ctx context.Context, cmd domain.Ar
 	return channel, err
 }
 
+// HandleUnarchiveChannel unarchives a channel
 func (s *ChannelService) HandleUnarchiveChannel(ctx context.Context, cmd domain.UnarchiveChannelCommand) (*domain.Channel, error) {
 	channel, err := s.repo.FindById(ctx, cmd.ChannelID)
 	if err != nil {
@@ -308,43 +213,90 @@ func (s *ChannelService) HandleUnarchiveChannel(ctx context.Context, cmd domain.
 	return channel, err
 }
 
-func (s *ChannelService) enrichMessagesWithUserInfo(ctx context.Context, messages []domain.Message) ([]domain.Message, error) {
-	if len(messages) == 0 {
-		return messages, nil
-	}
+// getChannelMembers returns the users and integration bots for a channel
+func (s *ChannelService) getChannelMembers(ctx context.Context, channel *domain.Channel) ([]*domain.User, []*domain.IntegrationBot, error) {
+	userIDs := make([]string, 0)
+	integrationIDs := make([]string, 0)
 
-	userIDs := make(map[string]bool)
-	for _, msg := range messages {
-		if msg.GetSenderUserId() != nil {
-			userIDs[msg.GetSenderUserId().String()] = true
+	for _, member := range channel.Members {
+		if member.GetRole() == "bot" {
+			integrationIDs = append(integrationIDs, member.GetId().String())
+		} else {
+			userIDs = append(userIDs, member.GetId().String())
 		}
 	}
 
-	var userIDList []string
-	for userID := range userIDs {
-		userIDList = append(userIDList, userID)
-	}
+	var users []*domain.User
+	var integrationBots []*domain.IntegrationBot
 
-	users, err := s.identityClient.GetUsers(ctx, userIDList)
-	if err != nil {
-		return messages, fmt.Errorf("failed to fetch user information: %w", err)
-	}
+	// Fetch users
+	if len(userIDs) > 0 {
+		usersResp, err := s.identityClient.GetUsers(ctx, userIDs)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to fetch user information: %w", err)
+		}
 
-	enrichedMessages := make([]domain.Message, len(messages))
-	for i, msg := range messages {
-		enrichedMessages[i] = msg
-		if msg.GetSenderUserId() != nil {
-			userID := msg.GetSenderUserId().String()
-			for _, user := range users.Users {
-				if user.Id == userID {
-					user := domain.NewUser(user.Id, user.Username, user.Email, user.FirstName, user.LastName)
-					msg.SetSenderUser(user)
-					enrichedMessages[i] = msg
-					break
-				}
+		for _, user := range usersResp.Users {
+			userID, err := uuid.Parse(user.Id)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to parse user ID: %w", err)
 			}
+			domainUser := domain.NewUser(userID, user.Username, user.Email, user.FirstName, user.LastName)
+			users = append(users, domainUser)
 		}
 	}
 
-	return enrichedMessages, nil
+	// Fetch integration bots
+	if len(integrationIDs) > 0 {
+		integrations, err := s.integrationClient.GetIntegrations(ctx, integrationIDs)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to fetch integration information: %w", err)
+		}
+
+		for _, integration := range integrations {
+			// Parse the created_at time
+			createdAt, err := time.Parse(time.RFC3339, integration.CreatedAt)
+			if err != nil {
+				log.Printf("Failed to parse integration created_at time: %v", err)
+				createdAt = time.Now()
+			}
+
+			integrationID, err := uuid.Parse(integration.Id)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to parse integration ID: %w", err)
+			}
+
+			integrationBot := domain.NewIntegrationBot(
+				integrationID,
+				integration.ServiceName,
+				createdAt,
+				integration.IsRevoked,
+			)
+			integrationBots = append(integrationBots, integrationBot)
+		}
+	}
+
+	return users, integrationBots, nil
+}
+
+func (s *ChannelService) ReturnChannelDTO(ctx context.Context, channel *domain.Channel) (*domain.ChannelDTO, error) {
+	users, integrationBots, err := s.getChannelMembers(ctx, channel)
+	if err != nil {
+		return nil, err
+	}
+
+	dto := domain.ToChannelDTO(channel, users, integrationBots)
+	return &dto, nil
+}
+
+func (s *ChannelService) ReturnChannelDTOs(ctx context.Context, channels []*domain.Channel) ([]domain.ChannelDTO, error) {
+	dtos := make([]domain.ChannelDTO, len(channels))
+	for i, channel := range channels {
+		dto, err := s.ReturnChannelDTO(ctx, channel)
+		if err != nil {
+			return nil, err
+		}
+		dtos[i] = *dto
+	}
+	return dtos, nil
 }

@@ -11,11 +11,13 @@ import (
 
 type HTTPHandler struct {
 	channelService *services.ChannelService
+	messageService *services.MessageService
 }
 
-func NewHttpHandler(service *services.ChannelService) *HTTPHandler {
+func NewHttpHandler(channelService *services.ChannelService, messageService *services.MessageService) *HTTPHandler {
 	return &HTTPHandler{
-		channelService: service,
+		channelService: channelService,
+		messageService: messageService,
 	}
 }
 
@@ -38,16 +40,17 @@ func (h *HTTPHandler) GetUserChannels(ctx *gin.Context) {
 
 	channels, err := h.channelService.HandleGetUserChannels(ctx, cmd)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "something went wrong: " + err.Error()})
+		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
 		return
 	}
 
-	channelsResponse := make([]ChannelResponse, len(channels))
-	for i, channel := range channels {
-		channelsResponse[i] = ToChannelResponse(channel)
+	channelsDTO, err := h.channelService.ReturnChannelDTOs(ctx, channels)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
+		return
 	}
 
-	ctx.JSON(http.StatusOK, channelsResponse)
+	ctx.JSON(http.StatusOK, channelsDTO)
 }
 
 // POST /api/v1/channels/
@@ -79,7 +82,11 @@ func (h *HTTPHandler) CreateChannel(ctx *gin.Context) {
 		return
 	}
 
-	channelDTO := ToChannelResponse(channel)
+	channelDTO, err := h.channelService.ReturnChannelDTO(ctx, channel)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
+		return
+	}
 
 	ctx.JSON(http.StatusCreated, channelDTO)
 }
@@ -105,7 +112,56 @@ func (h *HTTPHandler) GetChannel(ctx *gin.Context) {
 		return
 	}
 
-	channelDTO := ToChannelResponse(channel)
+	channelDTO, err := h.channelService.ReturnChannelDTO(ctx, channel)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
+		return
+	}
+
+	ctx.JSON(http.StatusOK, channelDTO)
+}
+
+// POST /api/v1/channels/:channelId/bots
+func (h *HTTPHandler) AddBotToChannel(ctx *gin.Context) {
+	var channelIdUri ChannelIDUri
+
+	if err := ctx.ShouldBindUri(&channelIdUri); err != nil {
+		ctx.JSON(http.StatusBadRequest, errorResponse(err))
+		return
+	}
+
+	var req AddBotToChannelRequest
+
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, errorResponse(err))
+		return
+	}
+
+	channelId, err := uuid.Parse(channelIdUri.ChannelID)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, errorResponse(err))
+		return
+	}
+
+	integrationId, err := uuid.Parse(req.IntegrationID)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, errorResponse(err))
+		return
+	}
+
+	channel, err := h.channelService.HandleAddBotToChannel(ctx, domain.AddBotToChannelCommand{
+		ChannelID:     channelId,
+		IntegrationID: integrationId,
+	})
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
+		return
+	}
+	channelDTO, err := h.channelService.ReturnChannelDTO(ctx, channel)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
+		return
+	}
 
 	ctx.JSON(http.StatusOK, channelDTO)
 }
@@ -169,12 +225,17 @@ func (h *HTTPHandler) JoinChannel(ctx *gin.Context) {
 		return
 	}
 
-	channelDTO := ToChannelResponse(channel)
+	channelDTO, err := h.channelService.ReturnChannelDTO(ctx, channel)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
+		return
+	}
 
 	ctx.JSON(http.StatusOK, channelDTO)
 }
 
 // POST /api/v1/channels/:channelId/messages
+// FIXME: redundant, should be removed
 func (h *HTTPHandler) SendMessage(ctx *gin.Context) {
 	userID := ctx.GetHeader("X-User-ID")
 	if userID == "" {
@@ -216,17 +277,24 @@ func (h *HTTPHandler) SendMessage(ctx *gin.Context) {
 		parentMessageID = &parsed
 	}
 
-	message, err := h.channelService.HandleMessageSent(ctx, domain.SendMessageCommand{
+	content := domain.NewMessageContent(req.ContentText) //TODO: add content type
+
+	message, err := h.messageService.HandleMessageSent(ctx, domain.SendMessageCommand{
 		ChannelID:       channelId,
 		SenderUserID:    senderID,
 		ParentMessageID: parentMessageID,
-		Content:         domain.MessageContent{},
+		Content:         content,
 	})
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
 		return
 	}
-	messageDTO := ToMessageResponse(message)
+
+	messageDTO, err := h.messageService.ToMessageDTO(ctx, message)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
+		return
+	}
 
 	ctx.JSON(http.StatusCreated, messageDTO)
 }
@@ -246,20 +314,22 @@ func (h *HTTPHandler) GetMessages(ctx *gin.Context) {
 		return
 	}
 
-	channel, err := h.channelService.HandleListMessages(ctx, domain.ListMessagesForChannelCommand{
+	cmd := domain.ListMessagesForChannelCommand{
 		ChannelID: channelId,
 		Limit:     50,
 		Offset:    0,
-	})
+	}
+
+	messages, err := h.messageService.HandleListMessages(ctx, cmd)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, errorResponse(err))
 		return
 	}
-	messages := channel.Messages
 
-	messagesDTO := make([]MessageResponse, len(messages))
-	for i, message := range messages {
-		messagesDTO[i] = ToMessageResponse(&message)
+	messagesDTO, err := h.messageService.ToMessageDTOs(ctx, messages)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
+		return
 	}
 
 	ctx.JSON(http.StatusOK, messagesDTO)
@@ -301,20 +371,21 @@ func (h *HTTPHandler) AddReaction(ctx *gin.Context) {
 		return
 	}
 
-	reaction, err := h.channelService.HandleAddReaction(ctx, domain.AddReactionCommand{
+	cmd := domain.AddReactionCommand{
 		ChannelID:    channelId,
 		MessageID:    messageId,
 		UserID:       userId,
 		ReactionType: req.ReactionType,
-	})
+	}
+
+	reaction, err := h.messageService.HandleAddReaction(ctx, cmd)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
 		return
 	}
 
-	reactionDTO := ToReactionResponse(reaction)
-
-	ctx.JSON(http.StatusCreated, reactionDTO)
+	//TODO: return the reaction as a DTO? or return the message with the reaction?
+	ctx.JSON(http.StatusCreated, reaction)
 }
 
 // DELETE /api/v1/channels/:channelId/messages/:messageId/reactions
@@ -354,12 +425,14 @@ func (h *HTTPHandler) RemoveReaction(ctx *gin.Context) {
 		return
 	}
 
-	_, err = h.channelService.HandleRemoveReaction(ctx, domain.RemoveReactionCommand{
+	cmd := domain.RemoveReactionCommand{
 		ChannelID:    channelId,
 		MessageID:    messageId,
 		UserID:       userId,
 		ReactionType: req.ReactionType,
-	})
+	}
+
+	_, err = h.messageService.HandleRemoveReaction(ctx, cmd)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
 		return

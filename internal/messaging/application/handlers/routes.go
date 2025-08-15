@@ -25,6 +25,8 @@ func SetupRoutes(router *gin.Engine, httpHandler *HTTPHandler, wsHandler *WebSoc
 			channelsGroup.POST("/:channelId/join", httpHandler.JoinChannel)
 			channelsGroup.PUT("/:channelId/archive", httpHandler.ArchiveChannel)
 			channelsGroup.PUT("/:channelId/unarchive", httpHandler.UnarchiveChannel)
+			channelsGroup.POST("/:channelId/bots", httpHandler.AddBotToChannel)
+
 			messagesGroup := channelsGroup.Group("/:channelId/messages")
 			{
 				messagesGroup.GET("/", httpHandler.GetMessages)
