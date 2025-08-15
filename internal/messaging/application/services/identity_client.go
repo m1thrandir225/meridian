@@ -3,7 +3,6 @@ package services
 import (
 	"context"
 	"log"
-	"time"
 
 	identitypb "github.com/m1thrandir225/meridian/internal/identity/infrastructure/api"
 	"google.golang.org/grpc"
@@ -29,9 +28,7 @@ func NewIdentityClient(address string) (*IdentityClient, error) {
 	}, nil
 }
 
-func (ic *IdentityClient) ValidateToken(token string) (*identitypb.ValidateTokenResponse, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+func (ic *IdentityClient) ValidateToken(ctx context.Context, token string) (*identitypb.ValidateTokenResponse, error) {
 	req := &identitypb.ValidateTokenRequest{
 		Token: token,
 	}
@@ -45,10 +42,7 @@ func (ic *IdentityClient) ValidateToken(token string) (*identitypb.ValidateToken
 	return resp, nil
 }
 
-func (ic *IdentityClient) GetUserByID(userID string) (*identitypb.GetUserByIDResponse, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
+func (ic *IdentityClient) GetUserByID(ctx context.Context, userID string) (*identitypb.GetUserByIDResponse, error) {
 	req := &identitypb.GetUserByIDRequest{
 		UserId: userID,
 	}
@@ -62,12 +56,11 @@ func (ic *IdentityClient) GetUserByID(userID string) (*identitypb.GetUserByIDRes
 	return resp, nil
 }
 
-func (ic *IdentityClient) GetUsers(context context.Context, userIDs []string) (*identitypb.GetUsersResponse, error) {
-
+func (ic *IdentityClient) GetUsers(ctx context.Context, userIDs []string) (*identitypb.GetUsersResponse, error) {
 	req := &identitypb.GetUsersRequest{
 		UserIds: userIDs,
 	}
-	resp, err := ic.client.GetUsers(context, req)
+	resp, err := ic.client.GetUsers(ctx, req)
 	if err != nil {
 		log.Printf("gRPC call to GetUsers failed: %v", err)
 		return nil, err

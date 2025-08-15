@@ -314,7 +314,7 @@ onMounted(() => {
           <Avatar class="h-8 w-8">
             <AvatarFallback>
               {{
-                message.sender_user_id === authStore.user?.user_id
+                message.sender_user_id === authStore.user?.id
                   ? `${getUserInitials(authStore.userDisplayName())}`
                   : getUserInitials(
                       `${message.sender_user?.first_name} ${message.sender_user?.last_name}`,
@@ -328,13 +328,13 @@ onMounted(() => {
             <div class="flex items-center gap-2 mb-1">
               <span
                 class="font-semibold text-primary text-[10px]"
-                v-if="message.sender_user_id !== authStore.user?.user_id"
+                v-if="message.sender_user_id !== authStore.user?.id"
               >
                 @{{ message.sender_user?.username }}
               </span>
               <span class="font-medium text-sm">
                 {{
-                  message.sender_user_id === authStore.user?.user_id
+                  message.sender_user_id === authStore.user?.id
                     ? 'You'
                     : getUserDisplayName(
                         message.sender_user?.first_name ?? '',

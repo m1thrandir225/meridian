@@ -241,7 +241,7 @@ func (s *ChannelService) getChannelMembers(ctx context.Context, channel *domain.
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to parse user ID: %w", err)
 			}
-			domainUser := domain.NewUser(userID, user.Username, user.Email, user.FirstName, user.LastName)
+			domainUser := domain.NewUser(userID, user.Username, user.FirstName, user.LastName, user.Email)
 			users = append(users, domainUser)
 		}
 	}

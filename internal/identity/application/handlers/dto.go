@@ -1,7 +1,7 @@
 package handlers
 
 type UserResponse struct {
-	UserID    string `json:"user_id"`
+	ID        string `json:"id"`
 	Username  string `json:"username"`
 	Email     string `json:"email"`
 	FirstName string `json:"first_name"`

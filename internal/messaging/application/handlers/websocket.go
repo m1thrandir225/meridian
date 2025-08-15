@@ -57,7 +57,7 @@ func (h *WebSocketHandler) HandleWebSocket(c *gin.Context) {
 		return
 	}
 
-	userID, err := h.validateToken(token)
+	userID, err := h.validateToken(c.Request.Context(), token)
 	if err != nil {
 		log.Printf("Failed to validate token: %v", err)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
@@ -385,8 +385,8 @@ func (h *WebSocketHandler) SendToUser(userID string, message WebSocketMessage) e
 	return h.sendToClient(userID, message)
 }
 
-func (h *WebSocketHandler) validateToken(token string) (string, error) {
-	resp, err := h.identityClient.ValidateToken(token)
+func (h *WebSocketHandler) validateToken(ctx context.Context, token string) (string, error) {
+	resp, err := h.identityClient.ValidateToken(ctx, token)
 	if err != nil {
 		return "", fmt.Errorf("failed to validate token: %w", err)
 	}

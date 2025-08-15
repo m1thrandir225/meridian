@@ -50,7 +50,7 @@ func (h *HTTPHandler) handleRegisterRequest(ctx *gin.Context) {
 	}
 
 	response := UserResponse{
-		UserID:    user.ID.String(),
+		ID:        user.ID.String(),
 		Username:  user.Username.String(),
 		Email:     user.Email.String(),
 		FirstName: user.FirstName,
@@ -95,7 +95,7 @@ func (h *HTTPHandler) handleLoginRequest(ctx *gin.Context) {
 
 	resp := AuthenticateUserResponse{
 		User: UserResponse{
-			UserID:    user.ID.String(),
+			ID:        user.ID.String(),
 			Username:  user.Username.String(),
 			Email:     user.Email.String(),
 			FirstName: user.FirstName,
@@ -132,7 +132,7 @@ func (h *HTTPHandler) handleGetCurrentUser(ctx *gin.Context) {
 	}
 
 	response := UserResponse{
-		UserID:    user.ID.String(),
+		ID:        user.ID.String(),
 		Username:  user.Username.String(),
 		Email:     user.Email.String(),
 		FirstName: user.FirstName,
@@ -186,7 +186,7 @@ func (h *HTTPHandler) handleUpdateCurrentUserRequest(ctx *gin.Context) {
 	}
 
 	response := UserResponse{
-		UserID:    updatedUser.ID.String(),
+		ID:        updatedUser.ID.String(),
 		Username:  updatedUser.Username.String(),
 		Email:     updatedUser.Email.String(),
 		FirstName: updatedUser.FirstName,

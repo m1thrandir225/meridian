@@ -195,7 +195,7 @@ func (s *MessageService) ToMessageDTO(ctx context.Context, message *domain.Messa
 
 // getSenderUser returns the user with information from the identity service
 func (s *MessageService) getSenderUser(ctx context.Context, userID string) (*domain.User, error) {
-	pbUser, err := s.identityClient.GetUserByID(userID)
+	pbUser, err := s.identityClient.GetUserByID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -204,7 +204,7 @@ func (s *MessageService) getSenderUser(ctx context.Context, userID string) (*dom
 		return nil, err
 	}
 
-	user := domain.NewUser(userId, pbUser.User.Username, pbUser.User.Email, pbUser.User.FirstName, pbUser.User.LastName)
+	user := domain.NewUser(userId, pbUser.User.Username, pbUser.User.FirstName, pbUser.User.LastName, pbUser.User.Email)
 
 	return user, nil
 }
