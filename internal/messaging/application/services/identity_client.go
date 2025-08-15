@@ -45,6 +45,36 @@ func (ic *IdentityClient) ValidateToken(token string) (*identitypb.ValidateToken
 	return resp, nil
 }
 
+func (ic *IdentityClient) GetUserByID(userID string) (*identitypb.GetUserByIDResponse, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	req := &identitypb.GetUserByIDRequest{
+		UserId: userID,
+	}
+
+	resp, err := ic.client.GetUserByID(ctx, req)
+	if err != nil {
+		log.Printf("gRPC call to GetUserByID failed: %v", err)
+		return nil, err
+	}
+
+	return resp, nil
+}
+
+func (ic *IdentityClient) GetUsers(context context.Context, userIDs []string) (*identitypb.GetUsersResponse, error) {
+
+	req := &identitypb.GetUsersRequest{
+		UserIds: userIDs,
+	}
+	resp, err := ic.client.GetUsers(context, req)
+	if err != nil {
+		log.Printf("gRPC call to GetUsers failed: %v", err)
+		return nil, err
+	}
+	return resp, nil
+}
+
 func (ic *IdentityClient) Close() error {
 	return ic.conn.Close()
 }

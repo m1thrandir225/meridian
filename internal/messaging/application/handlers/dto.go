@@ -58,7 +58,25 @@ type MessageResponse struct {
 	ContentText     string    `json:"content_text"`
 	CreatedAt       time.Time `json:"created_at"`
 	ParentMessageID *string
+	SenderUser      *UserResponse      `json:"sender_user,omitempty"`
 	Reactions       []ReactionResponse `json:"reactions,omitempty"`
+}
+type UserResponse struct {
+	ID        string `json:"id"`
+	Username  string `json:"username"`
+	Email     string `json:"email"`
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"`
+}
+
+func ToUserResponse(user *domain.User) UserResponse {
+	return UserResponse{
+		ID:        user.ID,
+		Username:  user.Username,
+		Email:     user.Email,
+		FirstName: user.FirstName,
+		LastName:  user.LastName,
+	}
 }
 
 func ToMessageResponse(message *domain.Message) MessageResponse {
@@ -83,6 +101,18 @@ func ToMessageResponse(message *domain.Message) MessageResponse {
 		reactionsDTO[i] = ToReactionResponse(&reaction)
 	}
 
+	var senderUser *UserResponse
+	if message.GetSenderUser() != nil {
+		sender := message.GetSenderUser()
+		senderUser = &UserResponse{
+			ID:        sender.ID,
+			Username:  sender.Username,
+			Email:     sender.Email,
+			FirstName: sender.FirstName,
+			LastName:  sender.LastName,
+		}
+	}
+
 	return MessageResponse{
 		ID:              message.GetId().String(),
 		ChannelID:       message.GetChannelId().String(),
@@ -92,6 +122,7 @@ func ToMessageResponse(message *domain.Message) MessageResponse {
 		CreatedAt:       message.GetCreatedAt(),
 		ParentMessageID: parentId,
 		Reactions:       reactionsDTO,
+		SenderUser:      senderUser,
 	}
 }
 

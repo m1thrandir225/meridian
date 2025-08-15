@@ -130,6 +130,44 @@ func (r *PostgresUserRepository) Save(ctx context.Context, user *domain.User) er
 	return nil
 }
 
+func (r *PostgresUserRepository) FindByIds(ctx context.Context, ids []uuid.UUID) ([]*domain.User, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+
+	idStrings := make([]string, len(ids))
+	for i, id := range ids {
+		idStrings[i] = id.String()
+	}
+
+	query := `
+	SELECT id, username, first_name, last_name, email, password, version, registartion_time
+	FROM users
+	WHERE id = ANY($1)
+	ORDER BY id
+	`
+
+	rows, err := r.db.Query(ctx, query, idStrings)
+	if err != nil {
+		return nil, fmt.Errorf("error querying users by IDs: %w", err)
+	}
+	defer rows.Close()
+
+	var users []*domain.User
+	for rows.Next() {
+		user, err := r.scanUser(rows)
+		if err != nil {
+			return nil, fmt.Errorf("error scanning user: %w", err)
+		}
+		users = append(users, user)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating users: %w", err)
+	}
+
+	return users, nil
+}
 func (r *PostgresUserRepository) FindById(ctx context.Context, id uuid.UUID) (*domain.User, error) {
 	return r.findByField(ctx, "id", id.String())
 }

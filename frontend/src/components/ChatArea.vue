@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, watch, onMounted, onUnmounted } from 'vue'
-import { Hash, Users, Send, Smile, Menu } from 'lucide-vue-next'
+import { Hash, Users, Send, Smile, Menu, Paperclip } from 'lucide-vue-next'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -9,6 +9,7 @@ import { useChannelStore } from '@/stores/channel'
 import { useMessageStore } from '@/stores/message'
 import { useAuthStore } from '@/stores/auth'
 import websocketService from '@/services/websocket.service'
+import { getUserInitials, getUserDisplayName } from '@/lib/utils'
 
 // Props and emits
 interface Props {
@@ -144,14 +145,14 @@ onMounted(() => {
   }
 })
 
-// const formatTime = (timestamp: string) => {
-//   const date = new Date(timestamp)
-//   return date.toLocaleTimeString('en-US', {
-//     hour: '2-digit',
-//     minute: '2-digit',
-//     hour12: false,
-//   })
-// }
+const formatTime = (timestamp: string) => {
+  const date = new Date(timestamp)
+  return date.toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+}
 
 // const toggleReaction = (messageId: string, emoji: string) => {
 //   const message = messages.value.find((m) => m.id === messageId)
@@ -312,18 +313,37 @@ onMounted(() => {
           <!-- Avatar -->
           <Avatar class="h-8 w-8">
             <AvatarFallback>
-              {{ message.sender_user_id?.charAt(0).toUpperCase() }}
+              {{
+                message.sender_user_id === authStore.user?.user_id
+                  ? `${getUserInitials(authStore.userDisplayName())}`
+                  : getUserInitials(
+                      `${message.sender_user?.first_name} ${message.sender_user?.last_name}`,
+                    )
+              }}
             </AvatarFallback>
           </Avatar>
 
           <!-- Message Content -->
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2 mb-1">
+              <span
+                class="font-semibold text-primary text-[10px]"
+                v-if="message.sender_user_id !== authStore.user?.user_id"
+              >
+                @{{ message.sender_user?.username }}
+              </span>
               <span class="font-medium text-sm">
-                {{ message.sender_user_id === authStore.user?.id ? 'You' : message.sender_user_id }}
+                {{
+                  message.sender_user_id === authStore.user?.user_id
+                    ? 'You'
+                    : getUserDisplayName(
+                        message.sender_user?.first_name ?? '',
+                        message.sender_user?.last_name ?? '',
+                      )
+                }}
               </span>
               <span class="text-xs text-muted-foreground">
-                {{ new Date(message.created_at).toLocaleTimeString() }}
+                {{ formatTime(message.created_at) }}
               </span>
             </div>
 

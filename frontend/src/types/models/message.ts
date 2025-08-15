@@ -6,4 +6,11 @@ export interface Message {
   content_text: string
   parent_message_id?: string
   created_at: string
+  sender_user?: {
+    id: string
+    username: string
+    email: string
+    first_name: string
+    last_name: string
+  }
 }

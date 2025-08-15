@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/m1thrandir225/meridian/pkg/kafka"
 
@@ -10,14 +11,16 @@ import (
 )
 
 type ChannelService struct {
-	repo     persistence.ChannelRepository
-	eventPub kafka.EventPublisher
+	repo           persistence.ChannelRepository
+	eventPub       kafka.EventPublisher
+	identityClient *IdentityClient
 }
 
-func NewChannelService(repo persistence.ChannelRepository, eventPub kafka.EventPublisher) *ChannelService {
+func NewChannelService(repo persistence.ChannelRepository, eventPub kafka.EventPublisher, identityClient *IdentityClient) *ChannelService {
 	return &ChannelService{
-		repo:     repo,
-		eventPub: eventPub,
+		repo:           repo,
+		eventPub:       eventPub,
+		identityClient: identityClient,
 	}
 }
 
@@ -70,6 +73,11 @@ func (s *ChannelService) HandleListMessages(ctx context.Context, cmd domain.List
 	}
 
 	messages, err := s.repo.FindMessages(context.Background(), cmd.ChannelID, cmd.Limit, cmd.Offset)
+	if err != nil {
+		return nil, err
+	}
+
+	messages, err = s.enrichMessagesWithUserInfo(ctx, messages)
 	if err != nil {
 		return nil, err
 	}
@@ -298,4 +306,45 @@ func (s *ChannelService) HandleUnarchiveChannel(ctx context.Context, cmd domain.
 	}
 	channel.ClearPendingEvents()
 	return channel, err
+}
+
+func (s *ChannelService) enrichMessagesWithUserInfo(ctx context.Context, messages []domain.Message) ([]domain.Message, error) {
+	if len(messages) == 0 {
+		return messages, nil
+	}
+
+	userIDs := make(map[string]bool)
+	for _, msg := range messages {
+		if msg.GetSenderUserId() != nil {
+			userIDs[msg.GetSenderUserId().String()] = true
+		}
+	}
+
+	var userIDList []string
+	for userID := range userIDs {
+		userIDList = append(userIDList, userID)
+	}
+
+	users, err := s.identityClient.GetUsers(ctx, userIDList)
+	if err != nil {
+		return messages, fmt.Errorf("failed to fetch user information: %w", err)
+	}
+
+	enrichedMessages := make([]domain.Message, len(messages))
+	for i, msg := range messages {
+		enrichedMessages[i] = msg
+		if msg.GetSenderUserId() != nil {
+			userID := msg.GetSenderUserId().String()
+			for _, user := range users.Users {
+				if user.Id == userID {
+					user := domain.NewUser(user.Id, user.Username, user.Email, user.FirstName, user.LastName)
+					msg.SetSenderUser(user)
+					enrichedMessages[i] = msg
+					break
+				}
+			}
+		}
+	}
+
+	return enrichedMessages, nil
 }

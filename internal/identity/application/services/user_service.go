@@ -162,6 +162,25 @@ func (s *IdentityService) GetUser(ctx context.Context, cmd domain.GetUserCommand
 	return user, nil
 }
 
+func (s *IdentityService) GetUsers(ctx context.Context, cmd domain.GetUsersCommand) ([]*domain.User, error) {
+	if len(cmd.UserIds) == 0 {
+		return []*domain.User{}, nil
+	}
+	userIds := make([]uuid.UUID, len(cmd.UserIds))
+	for i, id := range cmd.UserIds {
+		userId, err := uuid.Parse(id)
+		if err != nil {
+			return nil, fmt.Errorf("invalid user ID: %w", err)
+		}
+		userIds[i] = userId
+	}
+	users, err := s.repo.FindByIds(ctx, userIds)
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving users: %w", err)
+	}
+	return users, nil
+}
+
 func (s *IdentityService) UpdateUserProfile(ctx context.Context, cmd domain.UpdateUserProfileCommand) (*domain.User, error) {
 	userId, err := uuid.Parse(cmd.UserID)
 	if err != nil {

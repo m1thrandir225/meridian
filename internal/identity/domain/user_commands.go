@@ -19,6 +19,10 @@ type GetUserCommand struct {
 	UserID string
 }
 
+type GetUsersCommand struct {
+	UserIds []string
+}
+
 type UpdateUserProfileCommand struct {
 	UserID       string
 	NewEmail     *string

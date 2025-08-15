@@ -161,7 +161,7 @@ func main() {
 
 	go func() {
 		logger.Printf("Starting gRPC server on %s", cfg.GRPCPort)
-		if err := handlers.StartGRPCServer(cfg.GRPCPort, tokenVerifier); err != nil {
+		if err := handlers.StartGRPCServer(cfg.GRPCPort, tokenVerifier, service); err != nil {
 			logger.Fatalf("Failed to start gRPC server: %v", err)
 		}
 	}()

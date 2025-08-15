@@ -109,6 +109,258 @@ func (x *ValidateTokenResponse) GetUserId() string {
 	return ""
 }
 
+type GetUserByIDRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetUserByIDRequest) Reset() {
+	*x = GetUserByIDRequest{}
+	mi := &file_internal_identity_infrastructure_api_identity_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetUserByIDRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetUserByIDRequest) ProtoMessage() {}
+
+func (x *GetUserByIDRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_identity_infrastructure_api_identity_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetUserByIDRequest.ProtoReflect.Descriptor instead.
+func (*GetUserByIDRequest) Descriptor() ([]byte, []int) {
+	return file_internal_identity_infrastructure_api_identity_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *GetUserByIDRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+type GetUsersRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserIds       []string               `protobuf:"bytes,1,rep,name=user_ids,json=userIds,proto3" json:"user_ids,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetUsersRequest) Reset() {
+	*x = GetUsersRequest{}
+	mi := &file_internal_identity_infrastructure_api_identity_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetUsersRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetUsersRequest) ProtoMessage() {}
+
+func (x *GetUsersRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_identity_infrastructure_api_identity_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetUsersRequest.ProtoReflect.Descriptor instead.
+func (*GetUsersRequest) Descriptor() ([]byte, []int) {
+	return file_internal_identity_infrastructure_api_identity_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *GetUsersRequest) GetUserIds() []string {
+	if x != nil {
+		return x.UserIds
+	}
+	return nil
+}
+
+type User struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Username      string                 `protobuf:"bytes,2,opt,name=username,proto3" json:"username,omitempty"`
+	Email         string                 `protobuf:"bytes,3,opt,name=email,proto3" json:"email,omitempty"`
+	FirstName     string                 `protobuf:"bytes,4,opt,name=first_name,json=firstName,proto3" json:"first_name,omitempty"`
+	LastName      string                 `protobuf:"bytes,5,opt,name=last_name,json=lastName,proto3" json:"last_name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *User) Reset() {
+	*x = User{}
+	mi := &file_internal_identity_infrastructure_api_identity_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *User) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*User) ProtoMessage() {}
+
+func (x *User) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_identity_infrastructure_api_identity_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use User.ProtoReflect.Descriptor instead.
+func (*User) Descriptor() ([]byte, []int) {
+	return file_internal_identity_infrastructure_api_identity_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *User) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *User) GetUsername() string {
+	if x != nil {
+		return x.Username
+	}
+	return ""
+}
+
+func (x *User) GetEmail() string {
+	if x != nil {
+		return x.Email
+	}
+	return ""
+}
+
+func (x *User) GetFirstName() string {
+	if x != nil {
+		return x.FirstName
+	}
+	return ""
+}
+
+func (x *User) GetLastName() string {
+	if x != nil {
+		return x.LastName
+	}
+	return ""
+}
+
+type GetUsersResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Users         []*User                `protobuf:"bytes,1,rep,name=users,proto3" json:"users,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetUsersResponse) Reset() {
+	*x = GetUsersResponse{}
+	mi := &file_internal_identity_infrastructure_api_identity_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetUsersResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetUsersResponse) ProtoMessage() {}
+
+func (x *GetUsersResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_identity_infrastructure_api_identity_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetUsersResponse.ProtoReflect.Descriptor instead.
+func (*GetUsersResponse) Descriptor() ([]byte, []int) {
+	return file_internal_identity_infrastructure_api_identity_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *GetUsersResponse) GetUsers() []*User {
+	if x != nil {
+		return x.Users
+	}
+	return nil
+}
+
+type GetUserByIDResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	User          *User                  `protobuf:"bytes,1,opt,name=user,proto3" json:"user,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetUserByIDResponse) Reset() {
+	*x = GetUserByIDResponse{}
+	mi := &file_internal_identity_infrastructure_api_identity_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetUserByIDResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetUserByIDResponse) ProtoMessage() {}
+
+func (x *GetUserByIDResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_identity_infrastructure_api_identity_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetUserByIDResponse.ProtoReflect.Descriptor instead.
+func (*GetUserByIDResponse) Descriptor() ([]byte, []int) {
+	return file_internal_identity_infrastructure_api_identity_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *GetUserByIDResponse) GetUser() *User {
+	if x != nil {
+		return x.User
+	}
+	return nil
+}
+
 var File_internal_identity_infrastructure_api_identity_proto protoreflect.FileDescriptor
 
 const file_internal_identity_infrastructure_api_identity_proto_rawDesc = "" +
@@ -117,9 +369,26 @@ const file_internal_identity_infrastructure_api_identity_proto_rawDesc = "" +
 	"\x14ValidateTokenRequest\x12\x14\n" +
 	"\x05token\x18\x01 \x01(\tR\x05token\"0\n" +
 	"\x15ValidateTokenResponse\x12\x17\n" +
-	"\auser_id\x18\x01 \x01(\tR\x06userId2i\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\"-\n" +
+	"\x12GetUserByIDRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\",\n" +
+	"\x0fGetUsersRequest\x12\x19\n" +
+	"\buser_ids\x18\x01 \x03(\tR\auserIds\"\x84\x01\n" +
+	"\x04User\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1a\n" +
+	"\busername\x18\x02 \x01(\tR\busername\x12\x14\n" +
+	"\x05email\x18\x03 \x01(\tR\x05email\x12\x1d\n" +
+	"\n" +
+	"first_name\x18\x04 \x01(\tR\tfirstName\x12\x1b\n" +
+	"\tlast_name\x18\x05 \x01(\tR\blastName\";\n" +
+	"\x10GetUsersResponse\x12'\n" +
+	"\x05users\x18\x01 \x03(\v2\x11.identity.v1.UserR\x05users\"<\n" +
+	"\x13GetUserByIDResponse\x12%\n" +
+	"\x04user\x18\x01 \x01(\v2\x11.identity.v1.UserR\x04user2\x84\x02\n" +
 	"\x0fIdentityService\x12V\n" +
-	"\rValidateToken\x12!.identity.v1.ValidateTokenRequest\x1a\".identity.v1.ValidateTokenResponseBSZQgithub.com/m1thrandir225/meridian/internal/identity/infrastructure/api;identitypbb\x06proto3"
+	"\rValidateToken\x12!.identity.v1.ValidateTokenRequest\x1a\".identity.v1.ValidateTokenResponse\x12P\n" +
+	"\vGetUserByID\x12\x1f.identity.v1.GetUserByIDRequest\x1a .identity.v1.GetUserByIDResponse\x12G\n" +
+	"\bGetUsers\x12\x1c.identity.v1.GetUsersRequest\x1a\x1d.identity.v1.GetUsersResponseBSZQgithub.com/m1thrandir225/meridian/internal/identity/infrastructure/api;identitypbb\x06proto3"
 
 var (
 	file_internal_identity_infrastructure_api_identity_proto_rawDescOnce sync.Once
@@ -133,19 +402,30 @@ func file_internal_identity_infrastructure_api_identity_proto_rawDescGZIP() []by
 	return file_internal_identity_infrastructure_api_identity_proto_rawDescData
 }
 
-var file_internal_identity_infrastructure_api_identity_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_internal_identity_infrastructure_api_identity_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_internal_identity_infrastructure_api_identity_proto_goTypes = []any{
 	(*ValidateTokenRequest)(nil),  // 0: identity.v1.ValidateTokenRequest
 	(*ValidateTokenResponse)(nil), // 1: identity.v1.ValidateTokenResponse
+	(*GetUserByIDRequest)(nil),    // 2: identity.v1.GetUserByIDRequest
+	(*GetUsersRequest)(nil),       // 3: identity.v1.GetUsersRequest
+	(*User)(nil),                  // 4: identity.v1.User
+	(*GetUsersResponse)(nil),      // 5: identity.v1.GetUsersResponse
+	(*GetUserByIDResponse)(nil),   // 6: identity.v1.GetUserByIDResponse
 }
 var file_internal_identity_infrastructure_api_identity_proto_depIdxs = []int32{
-	0, // 0: identity.v1.IdentityService.ValidateToken:input_type -> identity.v1.ValidateTokenRequest
-	1, // 1: identity.v1.IdentityService.ValidateToken:output_type -> identity.v1.ValidateTokenResponse
-	1, // [1:2] is the sub-list for method output_type
-	0, // [0:1] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	4, // 0: identity.v1.GetUsersResponse.users:type_name -> identity.v1.User
+	4, // 1: identity.v1.GetUserByIDResponse.user:type_name -> identity.v1.User
+	0, // 2: identity.v1.IdentityService.ValidateToken:input_type -> identity.v1.ValidateTokenRequest
+	2, // 3: identity.v1.IdentityService.GetUserByID:input_type -> identity.v1.GetUserByIDRequest
+	3, // 4: identity.v1.IdentityService.GetUsers:input_type -> identity.v1.GetUsersRequest
+	1, // 5: identity.v1.IdentityService.ValidateToken:output_type -> identity.v1.ValidateTokenResponse
+	6, // 6: identity.v1.IdentityService.GetUserByID:output_type -> identity.v1.GetUserByIDResponse
+	5, // 7: identity.v1.IdentityService.GetUsers:output_type -> identity.v1.GetUsersResponse
+	5, // [5:8] is the sub-list for method output_type
+	2, // [2:5] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_internal_identity_infrastructure_api_identity_proto_init() }
@@ -159,7 +439,7 @@ func file_internal_identity_infrastructure_api_identity_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_identity_infrastructure_api_identity_proto_rawDesc), len(file_internal_identity_infrastructure_api_identity_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   2,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

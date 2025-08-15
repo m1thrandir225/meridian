@@ -127,17 +127,17 @@ func main() {
 	repository := persistence.NewPostgresChannelRepository(dbPool)
 	logger.Println("Database pool initialized.")
 
-	service := services.NewChannelService(repository, eventPublisher)
-	logger.Println("Channel service initialized.")
-
-	httpHandler := handlers.NewHttpHandler(service)
-	logger.Println("HTTP Handler initialized")
-
 	identityClient, err := services.NewIdentityClient(cfg.IdentityGRPCURL)
 	if err != nil {
 		logger.Fatalf("Failed to create identity client: %v", err)
 	}
 	defer identityClient.Close()
+
+	service := services.NewChannelService(repository, eventPublisher, identityClient)
+	logger.Println("Channel service initialized.")
+
+	httpHandler := handlers.NewHttpHandler(service)
+	logger.Println("HTTP Handler initialized")
 
 	wsHandler := handlers.NewWebSocketHandler(service, redisClient, identityClient)
 	logger.Println("WebSocket Handler initialized")
