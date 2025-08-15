@@ -107,9 +107,11 @@ func (r *PostgresChannelRepository) Save(ctx context.Context, channel *models.Ch
 
 func (r *PostgresChannelRepository) FindUserChannels(ctx context.Context, userID uuid.UUID) ([]*models.Channel, error) {
 	query := `
-		SELECT id, name, topic, creator_user_id, creation_time, last_message_time, is_archived, version
-		FROM channels
-		WHERE creator_user_id = $1
+		SELECT DISTINCT c.id, c.name, c.topic, c.creator_user_id, c.creation_time, c.last_message_time, c.is_archived, c.version
+		FROM channels c
+		LEFT JOIN members m ON c.id = m.channel_id
+		WHERE c.creator_user_id = $1 OR m.user_id = $1
+		ORDER BY c.last_message_time DESC NULLS LAST
 	`
 	rows, err := r.pool.Query(ctx, query, userID)
 	if err != nil {

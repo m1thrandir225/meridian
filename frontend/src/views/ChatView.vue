@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import ChatLayout from '@/layouts/ChatLayout.vue'
 import ChatArea from '@/components/ChatArea.vue'
-import { onMounted, ref, watch } from 'vue'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useMessageStore } from '@/stores/message'
 import { useChannelStore } from '@/stores/channel'
+import websocketService from '@/services/websocket.service'
 
 const route = useRoute()
 const messageStore = useMessageStore()
@@ -15,6 +16,9 @@ const isChannelsSidebarOpen = ref(true)
 const isMembersSidebarOpen = ref(true)
 
 onMounted(async () => {
+  websocketService.connect()
+  messageStore.initializeWebSocket()
+
   if (!channelStore.channels.length) {
     await channelStore.fetchChannels()
   }
@@ -23,6 +27,10 @@ onMounted(async () => {
     messageStore.fetchMessages(route.params.id as string)
   }
 })
+onUnmounted(() => {
+  messageStore.cleanupWebSocket()
+})
+
 watch(
   [() => route.params.id, () => channelStore.channels.length],
   ([id, channelsLength], [oldId, oldChannelsLength]) => {

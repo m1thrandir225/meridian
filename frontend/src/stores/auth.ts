@@ -51,7 +51,6 @@ export const useAuthStore = defineStore(
         !accessTokenExpirationTime.value ||
         now > accessTokenExpirationTime.value
       ) {
-        logout()
         return false
       }
 

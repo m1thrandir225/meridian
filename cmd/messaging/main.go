@@ -133,7 +133,13 @@ func main() {
 	httpHandler := handlers.NewHttpHandler(service)
 	logger.Println("HTTP Handler initialized")
 
-	wsHandler := handlers.NewWebSocketHandler(service, redisClient)
+	identityClient, err := services.NewIdentityClient(cfg.IdentityGRPCURL)
+	if err != nil {
+		logger.Fatalf("Failed to create identity client: %v", err)
+	}
+	defer identityClient.Close()
+
+	wsHandler := handlers.NewWebSocketHandler(service, redisClient, identityClient)
 	logger.Println("WebSocket Handler initialized")
 
 	// -- GIN ROUTE SETUP --

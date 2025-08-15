@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, nextTick, watch, onMounted } from 'vue'
+import { ref, computed, nextTick, watch, onMounted, onUnmounted } from 'vue'
 import { Hash, Users, Send, Smile, Menu } from 'lucide-vue-next'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -7,14 +7,8 @@ import { Input } from '@/components/ui/input'
 import { useAppearanceStore } from '@/stores/appearance'
 import { useChannelStore } from '@/stores/channel'
 import { useMessageStore } from '@/stores/message'
-
-// Appearance store
-const appearanceStore = useAppearanceStore()
-const channelStore = useChannelStore()
-// Chat scroll management
-const messagesContainer = ref<HTMLElement | null>(null)
-const isUserInteracting = ref(false)
-const scrollToBottomTimeout = ref<number | null>(null)
+import { useAuthStore } from '@/stores/auth'
+import websocketService from '@/services/websocket.service'
 
 // Props and emits
 interface Props {
@@ -31,6 +25,20 @@ const emit = defineEmits<{
   toggleChannelsSidebar: []
   toggleMembersSidebar: []
 }>()
+
+// Appearance store
+const appearanceStore = useAppearanceStore()
+const messageStore = useMessageStore()
+const channelStore = useChannelStore()
+const authStore = useAuthStore()
+
+// Chat scroll management
+const messagesContainer = ref<HTMLElement | null>(null)
+const isUserInteracting = ref(false)
+const scrollToBottomTimeout = ref<number | null>(null)
+const typingTimeout = ref<number | null>(null)
+const isTyping = ref<boolean>(false)
+const newMessage = ref<string>('')
 
 // Computed styles based on appearance settings
 const messageContainerClasses = computed(() => {
@@ -55,171 +63,180 @@ const messageSpacing = computed(() => {
   return appearanceStore.messageDisplayMode === 'compact' ? 'space-y-1' : 'space-y-4'
 })
 
-const messagesFromStore = useMessageStore().messages
+const messages = computed(() => messageStore.currentMessages)
+const currentChannel = computed(() => channelStore.getCurrentChannel)
+const isLoading = computed(() => messageStore.loading)
 
-const messages = ref([
-  {
-    id: '1',
-    author: {
-      name: 'John Doe',
-      username: 'johndoe',
-      avatar: '/avatars/01.png',
-    },
-    content: 'Hey everyone! Welcome to the general channel 👋',
-    timestamp: '2024-01-15T10:30:00Z',
-    isOwn: false,
-    reactions: [
-      { emoji: '👋', count: 3, userReacted: false },
-      { emoji: '🎉', count: 1, userReacted: true },
-    ],
-  },
-  {
-    id: '2',
-    author: {
-      name: 'Jane Smith',
-      username: 'janesmith',
-      avatar: '/avatars/02.png',
-    },
-    content: 'Thanks for setting this up! This looks great.',
-    timestamp: '2024-01-15T10:32:00Z',
-    isOwn: false,
-    reactions: [{ emoji: '👍', count: 2, userReacted: false }],
-  },
-  {
-    id: '3',
-    author: {
-      name: 'You',
-      username: 'you',
-      avatar: '/avatars/user.png',
-    },
-    content: 'Glad you like it! Feel free to share any feedback.',
-    timestamp: '2024-01-15T10:35:00Z',
-    isOwn: true,
-    reactions: [],
-  },
-])
-
-const newMessage = ref('')
-
-const formatTime = (timestamp: string) => {
-  const date = new Date(timestamp)
-  return date.toLocaleTimeString('en-US', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
+const scrollToBottom = () => {
+  nextTick(() => {
+    if (messagesContainer.value) {
+      messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
+    }
   })
 }
 
+watch(
+  messages,
+  () => {
+    scrollToBottom()
+  },
+  { deep: true },
+)
+
 const sendMessage = () => {
-  if (newMessage.value.trim()) {
+  if (newMessage.value.trim() && currentChannel.value?.id) {
     console.log('Sending message:', newMessage.value)
-    messages.value.push({
-      id: String(messages.value.length + 1),
-      author: {
-        name: 'You',
-        username: 'you',
-        avatar: '/avatars/user.png',
-      },
-      content: newMessage.value,
-      timestamp: new Date().toISOString(),
-      isOwn: true,
-      reactions: [],
-    })
+
+    messageStore.sendMessage(newMessage.value, currentChannel.value.id)
+
+    // Clear input
     newMessage.value = ''
 
-    // Force scroll to bottom when user sends a message
-    nextTick(() => {
-      if (messagesContainer.value) {
-        messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
-      }
-    })
+    stopTyping()
   }
 }
 
-const toggleReaction = (messageId: string, emoji: string) => {
-  const message = messages.value.find((m) => m.id === messageId)
-  if (!message) return
+const startTyping = () => {
+  if (!currentChannel.value?.id || isTyping.value) return
 
-  const existingReaction = message.reactions.find((r) => r.emoji === emoji)
+  isTyping.value = true
+  messageStore.startTyping(currentChannel.value.id)
+}
 
-  if (existingReaction) {
-    if (existingReaction.userReacted) {
-      existingReaction.count--
-      existingReaction.userReacted = false
-      if (existingReaction.count === 0) {
-        message.reactions = message.reactions.filter((r) => r.emoji !== emoji)
-      }
-    } else {
-      existingReaction.count++
-      existingReaction.userReacted = true
-    }
-  } else {
-    message.reactions.push({
-      emoji,
-      count: 1,
-      userReacted: true,
-    })
+const stopTyping = () => {
+  if (!currentChannel.value?.id) return
+
+  isTyping.value = false
+  messageStore.stopTyping(currentChannel.value.id)
+}
+
+const handleInputChange = () => {
+  startTyping()
+
+  // Clear existing timeout
+  if (typingTimeout.value) {
+    clearTimeout(typingTimeout.value)
+  }
+
+  // Set new timeout to stop typing after 2 seconds
+  typingTimeout.value = setTimeout(() => {
+    stopTyping()
+  }, 2000)
+}
+
+const handleKeyPress = (event: KeyboardEvent) => {
+  if (event.key === 'Enter' && !event.shiftKey) {
+    event.preventDefault()
+    sendMessage()
   }
 }
 
-const quickReactions = ['👍', '❤️', '😂', '😮', '😢', '😡']
+onUnmounted(() => {
+  if (typingTimeout.value) {
+    clearTimeout(typingTimeout.value)
+  }
+  stopTyping()
+})
+
+onMounted(() => {
+  if (!websocketService.isConnected()) {
+    websocketService.connect()
+  }
+})
+
+// const formatTime = (timestamp: string) => {
+//   const date = new Date(timestamp)
+//   return date.toLocaleTimeString('en-US', {
+//     hour: '2-digit',
+//     minute: '2-digit',
+//     hour12: false,
+//   })
+// }
+
+// const toggleReaction = (messageId: string, emoji: string) => {
+//   const message = messages.value.find((m) => m.id === messageId)
+//   if (!message) return
+
+//   const existingReaction = message.reactions.find((r) => r.emoji === emoji)
+
+//   if (existingReaction) {
+//     if (existingReaction.userReacted) {
+//       existingReaction.count--
+//       existingReaction.userReacted = false
+//       if (existingReaction.count === 0) {
+//         message.reactions = message.reactions.filter((r) => r.emoji !== emoji)
+//       }
+//     } else {
+//       existingReaction.count++
+//       existingReaction.userReacted = true
+//     }
+//   } else {
+//     message.reactions.push({
+//       emoji,
+//       count: 1,
+//       userReacted: true,
+//     })
+//   }
+// }
+
+//const quickReactions = ['👍', '❤️', '😂', '😮', '😢', '😡']
 
 // Track hover state for messages
-const hoveredMessageId = ref<string | null>(null)
+//const hoveredMessageId = ref<string | null>(null)
 
-const setHoveredMessage = (messageId: string | null) => {
-  hoveredMessageId.value = messageId
-}
+// const setHoveredMessage = (messageId: string | null) => {
+//   hoveredMessageId.value = messageId
+// }
 
-const getMessageStyle = (messageId: string) => {
-  const isHovered = hoveredMessageId.value === messageId
-  if (!isHovered)
-    return {
-      border: '2px solid transparent',
-    }
+// const getMessageStyle = (messageId: string) => {
+//   const isHovered = hoveredMessageId.value === messageId
+//   if (!isHovered)
+//     return {
+//       border: '2px solid transparent',
+//     }
 
-  return {
-    border: `2px solid hsl(${appearanceStore.accentColorClass})`,
-    marginLeft: '4px',
-    paddingLeft: '8px',
-  }
-}
+//   return {
+//     border: `2px solid hsl(${appearanceStore.accentColorClass})`,
+//     marginLeft: '4px',
+//     paddingLeft: '8px',
+//   }
+// }
 
 // Auto-scroll functionality
-const scrollToBottom = () => {
-  if (messagesContainer.value && !isUserInteracting.value) {
-    nextTick(() => {
-      messagesContainer.value!.scrollTop = messagesContainer.value!.scrollHeight
-    })
-  }
-}
+// const scrollToBottom = () => {
+//   if (messagesContainer.value && !isUserInteracting.value) {
+//     nextTick(() => {
+//       messagesContainer.value!.scrollTop = messagesContainer.value!.scrollHeight
+//     })
+//   }
+// }
 
-const handleScrollInteraction = () => {
-  isUserInteracting.value = true
+// const handleScrollInteraction = () => {
+//   isUserInteracting.value = true
 
-  if (scrollToBottomTimeout.value) {
-    clearTimeout(scrollToBottomTimeout.value)
-  }
+//   if (scrollToBottomTimeout.value) {
+//     clearTimeout(scrollToBottomTimeout.value)
+//   }
 
-  // Resume auto-scroll after user stops scrolling for 3 seconds
-  scrollToBottomTimeout.value = window.setTimeout(() => {
-    isUserInteracting.value = false
-  }, 3000)
-}
+//   // Resume auto-scroll after user stops scrolling for 3 seconds
+//   scrollToBottomTimeout.value = window.setTimeout(() => {
+//     isUserInteracting.value = false
+//   }, 3000)
+// }
 
-const handleMessageHover = (hovering: boolean) => {
-  if (hovering) {
-    isUserInteracting.value = true
-  } else {
-    // Short delay before resuming auto-scroll when user stops hovering
-    if (scrollToBottomTimeout.value) {
-      clearTimeout(scrollToBottomTimeout.value)
-    }
-    scrollToBottomTimeout.value = window.setTimeout(() => {
-      isUserInteracting.value = false
-    }, 1000)
-  }
-}
+// const handleMessageHover = (hovering: boolean) => {
+//   if (hovering) {
+//     isUserInteracting.value = true
+//   } else {
+//     // Short delay before resuming auto-scroll when user stops hovering
+//     if (scrollToBottomTimeout.value) {
+//       clearTimeout(scrollToBottomTimeout.value)
+//     }
+//     scrollToBottomTimeout.value = window.setTimeout(() => {
+//       isUserInteracting.value = false
+//     }, 1000)
+//   }
+// }
 
 // Watch for new messages and auto-scroll
 watch(
@@ -273,107 +290,87 @@ onMounted(() => {
     </header>
 
     <!-- Messages Area -->
-    <div
-      ref="messagesContainer"
-      class="flex-1 overflow-y-auto p-4"
-      :class="messageSpacing"
-      @scroll="handleScrollInteraction"
-      @wheel="handleScrollInteraction"
-    >
-      <div
-        v-for="message in messagesFromStore"
-        :key="message.id"
-        :class="messageContainerClasses"
-        :style="getMessageStyle(message.id)"
-        @mouseenter="(setHoveredMessage(message.id), handleMessageHover(true))"
-        @mouseleave="(setHoveredMessage(null), handleMessageHover(false))"
-      >
-        <Avatar :class="`${avatarSize} mt-1`">
-          <AvatarFallback>{{
-            message.content_text
-              .split(' ')
-              .map((n) => n[0])
-              .join('')
-          }}</AvatarFallback>
-        </Avatar>
-        <div class="flex-1 min-w-0">
-          <div class="flex items-baseline gap-2 mb-1">
-            <span
-              :class="
-                appearanceStore.messageDisplayMode === 'compact'
-                  ? 'font-medium text-xs'
-                  : 'font-medium text-sm'
-              "
-              >{{ message.content_text }}</span
-            >
-            <span
-              :class="
-                appearanceStore.messageDisplayMode === 'compact'
-                  ? 'text-xs text-muted-foreground'
-                  : 'text-xs text-muted-foreground'
-              "
-              >{{ formatTime(message.created_at) }}</span
-            >
-          </div>
-          <div :class="messageTextClasses">
-            {{ message.content_text }}
-          </div>
+    <div class="flex-1 overflow-y-auto p-4" ref="messagesContainer">
+      <div v-if="isLoading" class="flex justify-center items-center h-full">
+        <div class="text-muted-foreground">Loading messages...</div>
+      </div>
 
-          <!-- Reactions Display -->
-          <!-- <div v-if="message.reactions.length > 0" class="flex flex-wrap gap-1 mb-2">
-            <button
-              v-for="reaction in message.reactions"
-              :key="reaction.emoji"
-              @click="toggleReaction(message.id, reaction.emoji)"
-              :class="[
-                'inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs border transition-colors',
-                reaction.userReacted
-                  ? 'bg-blue-100 border-blue-300 text-blue-700'
-                  : 'bg-muted border-border hover:bg-accent',
-              ]"
-            >
-              <span>{{ reaction.emoji }}</span>
-              <span>{{ reaction.count }}</span>
-            </button>
-          </div> -->
+      <div v-else-if="messages.length === 0" class="flex justify-center items-center h-full">
+        <div class="text-center text-muted-foreground">
+          <p>No messages yet</p>
+          <p class="text-sm">Start the conversation!</p>
+        </div>
+      </div>
 
-          <!-- Quick Reaction Buttons (appear on hover) -->
-          <div class="opacity-0 group-hover:opacity-100 transition-opacity w-auto">
-            <div class="flex gap-1 mt-1 px-4 py-2 w-fit border border-primary/50 rounded-xl">
-              <button
-                v-for="emoji in quickReactions"
-                :key="emoji"
-                @click="toggleReaction(message.id, emoji)"
-                class="w-6 h-6 rounded text-xs hover:bg-accent transition-colors flex items-center justify-center"
-                :title="`React with ${emoji}`"
-              >
-                {{ emoji }}
-              </button>
+      <div v-else class="space-y-4">
+        <div
+          v-for="message in messages"
+          :key="message.id"
+          :class="messageContainerClasses"
+          class="flex gap-3"
+        >
+          <!-- Avatar -->
+          <Avatar class="h-8 w-8">
+            <AvatarFallback>
+              {{ message.sender_user_id?.charAt(0).toUpperCase() }}
+            </AvatarFallback>
+          </Avatar>
+
+          <!-- Message Content -->
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="font-medium text-sm">
+                {{ message.sender_user_id === authStore.user?.id ? 'You' : message.sender_user_id }}
+              </span>
+              <span class="text-xs text-muted-foreground">
+                {{ new Date(message.created_at).toLocaleTimeString() }}
+              </span>
             </div>
+
+            <div class="text-sm">
+              {{ message.content_text }}
+            </div>
+
+            <!-- Reactions (if any) -->
+            <!-- <div v-if="message.reactions && message.reactions.length > 0" class="flex gap-1 mt-2">
+              <Badge
+                v-for="reaction in message.reactions"
+                :key="reaction.type"
+                variant="secondary"
+                class="text-xs"
+              >
+                {{ reaction.type }} {{ reaction.count }}
+              </Badge>
+            </div> -->
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Message Input -->
+    <!-- Input Area -->
     <div class="p-4 border-t">
-      <div class="relative flex items-center gap-2 bg-muted/50 rounded-lg p-3">
-        <Input
-          v-model="newMessage"
-          placeholder="Type a message..."
-          class="flex-1 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
-          @keydown.enter="sendMessage"
-        />
-        <Button variant="ghost" size="icon" class="h-6 w-6">
-          <Smile class="h-4 w-4" />
+      <div class="flex gap-2">
+        <Button variant="ghost" size="icon" class="h-9 w-9">
+          <Paperclip class="h-4 w-4" />
         </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          class="h-6 w-6"
-          @click="sendMessage"
-          :disabled="!newMessage.trim()"
-        >
+
+        <div class="flex-1 relative">
+          <Input
+            v-model="newMessage"
+            placeholder="Type a message..."
+            class="pr-20"
+            @input="handleInputChange"
+            @keypress="handleKeyPress"
+          />
+
+          <div class="absolute right-2 top-1/2 transform -translate-y-1/2 flex gap-1">
+            <Button variant="ghost" size="icon" class="h-6 w-6">
+              <Smile class="h-3 w-3" />
+            </Button>
+          </div>
+        </div>
+
+        <Button @click="sendMessage" :disabled="!newMessage.trim()" size="icon" class="h-9 w-9">
           <Send class="h-4 w-4" />
         </Button>
       </div>

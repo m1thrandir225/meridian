@@ -74,7 +74,11 @@ services:
     volumes:
       - kafka_data:/bitnami/kafka
     healthcheck:
-      test: [ "CMD-SHELL", "kafka-topics.sh --bootstrap-server localhost:9092 --list || exit 1" ]
+      test:
+        [
+          "CMD-SHELL",
+          "kafka-topics.sh --bootstrap-server localhost:9092 --list || exit 1",
+        ]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -159,7 +163,8 @@ services:
       - "traefik.enable=true"
       - "traefik.http.services.messaging.loadbalancer.server.port=8082"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:${MESSAGING_HTTP_PORT}/health"]
+      test:
+        ["CMD", "curl", "-f", "http://localhost:${MESSAGING_HTTP_PORT}/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -179,7 +184,11 @@ services:
     ports:
       - "${IDENTITY_DB_PORT}:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${IDENTITY_POSTGRES_USER} -d ${IDENTITY_DB_NAME}"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${IDENTITY_POSTGRES_USER} -d ${IDENTITY_DB_NAME}",
+        ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -224,11 +233,13 @@ services:
       IDENTITY_KAFKA_DEFAULT_TOPIC: "${IDENTITY_KAFKA_DEFAULT_TOPIC}"
       IDENTITY_PASETO_PRIVATE_KEY: "${IDENTITY_PASETO_PRIVATE_KEY}"
       IDENTITY_PASETO_PUBLIC_KEY: "${IDENTITY_PASETO_PUBLIC_KEY}"
+      IDENTITY_GRPC_PORT: "${IDENTITY_GRPC_PORT}"
       AUTH_TOKEN_VALIDITY_MINUTES: "${AUTH_TOKEN_VALIDITY_MINUTES}"
       INTEGRATION_GRPC_URL: "${INTEGRATION_GRPC_URL}"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:${IDENTITY_HTTP_PORT}/health"]
+      test:
+        ["CMD", "curl", "-f", "http://localhost:${IDENTITY_HTTP_PORT}/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -247,7 +258,11 @@ services:
     ports:
       - "${INTEGRATION_DB_PORT}:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${INTEGRATION_POSTGRES_USER} -d ${INTEGRATION_DB_NAME}"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${INTEGRATION_POSTGRES_USER} -d ${INTEGRATION_DB_NAME}",
+        ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -261,13 +276,19 @@ services:
       - meridian_network
     depends_on:
       integration_postgres:
-          condition: service_healthy
+        condition: service_healthy
     volumes:
       - ../internal/integration/infrastructure/persistence/migrations:/migrations
     environment:
       MIGRATE_DB_URL_MIGRATE: "${INTEGRATION_DB_URL_MIGRATE}"
     command:
-      [ "-path", "/migrations", "-database", "${INTEGRATION_DB_URL_MIGRATE}", "up" ]
+      [
+        "-path",
+        "/migrations",
+        "-database",
+        "${INTEGRATION_DB_URL_MIGRATE}",
+        "up",
+      ]
   integration:
     build:
       context: ../
@@ -293,10 +314,15 @@ services:
       - "traefik.enable=true"
       - "traefik.http.services.integration.loadbalancer.server.port=8083"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:${INTEGRATION_HTTP_PORT}/health"]
+      test:
+        [
+          "CMD",
+          "curl",
+          "-f",
+          "http://localhost:${INTEGRATION_HTTP_PORT}/health",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 10s
     restart: unless-stopped
-

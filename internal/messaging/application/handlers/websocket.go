@@ -4,17 +4,18 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
+	"net/http"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/m1thrandir225/meridian/internal/messaging/application/services"
 	"github.com/m1thrandir225/meridian/internal/messaging/domain"
 	"github.com/redis/go-redis/v9"
-	"log"
-	"net/http"
-	"strings"
-	"sync"
-	"time"
 )
 
 type WebSocketHandler struct {
@@ -23,6 +24,7 @@ type WebSocketHandler struct {
 	mu             sync.RWMutex
 	channelService *services.ChannelService
 	redisClient    *redis.Client
+	identityClient *services.IdentityClient
 }
 
 type WebSocketMessage struct {
@@ -50,7 +52,7 @@ type TypingPayload struct {
 	UserID    string `json:"user_id"`
 }
 
-func NewWebSocketHandler(channelService *services.ChannelService, redisClient *redis.Client) *WebSocketHandler {
+func NewWebSocketHandler(channelService *services.ChannelService, redisClient *redis.Client, identityClient *services.IdentityClient) *WebSocketHandler {
 	handler := &WebSocketHandler{
 		upgrader: websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool {
@@ -60,6 +62,7 @@ func NewWebSocketHandler(channelService *services.ChannelService, redisClient *r
 		clients:        make(map[string]*websocket.Conn),
 		channelService: channelService,
 		redisClient:    redisClient,
+		identityClient: identityClient,
 	}
 
 	if redisClient != nil {
@@ -70,14 +73,23 @@ func NewWebSocketHandler(channelService *services.ChannelService, redisClient *r
 }
 
 func (h *WebSocketHandler) HandleWebSocket(c *gin.Context) {
-	userID := c.GetHeader("X-User-Id")
-	if userID == "" {
+	token := c.Query("token")
+	if token == "" {
+		log.Printf("No token provided")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	userID, err := h.validateToken(token)
+	if err != nil {
+		log.Printf("Failed to validate token: %v", err)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
 	}
 
 	conn, err := h.upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
+		log.Printf("Failed to upgrade connection")
 		log.Printf("Failed to upgrade connection: %v", err)
 		return
 	}
@@ -394,4 +406,13 @@ func (h *WebSocketHandler) BroadcastMessage(message *domain.Message) {
 
 func (h *WebSocketHandler) SendToUser(userID string, message WebSocketMessage) error {
 	return h.sendToClient(userID, message)
+}
+
+func (h *WebSocketHandler) validateToken(token string) (string, error) {
+	resp, err := h.identityClient.ValidateToken(token)
+	if err != nil {
+		return "", fmt.Errorf("failed to validate token: %w", err)
+	}
+
+	return resp.UserId, nil
 }

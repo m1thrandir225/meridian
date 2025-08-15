@@ -29,6 +29,10 @@ http:
           - "Authorization"
           - "Content-Type"
           - "X-Requested-With"
+          - "Upgrade"
+          - "Connection"
+          - "Sec-WebSocket-Key"
+          - "Sec-WebSocket-Version"
         accessControlExposeHeaders:
           - "X-Total-Count"
         accessControlAllowCredentials: true
@@ -82,8 +86,18 @@ http:
         - rate-limit
       priority: 200
 
+    messaging-ws:
+      rule: "Host(`api.localhost`) && Path(`/api/v1/messages/ws`)"
+      service: messaging-service
+      entryPoints:
+        - web
+      middlewares:
+        - cors-headers
+      priority: 150
+      #tls: {}
+
     messaging:
-      rule: "Host(`api.localhost`) && PathPrefix(`/api/v1/messages`)"
+      rule: "Host(`api.localhost`) && PathPrefix(`/api/v1/messages`) && !Path(`/api/v1/messages/ws`)"
       service: messaging-service
       entryPoints:
         - web

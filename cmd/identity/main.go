@@ -33,6 +33,7 @@ type Config struct {
 	RefreshTokenValidity time.Duration
 	KafkaDefaultTopic    string
 	IntegrationGRPCURL   string
+	GRPCPort             string
 }
 
 func loadConfig() (*Config, error) {
@@ -83,6 +84,11 @@ func loadConfig() (*Config, error) {
 		log.Printf("WARN: Invalid REFRESH_TOKEN_VALIDITY_MINUTES '%s', using default %v", refreshTokenValidityStr, refreshTokenValidity)
 	}
 
+	grpcPort := os.Getenv("IDENTITY_GRPC_PORT")
+	if grpcPort == "" {
+		return nil, fmt.Errorf("missing IDENTITY_GRPC_PORT")
+	}
+
 	return &Config{
 		DatabaseURL:          dbURL,
 		KafkaBrokers:         strings.Split(kafkaBrokerStr, ","),
@@ -93,6 +99,7 @@ func loadConfig() (*Config, error) {
 		KafkaDefaultTopic:    kafkaDefaultTopic,
 		RefreshTokenValidity: refreshTokenValidity,
 		IntegrationGRPCURL:   integrationGRPCURL,
+		GRPCPort:             grpcPort,
 	}, nil
 }
 
@@ -138,6 +145,9 @@ func main() {
 	service := services.NewUserService(repository, pasetoGenerator, cfg.AuthTokenValidity, cfg.RefreshTokenValidity, eventPublisher)
 
 	tokenVerifier, err := auth.NewPasetoTokenVerifier()
+	if err != nil {
+		log.Fatalf("Failed to create token verifier: %v", err)
+	}
 
 	router := handlers.SetupIdentityRouter(service, tokenVerifier, cfg.IntegrationGRPCURL)
 
@@ -148,6 +158,13 @@ func main() {
 		WriteTimeout: 10 * time.Second,
 	}
 	errChan := make(chan error, 1)
+
+	go func() {
+		logger.Printf("Starting gRPC server on %s", cfg.GRPCPort)
+		if err := handlers.StartGRPCServer(cfg.GRPCPort, tokenVerifier); err != nil {
+			logger.Fatalf("Failed to start gRPC server: %v", err)
+		}
+	}()
 
 	go func() {
 		log.Printf("Starting Identity HTTP server on %s", cfg.HTTPPort)
