@@ -11,6 +11,7 @@ import (
 func SetupIntegrationRouter(
 	service *services.IntegrationService,
 	cache *cache.RedisCache,
+	messageClient *services.MessagingClient,
 ) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
@@ -18,15 +19,28 @@ func SetupIntegrationRouter(
 	router.Use(gin.Logger())
 	router.Use(gin.Recovery())
 
-	handler := NewHttpHandler(service, cache)
+	handler := NewHttpHandler(service, cache, messageClient)
 
 	router.GET("/health", handler.handleGetHealth)
 	router.GET("/metrics", handler.handleGetMetrics)
 
 	apiV1 := router.Group("/api/v1")
 	{
-		apiV1.POST("/integrations", handler.handleRegisterIntegration)
-		apiV1.DELETE("/integrations", handler.handleRevokeIntegration)
+		integrations := apiV1.Group("/integrations")
+		{
+			integrations.POST("", handler.handleRegisterIntegration)
+			integrations.DELETE("/:id", handler.handleRevokeIntegration)
+		}
+
+		webhookGroup := apiV1.Group("/integrations/webhook")
+		{
+			webhookGroup.POST("/message", handler.handleWebhookMessage)
+		}
+
+		callbackGroup := apiV1.Group("/integrations/callback")
+		{
+			callbackGroup.POST("/message", handler.handleCallbackMessage)
+		}
 	}
 	log.Println("Integration HTTP Router configured")
 	return router

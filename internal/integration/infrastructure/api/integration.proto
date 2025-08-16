@@ -17,6 +17,7 @@ message ValidateAPITokenResponse {
   bool valid = 1;
   string integration_id = 2;
   string integration_name = 3;
+  repeated string target_channel_ids = 4;
   string error = 5;
 }
 

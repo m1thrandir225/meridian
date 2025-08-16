@@ -113,7 +113,13 @@ func main() {
 
 	service := services.NewIntegrationService(repository, bcryptGenerator, eventPublisher)
 
-	router := handlers.SetupIntegrationRouter(service, redisCache)
+	messageClient, err := services.NewMessagingClient(cfg.MessagingGRPCURL)
+	if err != nil {
+		log.Fatalf("Failed to create messaging client: %v", err)
+	}
+	defer messageClient.Close()
+
+	router := handlers.SetupIntegrationRouter(service, redisCache, messageClient)
 	httpServer := &http.Server{
 		Addr:         cfg.HTTPPort,
 		Handler:      router,

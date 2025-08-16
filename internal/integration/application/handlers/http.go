@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -10,21 +11,25 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/m1thrandir225/meridian/internal/integration/application/services"
 	"github.com/m1thrandir225/meridian/internal/integration/domain"
+	messagingpb "github.com/m1thrandir225/meridian/internal/messaging/infrastructure/api"
 	"github.com/m1thrandir225/meridian/pkg/cache"
 )
 
 type HTTPHandler struct {
 	integrationService *services.IntegrationService
+	messageClient      *services.MessagingClient
 	cache              *cache.RedisCache
 }
 
 func NewHttpHandler(
 	service *services.IntegrationService,
 	cache *cache.RedisCache,
+	messageClient *services.MessagingClient,
 ) *HTTPHandler {
 	return &HTTPHandler{
 		integrationService: service,
 		cache:              cache,
+		messageClient:      messageClient,
 	}
 }
 
@@ -116,5 +121,149 @@ func (h *HTTPHandler) handleGetHealth(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, gin.H{
 		"status":  "healthy",
 		"service": "integration",
+	})
+}
+
+func (h *HTTPHandler) handleWebhookMessage(ctx *gin.Context) {
+	integrationID := ctx.GetHeader("X-Integration-ID")
+	targetChannels := ctx.GetHeader("X-Integration-Target-Channels")
+
+	if integrationID == "" {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Missing integration ID"})
+		return
+	}
+
+	var req WebhookMessageRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var channelIDs []string
+	if err := json.Unmarshal([]byte(targetChannels), &channelIDs); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid target channels format"})
+		return
+	}
+
+	targetChannelID := req.TargetChannelID
+	if targetChannelID == "" {
+		if len(channelIDs) == 0 {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "No target channels available"})
+			return
+		}
+	}
+	targetChannelID = channelIDs[0]
+
+	channelAllowed := false
+	for _, allowedChannel := range channelIDs {
+		if allowedChannel == targetChannelID {
+			channelAllowed = true
+			break
+		}
+	}
+
+	if !channelAllowed {
+		ctx.JSON(http.StatusForbidden, gin.H{"error": "Channel not allowed for this integration"})
+		return
+	}
+
+	messageReq := &messagingpb.SendMessageRequest{
+		Content:          req.ContentText,
+		SenderId:         integrationID,
+		SenderType:       "integration",
+		SenderName:       "Integration Bot",
+		TargetChannelIds: []string{targetChannelID},
+		MessageType:      "integration_webhook",
+		Metadata:         req.Metadata,
+	}
+
+	resp, err := h.messageClient.SendMessage(ctx, messageReq)
+	if err != nil {
+		log.Printf("ERROR: Failed to send message via gRPC: %v", err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send message"})
+		return
+	}
+
+	if !resp.Success {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Message delivery failed"})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"success":    true,
+		"message_id": resp.Responses[0].MessageId,
+		"channel_id": targetChannelID,
+	})
+}
+
+func (h *HTTPHandler) handleCallbackMessage(ctx *gin.Context) {
+	integrationID := ctx.GetHeader("X-Integration-ID")
+	targetChannels := ctx.GetHeader("X-Integration-Target-Channels")
+
+	if integrationID == "" {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Missing integration ID"})
+		return
+	}
+
+	var req CallbackMessageRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var channelIDs []string
+	if err := json.Unmarshal([]byte(targetChannels), &channelIDs); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid target channels format"})
+		return
+	}
+
+	targetChannelID := req.TargetChannelID
+	if targetChannelID == "" {
+		if len(channelIDs) == 0 {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "No target channels available"})
+			return
+		}
+		targetChannelID = channelIDs[0]
+	}
+
+	channelAllowed := false
+	for _, allowedChannel := range channelIDs {
+		if allowedChannel == targetChannelID {
+			channelAllowed = true
+			break
+		}
+	}
+
+	if !channelAllowed {
+		ctx.JSON(http.StatusForbidden, gin.H{"error": "Channel not allowed for this integration"})
+		return
+	}
+
+	messageReq := &messagingpb.SendMessageRequest{
+		Content:          req.ContentText,
+		SenderId:         integrationID,
+		SenderType:       "integration",
+		SenderName:       "Integration Bot",
+		TargetChannelIds: []string{targetChannelID},
+		MessageType:      "integration_callback",
+		Metadata:         req.Metadata,
+	}
+
+	resp, err := h.messageClient.SendMessage(ctx, messageReq)
+	if err != nil {
+		log.Printf("ERROR: Failed to send message via gRPC: %v", err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send message"})
+		return
+	}
+
+	if !resp.Success {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Message delivery failed"})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"success":    true,
+		"message_id": resp.Responses[0].MessageId,
+		"channel_id": targetChannelID,
 	})
 }

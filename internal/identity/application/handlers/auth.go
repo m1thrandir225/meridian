@@ -136,21 +136,25 @@ func (h *AuthHandler) handleAPITokenAuth(ctx *gin.Context, apiKey string, isInte
 		return
 	}
 
+	targetChannelsJSON := "[]"
+	if len(resp.TargetChannelIds) > 0 {
+		targetChannelsJSON = fmt.Sprintf(`["%s"]`, strings.Join(resp.TargetChannelIds, `","`))
+	}
+
 	ctx.Header("X-Integration-ID", resp.IntegrationId)
 	ctx.Header("X-Integration-Name", resp.IntegrationName)
 	ctx.Header("X-User-Type", "integration")
 	ctx.Header("X-Auth-Method", "api-token")
-	ctx.Header("X-Integration-Target-Channels", "") //TODO: fix this
+	ctx.Header("X-Integration-Target-Channels", targetChannelsJSON)
 
 	response := APIKeyValidateResponse{
 		Valid:                     true,
 		IntegrationID:             resp.IntegrationId,
-		IntegrationName:           resp.IntegrationId,
-		IntegrationTargetChannels: "",
+		IntegrationName:           resp.IntegrationName,
+		IntegrationTargetChannels: targetChannelsJSON,
 	}
 
 	h.cache.Set(ctx.Request.Context(), cacheKey, response, 15*time.Minute)
 
 	ctx.JSON(http.StatusOK, response)
-
 }

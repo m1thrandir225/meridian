@@ -53,10 +53,20 @@ func (h *GRPCServer) ValidateAPIToken(ctx context.Context, req *integrationpb.Va
 		}, nil
 	}
 
+	cmd := domain.GetIntegrationCommand{
+		IntegrationID: id,
+	}
+
+	integration, err := h.integrationService.GetIntegration(ctx, cmd)
+	if err != nil {
+		return nil, err
+	}
+
 	response := &integrationpb.ValidateAPITokenResponse{
-		Valid:           isValid,
-		IntegrationId:   id,
-		IntegrationName: "",
+		Valid:            isValid,
+		IntegrationId:    id,
+		IntegrationName:  integration.ServiceName,
+		TargetChannelIds: integration.TargetChannelIDsAsStringSlice(),
 	}
 	h.cache.Set(ctx, cacheKey, response, 15*time.Minute)
 
@@ -100,7 +110,7 @@ func (h *GRPCServer) GetIntegration(ctx context.Context, req *integrationpb.GetI
 	}
 	h.cache.Set(ctx, cacheKey, response, 15*time.Minute)
 
-	return nil, nil
+	return response, nil
 }
 
 func StartGRPCServer(
