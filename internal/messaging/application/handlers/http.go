@@ -1,23 +1,32 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/m1thrandir225/meridian/internal/messaging/application/services"
 	"github.com/m1thrandir225/meridian/internal/messaging/domain"
+	"github.com/m1thrandir225/meridian/pkg/cache"
 )
 
 type HTTPHandler struct {
 	channelService *services.ChannelService
 	messageService *services.MessageService
+	cache          *cache.RedisCache
 }
 
-func NewHttpHandler(channelService *services.ChannelService, messageService *services.MessageService) *HTTPHandler {
+func NewHttpHandler(
+	channelService *services.ChannelService,
+	messageService *services.MessageService,
+	cache *cache.RedisCache,
+) *HTTPHandler {
 	return &HTTPHandler{
 		channelService: channelService,
 		messageService: messageService,
+		cache:          cache,
 	}
 }
 
@@ -31,6 +40,13 @@ func (h *HTTPHandler) GetUserChannels(ctx *gin.Context) {
 	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "user id not valid"})
+		return
+	}
+
+	cacheKey := fmt.Sprintf("user_channels:%s", userID)
+	var cachedChannels []domain.Channel
+	if hit, _ := h.cache.GetWithMetrics(ctx, cacheKey, &cachedChannels); hit {
+		ctx.JSON(http.StatusOK, cachedChannels)
 		return
 	}
 
@@ -49,6 +65,8 @@ func (h *HTTPHandler) GetUserChannels(ctx *gin.Context) {
 		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
 		return
 	}
+
+	h.cache.Set(ctx, cacheKey, channelsDTO, 15*time.Minute)
 
 	ctx.JSON(http.StatusOK, channelsDTO)
 }
@@ -82,6 +100,9 @@ func (h *HTTPHandler) CreateChannel(ctx *gin.Context) {
 		return
 	}
 
+	cacheKey := fmt.Sprintf("user_channels:%s", creatorUserID.String())
+	h.cache.Delete(ctx.Request.Context(), cacheKey)
+
 	channelDTO, err := h.channelService.ReturnChannelDTO(ctx, channel)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
@@ -104,6 +125,13 @@ func (h *HTTPHandler) GetChannel(ctx *gin.Context) {
 		return
 	}
 
+	cacheKey := fmt.Sprintf("channel:%s", channelId.String())
+	var cachedChannel interface{}
+	if hit, _ := h.cache.GetWithMetrics(ctx.Request.Context(), cacheKey, &cachedChannel); hit {
+		ctx.JSON(http.StatusOK, cachedChannel)
+		return
+	}
+
 	channel, err := h.channelService.HandleGetChannel(ctx, domain.GetChannelCommand{
 		ChannelID: channelId,
 	})
@@ -117,6 +145,8 @@ func (h *HTTPHandler) GetChannel(ctx *gin.Context) {
 		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
 		return
 	}
+
+	h.cache.Set(ctx.Request.Context(), cacheKey, channelDTO, 15*time.Minute)
 
 	ctx.JSON(http.StatusOK, channelDTO)
 }
@@ -230,6 +260,9 @@ func (h *HTTPHandler) JoinChannel(ctx *gin.Context) {
 		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
 		return
 	}
+
+	cacheKey := fmt.Sprintf("user_channels:%s", userId.String())
+	h.cache.Delete(ctx.Request.Context(), cacheKey)
 
 	ctx.JSON(http.StatusOK, channelDTO)
 }
@@ -438,4 +471,23 @@ func (h *HTTPHandler) RemoveReaction(ctx *gin.Context) {
 		return
 	}
 	ctx.Status(http.StatusOK)
+}
+
+// GET /api/v1/metrics
+func (h *HTTPHandler) handleGetMetrics(ctx *gin.Context) {
+	metrics := h.cache.GetMetrics()
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"hits":     metrics.GetHits(),
+		"misses":   metrics.GetMisses(),
+		"hit_rate": metrics.GetHitRate(),
+	})
+}
+
+// GET /api/v1/health
+func (h *HTTPHandler) handleGetHealth(ctx *gin.Context) {
+	ctx.JSON(http.StatusOK, gin.H{
+		"status":  "healthy",
+		"service": "messaging",
+	})
 }

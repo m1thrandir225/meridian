@@ -10,3 +10,7 @@ type RevokeTokenCommand struct {
 	IntegrationID string
 	RequestorID   string
 }
+
+type GetIntegrationCommand struct {
+	IntegrationID string
+}

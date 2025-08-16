@@ -2,22 +2,27 @@ package handlers
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/m1thrandir225/meridian/internal/identity/application/services"
 	"github.com/m1thrandir225/meridian/internal/identity/domain"
 	"github.com/m1thrandir225/meridian/pkg/auth"
+	"github.com/m1thrandir225/meridian/pkg/cache"
 )
 
 type HTTPHandler struct {
 	userService *services.IdentityService
+	cache       *cache.RedisCache
 }
 
-func NewHTTPHandler(userService *services.IdentityService) *HTTPHandler {
+func NewHTTPHandler(userService *services.IdentityService, cache *cache.RedisCache) *HTTPHandler {
 	return &HTTPHandler{
 		userService: userService,
+		cache:       cache,
 	}
 }
 
@@ -86,6 +91,13 @@ func (h *HTTPHandler) handleLoginRequest(ctx *gin.Context) {
 		UserID: claims.Custom.UserID,
 	}
 
+	cacheKey := fmt.Sprintf("user_profile:%s", claims.Custom.UserID)
+	var cachedUser UserResponse
+	if hit, _ := h.cache.GetWithMetrics(ctx.Request.Context(), cacheKey, &cachedUser); hit {
+		ctx.JSON(http.StatusOK, cachedUser)
+		return
+	}
+
 	user, err := h.userService.GetUser(ctx, getUserCMD)
 	if err != nil {
 		log.Printf("ERROR fetching user: %v", err)
@@ -109,6 +121,8 @@ func (h *HTTPHandler) handleLoginRequest(ctx *gin.Context) {
 		},
 	}
 
+	h.cache.Set(ctx.Request.Context(), cacheKey, resp.User, 15*time.Minute)
+
 	ctx.JSON(http.StatusOK, resp)
 }
 
@@ -117,6 +131,13 @@ func (h *HTTPHandler) handleGetCurrentUser(ctx *gin.Context) {
 	userId, exists := auth.UserIDFromContext(ctx.Request.Context())
 	if !exists {
 		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: User ID not found in token"})
+		return
+	}
+
+	cacheKey := fmt.Sprintf("user_profile:%s", userId)
+	var cachedUser UserResponse
+	if hit, _ := h.cache.GetWithMetrics(ctx.Request.Context(), cacheKey, &cachedUser); hit {
+		ctx.JSON(http.StatusOK, cachedUser)
 		return
 	}
 
@@ -139,6 +160,8 @@ func (h *HTTPHandler) handleGetCurrentUser(ctx *gin.Context) {
 		LastName:  user.LastName,
 	}
 
+	h.cache.Set(ctx.Request.Context(), cacheKey, response, 15*time.Minute)
+
 	ctx.JSON(http.StatusOK, response)
 }
 
@@ -159,6 +182,7 @@ func (h *HTTPHandler) handleUpdateCurrentUserRequest(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
 	if !req.HasAnyField() {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "At least one field must be provided to update profile"})
 	}
@@ -185,6 +209,8 @@ func (h *HTTPHandler) handleUpdateCurrentUserRequest(ctx *gin.Context) {
 		return
 	}
 
+	cacheKey := fmt.Sprintf("user_profile:%s", userId)
+	h.cache.Delete(ctx.Request.Context(), cacheKey)
 	response := UserResponse{
 		ID:        updatedUser.ID.String(),
 		Username:  updatedUser.Username.String(),
@@ -268,4 +294,23 @@ func (h *HTTPHandler) handleRefreshTokenRequest(ctx *gin.Context) {
 		RefreshToken: newRefreshToken,
 	}
 	ctx.JSON(http.StatusOK, resp)
+}
+
+// GET /api/v1/me/metrics
+func (h *HTTPHandler) handleGetMetrics(ctx *gin.Context) {
+	metrics := h.cache.GetMetrics()
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"hits":     metrics.GetHits(),
+		"misses":   metrics.GetMisses(),
+		"hit_rate": metrics.GetHitRate(),
+	})
+}
+
+// GET /api/v1/health
+func (h *HTTPHandler) handleGetHealth(ctx *gin.Context) {
+	ctx.JSON(http.StatusOK, gin.H{
+		"status":  "healthy",
+		"service": "identity",
+	})
 }

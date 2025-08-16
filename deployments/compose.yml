@@ -8,6 +8,9 @@ volumes:
   zookeeper_data:
   kafka_data:
   traefik_logs:
+  messaging_redis_data:
+  identity_redis_data:
+  integration_redis_data:
 
 services:
   traefik:
@@ -118,7 +121,14 @@ services:
       - meridian_network
     ports:
       - "${MESSAGING_REDIS_PORT}:${MESSAGING_REDIS_PORT}"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "${MESSAGING_REDIS_PORT}", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
+    volumes:
+      - messaging_redis_data:/data
   messaging_migrate:
     build:
       context: ../
@@ -146,7 +156,7 @@ services:
       messaging_postgres:
         condition: service_healthy
       messaging_redis:
-        condition: service_started
+        condition: service_healthy
       kafka:
         condition: service_healthy
     environment:
@@ -155,9 +165,10 @@ services:
       MESSAGING_KAFKA_BROKERS: "${KAFKA_BROKERS}"
       MESSAGING_KAFKA_DEFAULT_TOPIC: "${MESSAGING_KAFKA_DEFAULT_TOPIC}"
       MESSAGING_GRPC_PORT: "${MESSAGING_GRPC_PORT}"
+      MESSAGING_REDIS_URL: "${MESSAGING_REDIS_URL}"
       IDENTITY_GRPC_URL: "${IDENTITY_GRPC_URL}"
       INTEGRATION_GRPC_URL: "${INTEGRATION_GRPC_URL}"
-      MESSAGING_REDIS_URL: "${MESSAGING_REDIS_URL}"
+
     networks:
       - meridian_network
     labels:
@@ -194,6 +205,22 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+  identity_redis:
+    image: redis:7-alpine
+    container_name: meridian_redis_identity
+    command: --port ${IDENTITY_REDIS_PORT}
+    networks:
+      - meridian_network
+    ports:
+      - "${IDENTITY_REDIS_PORT}:${IDENTITY_REDIS_PORT}"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "${IDENTITY_REDIS_PORT}", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    volumes:
+      - identity_redis_data:/data
   identity_migrate:
     build:
       context: ../
@@ -224,6 +251,8 @@ services:
         condition: service_healthy
       kafka:
         condition: service_healthy
+      identity_redis:
+        condition: service_healthy
     labels:
       - "traefik.enable=true"
       - "traefik.http.services.identity.loadbalancer.server.port=8081"
@@ -235,6 +264,7 @@ services:
       IDENTITY_PASETO_PRIVATE_KEY: "${IDENTITY_PASETO_PRIVATE_KEY}"
       IDENTITY_PASETO_PUBLIC_KEY: "${IDENTITY_PASETO_PUBLIC_KEY}"
       IDENTITY_GRPC_PORT: "${IDENTITY_GRPC_PORT}"
+      IDENTITY_REDIS_URL: "${IDENTITY_REDIS_URL}"
       AUTH_TOKEN_VALIDITY_MINUTES: "${AUTH_TOKEN_VALIDITY_MINUTES}"
       INTEGRATION_GRPC_URL: "${INTEGRATION_GRPC_URL}"
     restart: unless-stopped
@@ -268,6 +298,22 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+  integration_redis:
+    image: redis:7-alpine
+    container_name: meridian_redis_integration
+    command: --port ${INTEGRATION_REDIS_PORT}
+    networks:
+      - meridian_network
+    ports:
+      - "${INTEGRATION_REDIS_PORT}:${INTEGRATION_REDIS_PORT}"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "${INTEGRATION_REDIS_PORT}", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    volumes:
+      - integration_redis_data:/data
   integration_migrate:
     build:
       context: ../
@@ -304,12 +350,15 @@ services:
         condition: service_healthy
       kafka:
         condition: service_healthy
+      integration_redis:
+        condition: service_healthy
     environment:
       INTEGRATION_HTTP_PORT: ":${INTEGRATION_HTTP_PORT}"
       INTEGRATION_DB_URL: "${INTEGRATION_DB_URL}"
       INTEGRATION_KAFKA_BROKERS: "${KAFKA_BROKERS}"
       INTEGRATION_KAFKA_DEFAULT_TOPIC: "${INTEGRATION_KAFKA_DEFAULT_TOPIC}"
       INTEGRATION_GRPC_PORT: "${INTEGRATION_GRPC_PORT}"
+      INTEGRATION_REDIS_URL: "${INTEGRATION_REDIS_URL}"
       MESSAGING_GRPC_URL: "${MESSAGING_GRPC_URL}"
     labels:
       - "traefik.enable=true"

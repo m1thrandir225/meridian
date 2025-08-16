@@ -10,6 +10,7 @@ import (
 	"github.com/m1thrandir225/meridian/internal/messaging/application/services"
 	"github.com/m1thrandir225/meridian/internal/messaging/domain"
 	messagingpb "github.com/m1thrandir225/meridian/internal/messaging/infrastructure/api"
+	"github.com/m1thrandir225/meridian/pkg/cache"
 	"google.golang.org/grpc"
 )
 
@@ -18,13 +19,20 @@ type GRPCServer struct {
 	messageService *services.MessageService
 	messagingpb.UnimplementedMessagingServiceServer
 	wsHandler *WebSocketHandler
+	cache     *cache.RedisCache
 }
 
-func NewGRPCHandler(channelService *services.ChannelService, messageService *services.MessageService, wsHandler *WebSocketHandler) *GRPCServer {
+func NewGRPCHandler(
+	channelService *services.ChannelService,
+	messageService *services.MessageService,
+	wsHandler *WebSocketHandler,
+	cache *cache.RedisCache,
+) *GRPCServer {
 	return &GRPCServer{
 		channelService: channelService,
 		messageService: messageService,
 		wsHandler:      wsHandler,
+		cache:          cache,
 	}
 }
 
@@ -123,14 +131,20 @@ func (h *GRPCServer) SendMessage(ctx context.Context, req *messagingpb.SendMessa
 	}, nil
 
 }
-func StartGRPCServer(port string, channelService *services.ChannelService, messageService *services.MessageService, wsHandler *WebSocketHandler) error {
+func StartGRPCServer(
+	port string,
+	channelService *services.ChannelService,
+	messageService *services.MessageService,
+	wsHandler *WebSocketHandler,
+	cache *cache.RedisCache,
+) error {
 	lis, err := net.Listen("tcp", ":"+port)
 	if err != nil {
 		return err
 	}
 
 	s := grpc.NewServer()
-	grpcHandler := NewGRPCHandler(channelService, messageService, wsHandler)
+	grpcHandler := NewGRPCHandler(channelService, messageService, wsHandler, cache)
 	messagingpb.RegisterMessagingServiceServer(s, grpcHandler)
 
 	log.Printf("Messaging gRPC server listening on port %s", port)

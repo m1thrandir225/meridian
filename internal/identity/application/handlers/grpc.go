@@ -5,39 +5,65 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"time"
 
 	"github.com/m1thrandir225/meridian/internal/identity/application/services"
 	"github.com/m1thrandir225/meridian/internal/identity/domain"
 	identitypb "github.com/m1thrandir225/meridian/internal/identity/infrastructure/api"
 	"github.com/m1thrandir225/meridian/pkg/auth"
+	"github.com/m1thrandir225/meridian/pkg/cache"
 	"google.golang.org/grpc"
 )
 
 type GRPCServer struct {
 	tokenVerifier   auth.TokenVerifier
 	identityService *services.IdentityService
+	cache           *cache.RedisCache
 	identitypb.UnimplementedIdentityServiceServer
 }
 
-func NewGRPCServer(tokenVerifier auth.TokenVerifier, identityService *services.IdentityService) *GRPCServer {
+func NewGRPCServer(
+	tokenVerifier auth.TokenVerifier,
+	identityService *services.IdentityService,
+	cache *cache.RedisCache,
+) *GRPCServer {
 	return &GRPCServer{
 		tokenVerifier:   tokenVerifier,
 		identityService: identityService,
+		cache:           cache,
 	}
 }
 
 func (s *GRPCServer) ValidateToken(ctx context.Context, req *identitypb.ValidateTokenRequest) (*identitypb.ValidateTokenResponse, error) {
+	cacheKey := fmt.Sprintf("grpc_token_validation:%s", req.Token)
+	var cachedResponse identitypb.ValidateTokenResponse
+	if hit, _ := s.cache.GetWithMetrics(ctx, cacheKey, &cachedResponse); hit {
+		return &cachedResponse, nil
+	}
+
 	claims, err := s.tokenVerifier.Verify(req.Token)
 	if err != nil {
 		return nil, fmt.Errorf("invalid token: %v", err)
 	}
 
-	return &identitypb.ValidateTokenResponse{
+	response := identitypb.ValidateTokenResponse{
 		UserId: claims.Custom.UserID,
-	}, nil
+	}
+
+	s.cache.Set(ctx, cacheKey, response, 15*time.Minute)
+
+	return &response, nil
 }
 
 func (s *GRPCServer) GetUserByID(ctx context.Context, req *identitypb.GetUserByIDRequest) (*identitypb.GetUserByIDResponse, error) {
+
+	cacheKey := fmt.Sprintf("grpc_user:%s", req.UserId)
+	var cachedUser identitypb.User
+	if hit, _ := s.cache.GetWithMetrics(ctx, cacheKey, &cachedUser); hit {
+		return &identitypb.GetUserByIDResponse{
+			User: &cachedUser,
+		}, nil
+	}
 
 	cmd := domain.GetUserCommand{
 		UserID: req.UserId,
@@ -47,7 +73,8 @@ func (s *GRPCServer) GetUserByID(ctx context.Context, req *identitypb.GetUserByI
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user by ID: %v", err)
 	}
-	return &identitypb.GetUserByIDResponse{
+
+	response := identitypb.GetUserByIDResponse{
 		User: &identitypb.User{
 			Id:        user.ID.String(),
 			Username:  user.Username.String(),
@@ -55,10 +82,21 @@ func (s *GRPCServer) GetUserByID(ctx context.Context, req *identitypb.GetUserByI
 			FirstName: user.FirstName,
 			LastName:  user.LastName,
 		},
-	}, nil
+	}
+
+	s.cache.Set(ctx, cacheKey, response, 15*time.Minute)
+
+	return &response, nil
 }
 
 func (s *GRPCServer) GetUsers(ctx context.Context, req *identitypb.GetUsersRequest) (*identitypb.GetUsersResponse, error) {
+
+	cacheKey := fmt.Sprintf("grpc_users:%s", req.UserIds)
+	var cachedUsers identitypb.GetUsersResponse
+	if hit, _ := s.cache.GetWithMetrics(ctx, cacheKey, &cachedUsers); hit {
+		return &cachedUsers, nil
+	}
+
 	cmd := domain.GetUsersCommand{
 		UserIds: req.UserIds,
 	}
@@ -77,19 +115,29 @@ func (s *GRPCServer) GetUsers(ctx context.Context, req *identitypb.GetUsersReque
 			LastName:  user.LastName,
 		}
 	}
-	return &identitypb.GetUsersResponse{
+
+	response := identitypb.GetUsersResponse{
 		Users: pbUsers,
-	}, nil
+	}
+
+	s.cache.Set(ctx, cacheKey, response, 15*time.Minute)
+
+	return &response, nil
 }
 
-func StartGRPCServer(port string, tokenVerifier auth.TokenVerifier, identityService *services.IdentityService) error {
+func StartGRPCServer(
+	port string,
+	tokenVerifier auth.TokenVerifier,
+	identityService *services.IdentityService,
+	cache *cache.RedisCache,
+) error {
 	lis, err := net.Listen("tcp", ":"+port)
 	if err != nil {
 		return err
 	}
 
 	s := grpc.NewServer()
-	grpcHandler := NewGRPCServer(tokenVerifier, identityService)
+	grpcHandler := NewGRPCServer(tokenVerifier, identityService, cache)
 	identitypb.RegisterIdentityServiceServer(s, grpcHandler)
 
 	log.Printf("Identity gRPC server listening on port %s", port)

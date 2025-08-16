@@ -2,37 +2,30 @@ package handlers
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/m1thrandir225/meridian/internal/integration/application/services"
 	"github.com/m1thrandir225/meridian/internal/integration/domain"
+	"github.com/m1thrandir225/meridian/pkg/cache"
 )
 
 type HTTPHandler struct {
 	integrationService *services.IntegrationService
+	cache              *cache.RedisCache
 }
 
-func NewHttpHandler(service *services.IntegrationService) *HTTPHandler {
+func NewHttpHandler(
+	service *services.IntegrationService,
+	cache *cache.RedisCache,
+) *HTTPHandler {
 	return &HTTPHandler{
 		integrationService: service,
+		cache:              cache,
 	}
-}
-
-type RegisterIntegrationRequest struct {
-	ServiceName      string   `json:"service_name" binding:"required"`
-	TargetChannelIDs []string `json:"target_channel_ids" binding:"required"`
-}
-
-type RegisterIntegrationResponse struct {
-	ServiceName    string   `json:"service_name"`
-	TargetChannels []string `json:"target_channels"`
-	Token          string   `json:"token"`
-}
-
-type RevokeIntegrationRequest struct {
-	IntegrationID string `json:"integration_id" binding:"required"`
 }
 
 // POST /api/v1/integrations
@@ -65,6 +58,9 @@ func (h *HTTPHandler) handleRegisterIntegration(ctx *gin.Context) {
 		TargetChannels: integration.TargetChannelIDsAsStringSlice(),
 		Token:          token,
 	}
+
+	cacheKey := fmt.Sprintf("integration:%s", integration.ID)
+	h.cache.Set(ctx, cacheKey, resp, 15*time.Minute)
 
 	ctx.JSON(http.StatusOK, resp)
 }
@@ -100,5 +96,25 @@ func (h *HTTPHandler) handleRevokeIntegration(ctx *gin.Context) {
 		}
 		return
 	}
+
+	cacheKey := fmt.Sprintf("integration:%s", req.IntegrationID)
+	h.cache.Delete(ctx, cacheKey)
+
 	ctx.Status(http.StatusNoContent)
+}
+
+func (h *HTTPHandler) handleGetMetrics(ctx *gin.Context) {
+	metrics := h.cache.GetMetrics()
+	ctx.JSON(http.StatusOK, gin.H{
+		"hits":     metrics.GetHits(),
+		"misses":   metrics.GetMisses(),
+		"hit_rate": metrics.GetHitRate(),
+	})
+}
+
+func (h *HTTPHandler) handleGetHealth(ctx *gin.Context) {
+	ctx.JSON(http.StatusOK, gin.H{
+		"status":  "healthy",
+		"service": "integration",
+	})
 }

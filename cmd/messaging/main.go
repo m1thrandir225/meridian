@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/m1thrandir225/meridian/pkg/cache"
 	"github.com/m1thrandir225/meridian/pkg/kafka"
 	"github.com/redis/go-redis/v9"
 
@@ -108,6 +109,7 @@ func main() {
 		DB:   0,
 	})
 	defer redisClient.Close()
+	redisCache := cache.NewRedisCache(redisClient)
 
 	// --- Kafka Producers ---
 	config := sarama.NewConfig()
@@ -152,7 +154,7 @@ func main() {
 	messageService := services.NewMessageService(repository, eventPublisher, identityClient, integrationClient)
 	logger.Println("Message service initialized.")
 
-	httpHandler := handlers.NewHttpHandler(channelService, messageService)
+	httpHandler := handlers.NewHttpHandler(channelService, messageService, redisCache)
 	logger.Println("HTTP Handler initialized")
 
 	wsHandler := handlers.NewWebSocketHandler(channelService, messageService, redisClient, identityClient)
@@ -176,7 +178,13 @@ func main() {
 
 	go func() {
 		logger.Printf("Starting gRPC server on %s", cfg.GRPCPort)
-		if err := handlers.StartGRPCServer(cfg.GRPCPort, channelService, messageService, wsHandler); err != nil {
+		if err := handlers.StartGRPCServer(
+			cfg.GRPCPort,
+			channelService,
+			messageService,
+			wsHandler,
+			redisCache,
+		); err != nil {
 			logger.Fatalf("Failed to start gRPC server: %v", err)
 		}
 	}()

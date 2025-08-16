@@ -1,11 +1,12 @@
 package handlers
 
 import (
-	"github.com/gin-gonic/gin"
-	"github.com/m1thrandir225/meridian/pkg/auth"
 	"log"
 	"net/http"
 	"strings"
+
+	"github.com/gin-gonic/gin"
+	"github.com/m1thrandir225/meridian/pkg/auth"
 )
 
 func AuthenticationMiddleware(verifier auth.TokenVerifier) gin.HandlerFunc {

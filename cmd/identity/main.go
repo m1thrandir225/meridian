@@ -15,7 +15,9 @@ import (
 	"github.com/IBM/sarama"
 	"github.com/m1thrandir225/meridian/internal/identity/infrastructure/token_generator"
 	"github.com/m1thrandir225/meridian/pkg/auth"
+	"github.com/m1thrandir225/meridian/pkg/cache"
 	"github.com/m1thrandir225/meridian/pkg/kafka"
+	"github.com/redis/go-redis/v9"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/m1thrandir225/meridian/internal/identity/application/handlers"
@@ -27,6 +29,7 @@ type Config struct {
 	HTTPPort             string
 	KafkaBrokers         []string
 	DatabaseURL          string
+	RedisURL             string
 	PasetoPublicKey      string
 	PasetoPrivateKey     string
 	AuthTokenValidity    time.Duration
@@ -89,10 +92,16 @@ func loadConfig() (*Config, error) {
 		return nil, fmt.Errorf("missing IDENTITY_GRPC_PORT")
 	}
 
+	redisURL := os.Getenv("IDENTITY_REDIS_URL")
+	if redisURL == "" {
+		return nil, fmt.Errorf("missing IDENTITY_REDIS_URL")
+	}
+
 	return &Config{
 		DatabaseURL:          dbURL,
 		KafkaBrokers:         strings.Split(kafkaBrokerStr, ","),
 		HTTPPort:             httpPort,
+		RedisURL:             redisURL,
 		PasetoPrivateKey:     privKey,
 		PasetoPublicKey:      pubKey,
 		AuthTokenValidity:    tokenValidity,
@@ -126,6 +135,17 @@ func main() {
 		log.Fatalf("Unable to connect to database: %v", err)
 	}
 	defer dbPool.Close()
+
+	redisClient := redis.NewClient(&redis.Options{
+		Addr: cfg.RedisURL,
+	})
+	defer redisClient.Close()
+
+	redisCache := cache.NewRedisCache(redisClient)
+	if err != nil {
+		log.Fatalf("Failed to create Redis cache: %v", err)
+	}
+
 	kafkaCfg := sarama.NewConfig()
 	kafkaCfg.Producer.Return.Successes = true
 	syncProducer, err := sarama.NewSyncProducer(cfg.KafkaBrokers, kafkaCfg)
@@ -149,7 +169,12 @@ func main() {
 		log.Fatalf("Failed to create token verifier: %v", err)
 	}
 
-	router := handlers.SetupIdentityRouter(service, tokenVerifier, cfg.IntegrationGRPCURL)
+	router := handlers.SetupIdentityRouter(
+		service,
+		redisCache,
+		tokenVerifier,
+		cfg.IntegrationGRPCURL,
+	)
 
 	httpServer := &http.Server{
 		Addr:         cfg.HTTPPort,
@@ -161,7 +186,12 @@ func main() {
 
 	go func() {
 		logger.Printf("Starting gRPC server on %s", cfg.GRPCPort)
-		if err := handlers.StartGRPCServer(cfg.GRPCPort, tokenVerifier, service); err != nil {
+		if err := handlers.StartGRPCServer(
+			cfg.GRPCPort,
+			tokenVerifier,
+			service,
+			redisCache,
+		); err != nil {
 			logger.Fatalf("Failed to start gRPC server: %v", err)
 		}
 	}()

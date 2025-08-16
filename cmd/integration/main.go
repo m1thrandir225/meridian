@@ -17,7 +17,9 @@ import (
 	"github.com/m1thrandir225/meridian/internal/integration/application/handlers"
 	"github.com/m1thrandir225/meridian/internal/integration/application/services"
 	"github.com/m1thrandir225/meridian/internal/integration/infrastructure/persistence"
+	"github.com/m1thrandir225/meridian/pkg/cache"
 	"github.com/m1thrandir225/meridian/pkg/kafka"
+	"github.com/redis/go-redis/v9"
 )
 
 type Config struct {
@@ -25,6 +27,7 @@ type Config struct {
 	KafkaBrokers      []string
 	KafkaDefaultTopic string
 	DatabaseURL       string
+	RedisURL          string
 	GRPCPort          string
 	MessagingGRPCURL  string
 }
@@ -33,6 +36,10 @@ func loadConfig() (*Config, error) {
 	dbURL := os.Getenv("INTEGRATION_DB_URL")
 	if dbURL == "" {
 		return nil, fmt.Errorf("missing INTEGRATION_DB_URL")
+	}
+	redisURL := os.Getenv("INTEGRATION_REDIS_URL")
+	if redisURL == "" {
+		return nil, fmt.Errorf("missing INTEGRATION_REDIS_URL")
 	}
 
 	kafkaBrokerStr := os.Getenv("INTEGRATION_KAFKA_BROKERS")
@@ -62,6 +69,7 @@ func loadConfig() (*Config, error) {
 		KafkaBrokers:      strings.Split(kafkaBrokerStr, ","),
 		KafkaDefaultTopic: kafkaDefaultTopic,
 		DatabaseURL:       dbURL,
+		RedisURL:          redisURL,
 		GRPCPort:          grpcPort,
 		MessagingGRPCURL:  messagingGRPCURL,
 	}, nil
@@ -83,6 +91,12 @@ func main() {
 	}
 	defer dbPool.Close()
 
+	redisClient := redis.NewClient(&redis.Options{
+		Addr: cfg.RedisURL,
+	})
+	defer redisClient.Close()
+	redisCache := cache.NewRedisCache(redisClient)
+
 	kafkaCfg := sarama.NewConfig()
 	kafkaCfg.Producer.Return.Successes = true
 	syncProducer, err := sarama.NewSyncProducer(cfg.KafkaBrokers, kafkaCfg)
@@ -99,7 +113,7 @@ func main() {
 
 	service := services.NewIntegrationService(repository, bcryptGenerator, eventPublisher)
 
-	router := handlers.SetupIntegrationRouter(service)
+	router := handlers.SetupIntegrationRouter(service, redisCache)
 	httpServer := &http.Server{
 		Addr:         cfg.HTTPPort,
 		Handler:      router,
@@ -110,7 +124,7 @@ func main() {
 
 	go func() {
 		log.Printf("Starting gRPC Server on %s", cfg.GRPCPort)
-		if err := handlers.StartGRPCServer(service, cfg.GRPCPort); err != nil {
+		if err := handlers.StartGRPCServer(service, redisCache, cfg.GRPCPort); err != nil {
 			errChan <- fmt.Errorf("gRPC server error: %w", err)
 		}
 	}()

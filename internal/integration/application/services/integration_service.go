@@ -105,6 +105,20 @@ func (s *IntegrationService) RevokeToken(ctx context.Context, cmd domain.RevokeT
 	return nil
 }
 
+func (s *IntegrationService) GetIntegration(ctx context.Context, cmd domain.GetIntegrationCommand) (*domain.Integration, error) {
+	integrationID, err := domain.NewIntegrationIDFromString(cmd.IntegrationID)
+	if err != nil {
+		return nil, err
+	}
+
+	integration, err := s.repo.FindByID(ctx, integrationID.Value())
+	if err != nil {
+		return nil, err
+	}
+
+	return integration, nil
+}
+
 func (s *IntegrationService) dispatchEvents(ctx context.Context, integration *domain.Integration) {
 	if err := s.publisher.PublishEvents(ctx, integration.Events()); err != nil {
 		log.Printf("CRITICAL: Failed to publish domain events %+v: %v", integration.Events(), err)

@@ -1,36 +1,33 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/m1thrandir225/meridian/internal/identity/application/services"
 	"github.com/m1thrandir225/meridian/pkg/auth"
+	"github.com/m1thrandir225/meridian/pkg/cache"
 )
 
 type AuthHandler struct {
 	userService        *services.IdentityService
+	cache              *cache.RedisCache
 	tokenVerifier      auth.TokenVerifier
 	integrationGrpcURL string
 }
 
-type PasetoValidateResponse struct {
-	Valid  bool   `json:"valid"`
-	UserID string `json:"user_id"`
-	Email  string `json:"email"`
-}
-
-type APIKeyValidateResponse struct {
-	Valid                     bool   `json:"valid"`
-	IntegrationID             string `json:"integration_id"`
-	IntegrationName           string `json:"integration_name"`
-	IntegrationTargetChannels string `json:"integration_target_channels"`
-}
-
-func NewAuthHandler(userService *services.IdentityService, tokenVerifier auth.TokenVerifier, integrationGRPCURL string) *AuthHandler {
+func NewAuthHandler(
+	userService *services.IdentityService,
+	cache *cache.RedisCache,
+	tokenVerifier auth.TokenVerifier,
+	integrationGRPCURL string,
+) *AuthHandler {
 	return &AuthHandler{
 		userService:        userService,
+		cache:              cache,
 		tokenVerifier:      tokenVerifier,
 		integrationGrpcURL: integrationGRPCURL,
 	}
@@ -68,6 +65,17 @@ func (h *AuthHandler) ValidateToken(ctx *gin.Context) {
 }
 
 func (h *AuthHandler) handlePasetoAuth(ctx *gin.Context, token string, isIntegrationEndpoint bool, path string) {
+	cacheKey := fmt.Sprintf("token_validation:%s", token)
+	var cachedResponse PasetoValidateResponse
+	if hit, _ := h.cache.GetWithMetrics(ctx.Request.Context(), cacheKey, &cachedResponse); hit {
+		ctx.Header("X-User-ID", cachedResponse.UserID)
+		ctx.Header("X-User-Email", cachedResponse.Email)
+		ctx.Header("X-User-Type", "user")
+		ctx.Header("X-Auth-Method", "paseto")
+		ctx.JSON(http.StatusOK, cachedResponse)
+		return
+	}
+
 	claims, err := h.tokenVerifier.Verify(token)
 	if err != nil {
 		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
@@ -90,12 +98,27 @@ func (h *AuthHandler) handlePasetoAuth(ctx *gin.Context, token string, isIntegra
 		Email:  claims.Custom.Email,
 	}
 
+	h.cache.Set(ctx.Request.Context(), cacheKey, response, 15*time.Minute)
+
 	ctx.JSON(http.StatusOK, response)
 }
 
 func (h *AuthHandler) handleAPITokenAuth(ctx *gin.Context, apiKey string, isIntegrationEndpoint bool, path string) {
 	if !isIntegrationEndpoint {
 		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: Integration endpoint"})
+		return
+	}
+
+	cacheKey := fmt.Sprintf("api_token_validation:%s", apiKey)
+	var cachedResponse APIKeyValidateResponse
+	if hit, _ := h.cache.GetWithMetrics(ctx.Request.Context(), cacheKey, &cachedResponse); hit {
+		// Set headers from cached response
+		ctx.Header("X-Integration-ID", cachedResponse.IntegrationID)
+		ctx.Header("X-Integration-Name", cachedResponse.IntegrationName)
+		ctx.Header("X-User-Type", "integration")
+		ctx.Header("X-Auth-Method", "api-token")
+		ctx.Header("X-Integration-Target-Channels", cachedResponse.IntegrationTargetChannels)
+		ctx.JSON(http.StatusOK, cachedResponse)
 		return
 	}
 
@@ -125,6 +148,9 @@ func (h *AuthHandler) handleAPITokenAuth(ctx *gin.Context, apiKey string, isInte
 		IntegrationName:           resp.IntegrationId,
 		IntegrationTargetChannels: "",
 	}
+
+	h.cache.Set(ctx.Request.Context(), cacheKey, response, 15*time.Minute)
+
 	ctx.JSON(http.StatusOK, response)
 
 }
