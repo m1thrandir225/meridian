@@ -14,3 +14,8 @@ type RevokeTokenCommand struct {
 type GetIntegrationCommand struct {
 	IntegrationID string
 }
+
+type RegisterIntegrationAsBotInChannelCommand struct {
+	IntegrationID string
+	ChannelIDs    []string
+}

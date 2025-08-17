@@ -131,6 +131,64 @@ func (h *GRPCServer) SendMessage(ctx context.Context, req *messagingpb.SendMessa
 	}, nil
 
 }
+
+func (h *GRPCServer) RegisterBot(ctx context.Context, req *messagingpb.RegisterBotRequest) (*messagingpb.RegisterBotResponse, error) {
+	integrationID, err := uuid.Parse(req.IntegrationId)
+	if err != nil {
+		return nil, fmt.Errorf("invalid integration ID %s: %w", req.IntegrationId, err)
+	}
+
+	channels := make([]*domain.Channel, 0, len(req.ChannelIds))
+	success := true
+	for _, channelIDStr := range req.ChannelIds {
+		channelID, err := uuid.Parse(channelIDStr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid channel ID %s: %w", channelIDStr, err)
+		}
+
+		cmd := domain.AddBotToChannelCommand{
+			ChannelID:     channelID,
+			IntegrationID: integrationID,
+		}
+
+		channel, err := h.channelService.HandleAddBotToChannel(ctx, cmd)
+		if err != nil {
+			log.Printf("failed to add bot to channel %s: %v", channelIDStr, err)
+			success = false
+			continue
+		}
+		channels = append(channels, channel)
+	}
+
+	if !success {
+		return &messagingpb.RegisterBotResponse{
+			Success:       false,
+			IntegrationId: integrationID.String(),
+			ChannelIds:    req.ChannelIds,
+			Error:         "failed to add bot to some channels",
+		}, nil
+	}
+
+	for _, channelIDStr := range req.ChannelIds {
+		channelCacheKey := fmt.Sprintf("channel:%s", channelIDStr)
+		h.cache.Delete(ctx, channelCacheKey)
+		log.Printf("Invalidated cache for channel: %s", channelIDStr)
+	}
+
+	channelIDs := make([]string, 0, len(channels))
+	for _, channel := range channels {
+		channelIDs = append(channelIDs, channel.ID.String())
+	}
+
+	response := &messagingpb.RegisterBotResponse{
+		Success:       true,
+		IntegrationId: integrationID.String(),
+		ChannelIds:    channelIDs,
+	}
+
+	return response, nil
+
+}
 func StartGRPCServer(
 	port string,
 	channelService *services.ChannelService,

@@ -44,13 +44,13 @@ func (r *PostgresIntegrationRepository) Save(ctx context.Context, integration *d
 	}
 
 	insertSQL := `
-		INSERT INTO integrations (
-			id, service_name, creator_user_id, api_token_hash,
-			target_channel_ids, created_at, is_revoked
-		) VALUES ($1, $2, $3, $4, $5, $6, $7)`
+	INSERT INTO integrations (
+		id, service_name, creator_user_id, api_token_hash,
+		token_lookup_hash, target_channel_ids, created_at, is_revoked
+	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`
 	_, err = tx.Exec(ctx, insertSQL,
 		integration.ID.String(), integration.ServiceName, integration.CreatorUserID.String(),
-		integration.HashedAPIToken.Hash(), targetChannels,
+		integration.HashedAPIToken.Hash(), integration.TokenLookupHash, targetChannels,
 		integration.CreatedAt, integration.IsRevoked)
 
 	if err != nil {

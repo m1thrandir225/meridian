@@ -13,4 +13,10 @@ export interface Message {
     first_name: string
     last_name: string
   }
+  integration_bot?: {
+    id: string
+    is_revoked: boolean
+    service_name: string
+    created_at: string
+  }
 }

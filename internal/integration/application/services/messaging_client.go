@@ -2,8 +2,8 @@ package services
 
 import (
 	"context"
+	"fmt"
 	"log"
-	"time"
 
 	messagingpb "github.com/m1thrandir225/meridian/internal/messaging/infrastructure/api"
 	"google.golang.org/grpc"
@@ -31,14 +31,25 @@ func NewMessagingClient(address string) (*MessagingClient, error) {
 }
 
 func (mc *MessagingClient) SendMessage(ctx context.Context, req *messagingpb.SendMessageRequest) (*messagingpb.SendMessageResponse, error) {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
 	resp, err := mc.client.SendMessage(ctx, req)
 	if err != nil {
 		log.Printf("gRPC call to SendMessage failed: %v", err)
 		return nil, err
 	}
+	return resp, nil
+}
+
+func (mc *MessagingClient) RegisterBot(ctx context.Context, req *messagingpb.RegisterBotRequest) (*messagingpb.RegisterBotResponse, error) {
+	resp, err := mc.client.RegisterBot(ctx, req)
+	if err != nil {
+		log.Printf("gRPC call to RegisterBot failed: %v", err)
+		return nil, err
+	}
+
+	if resp.Error != "" || !resp.Success {
+		return nil, fmt.Errorf("failed to register bot: %s", resp.Error)
+	}
+
 	return resp, nil
 }
 

@@ -5,7 +5,7 @@ export type CreateIntegrationRequest = {
 
 export type CreateIntegrationResponse = {
   service_name: string
-  target_channel_ids: string[]
+  target_channels: string[]
   token: string
   token_lookup_hash: string
   is_revoked: boolean

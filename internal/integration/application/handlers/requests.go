@@ -1,5 +1,7 @@
 package handlers
 
+import "github.com/gin-gonic/gin"
+
 type RegisterIntegrationRequest struct {
 	ServiceName      string   `json:"service_name" binding:"required"`
 	TargetChannelIDs []string `json:"target_channel_ids" binding:"required"`
@@ -21,4 +23,8 @@ type CallbackMessageRequest struct {
 	TargetChannelID string            `json:"target_channel_id,omitempty"`
 	ParentMessageID *string           `json:"parent_message_id,omitempty"`
 	Metadata        map[string]string `json:"metadata,omitempty"`
+}
+
+func errorResponse(err error) gin.H {
+	return gin.H{"error": err.Error()}
 }

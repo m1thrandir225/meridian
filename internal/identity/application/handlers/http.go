@@ -91,13 +91,6 @@ func (h *HTTPHandler) handleLoginRequest(ctx *gin.Context) {
 		UserID: claims.Custom.UserID,
 	}
 
-	cacheKey := fmt.Sprintf("user_profile:%s", claims.Custom.UserID)
-	var cachedUser UserResponse
-	if hit, _ := h.cache.GetWithMetrics(ctx.Request.Context(), cacheKey, &cachedUser); hit {
-		ctx.JSON(http.StatusOK, cachedUser)
-		return
-	}
-
 	user, err := h.userService.GetUser(ctx, getUserCMD)
 	if err != nil {
 		log.Printf("ERROR fetching user: %v", err)
@@ -120,8 +113,6 @@ func (h *HTTPHandler) handleLoginRequest(ctx *gin.Context) {
 			ExpiresIn:    int64(h.userService.AuthTokenValidity.Seconds()),
 		},
 	}
-
-	h.cache.Set(ctx.Request.Context(), cacheKey, resp.User, 15*time.Minute)
 
 	ctx.JSON(http.StatusOK, resp)
 }

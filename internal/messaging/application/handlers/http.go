@@ -44,12 +44,12 @@ func (h *HTTPHandler) handleGetUserChannels(ctx *gin.Context) {
 		return
 	}
 
-	cacheKey := fmt.Sprintf("user_channels:%s", userID.String())
-	var cachedChannels []domain.ChannelDTO
-	if hit, _ := h.cache.GetWithMetrics(ctx.Request.Context(), cacheKey, &cachedChannels); hit {
-		ctx.JSON(http.StatusOK, cachedChannels)
-		return
-	}
+	// cacheKey := fmt.Sprintf("user_channels:%s", userID.String())
+	// var cachedChannels []domain.ChannelDTO
+	// if hit, _ := h.cache.GetWithMetrics(ctx.Request.Context(), cacheKey, &cachedChannels); hit {
+	// 	ctx.JSON(http.StatusOK, cachedChannels)
+	// 	return
+	// }
 
 	cmd := domain.GetUserChannelsCommand{
 		UserID: userID,
@@ -67,7 +67,7 @@ func (h *HTTPHandler) handleGetUserChannels(ctx *gin.Context) {
 		return
 	}
 
-	h.cache.Set(ctx.Request.Context(), cacheKey, channelsDTO, 5*time.Minute)
+	//h.cache.Set(ctx.Request.Context(), cacheKey, channelsDTO, 5*time.Minute)
 
 	ctx.JSON(http.StatusOK, channelsDTO)
 }

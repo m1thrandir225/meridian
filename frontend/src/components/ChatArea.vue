@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, watch, onMounted, onUnmounted } from 'vue'
-import { Hash, Users, Send, Smile, Menu, Paperclip } from 'lucide-vue-next'
+import { Hash, Users, Send, Smile, Menu, Paperclip, Bot } from 'lucide-vue-next'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -311,8 +311,8 @@ onMounted(() => {
           class="flex gap-3"
         >
           <!-- Avatar -->
-          <Avatar class="h-8 w-8">
-            <AvatarFallback>
+          <Avatar class="h-8 w-8" v-if="message.sender_user_id">
+            <AvatarFallback v-if="message.sender_user_id">
               {{
                 message.sender_user_id === authStore.user?.id
                   ? `${getUserInitials(authStore.userDisplayName())}`
@@ -322,17 +322,22 @@ onMounted(() => {
               }}
             </AvatarFallback>
           </Avatar>
+          <Avatar class="h-8 w-8" v-else-if="message.integration_id">
+            <AvatarFallback>
+              <Bot />
+            </AvatarFallback>
+          </Avatar>
 
           <!-- Message Content -->
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2 mb-1">
               <span
                 class="font-semibold text-primary text-[10px]"
-                v-if="message.sender_user_id !== authStore.user?.id"
+                v-if="message.sender_user_id && message.sender_user_id !== authStore.user?.id"
               >
                 @{{ message.sender_user?.username }}
               </span>
-              <span class="font-medium text-sm">
+              <span class="font-medium text-sm" v-if="message.sender_user_id">
                 {{
                   message.sender_user_id === authStore.user?.id
                     ? 'You'
@@ -341,6 +346,9 @@ onMounted(() => {
                         message.sender_user?.last_name ?? '',
                       )
                 }}
+              </span>
+              <span class="font-medium text-sm" v-else-if="message.integration_id">
+                {{ message.integration_bot?.service_name }}
               </span>
               <span class="text-xs text-muted-foreground">
                 {{ formatTime(message.created_at) }}
