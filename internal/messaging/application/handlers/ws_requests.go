@@ -1,6 +1,8 @@
 package handlers
 
-import "time"
+import (
+	"time"
+)
 
 type WebSocketMessage struct {
 	Type    string      `json:"type"`
@@ -14,12 +16,30 @@ type IncomingMessagePayload struct {
 }
 
 type OutgoingMessagePayload struct {
-	ID              string    `json:"id"`
-	Content         string    `json:"content"`
-	SenderID        string    `json:"sender_id"`
-	ChannelID       string    `json:"channel_id"`
-	ParentMessageID string    `json:"parent_message_id,omitempty"`
-	Timestamp       time.Time `json:"timestamp"`
+	ID              string             `json:"id"`
+	Content         string             `json:"content"`
+	SenderUserID    string             `json:"sender_user_id"`
+	IntegrationID   string             `json:"integration_id"`
+	ChannelID       string             `json:"channel_id"`
+	ParentMessageID string             `json:"parent_message_id,omitempty"`
+	Timestamp       time.Time          `json:"timestamp"`
+	SenderUser      *UserDTO           `json:"sender_user,omitempty"`
+	IntegrationBot  *IntegrationBotDTO `json:"integration_bot,omitempty"`
+}
+
+type UserDTO struct {
+	ID        string `json:"id"`
+	Username  string `json:"username"`
+	Email     string `json:"email"`
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"`
+}
+
+type IntegrationBotDTO struct {
+	ID          string    `json:"id"`
+	ServiceName string    `json:"service_name"`
+	CreatedAt   time.Time `json:"created_at"`
+	IsRevoked   bool      `json:"is_revoked"`
 }
 
 type TypingPayload struct {

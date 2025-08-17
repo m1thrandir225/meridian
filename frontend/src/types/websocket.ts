@@ -6,10 +6,24 @@ export interface WebSocketMessage {
 export interface IncomingMessagePayload {
   id: string
   content: string
-  sender_id: string
+  sender_user_id?: string
+  integration_id?: string
   channel_id: string
   parent_message_id?: string
   timestamp: string
+  sender_user?: {
+    id: string
+    username: string
+    email: string
+    first_name: string
+    last_name: string
+  }
+  integration_bot?: {
+    id: string
+    is_revoked: boolean
+    service_name: string
+    created_at: string
+  }
 }
 
 export interface TypingPayload {

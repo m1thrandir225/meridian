@@ -41,13 +41,17 @@ export const useMessageStore = defineStore('message', () => {
   }
 
   function addMessageFromWebSocket(payload: IncomingMessagePayload) {
+    console.log('payload', payload)
     const message: Message = {
       id: payload.id,
       channel_id: payload.channel_id,
-      sender_user_id: payload.sender_id,
+      sender_user_id: payload.sender_user_id,
+      integration_id: payload.integration_id,
       content_text: payload.content,
       parent_message_id: payload.parent_message_id,
       created_at: payload.timestamp,
+      sender_user: payload.sender_user,
+      integration_bot: payload.integration_bot,
     }
 
     addMessage(message)

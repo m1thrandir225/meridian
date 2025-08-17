@@ -177,17 +177,58 @@ func (h *WebSocketHandler) handleIncomingMessage(senderID string, payload interf
 	if err != nil {
 		return fmt.Errorf("failed to send message: %w", err)
 	}
-
-	outgoingMsg := OutgoingMessagePayload{
-		ID:        message.GetId().String(),
-		Content:   message.GetContent().GetText(),
-		SenderID:  message.GetSenderUserId().String(),
-		ChannelID: message.GetChannelId().String(),
-		Timestamp: message.GetCreatedAt(),
+	messageDTO, err := h.messageService.ToMessageDTO(ctx, message)
+	if err != nil {
+		return fmt.Errorf("failed to convert message to DTO: %w", err)
 	}
 
-	if message.GetParentMessageId() != nil {
+	outgoingMsg := OutgoingMessagePayload{
+		ID:        messageDTO.ID,
+		Content:   messageDTO.ContentText,
+		ChannelID: messageDTO.ChannelID,
+		Timestamp: messageDTO.CreatedAt,
+	}
+
+	// Handle sender ID safely
+	if messageDTO.SenderUserID != nil {
+		outgoingMsg.SenderUserID = *messageDTO.SenderUserID
+	} else if message.GetSenderUserId() != nil {
+		outgoingMsg.SenderUserID = message.GetSenderUserId().String()
+	}
+
+	// Handle integration ID safely
+	if messageDTO.IntegrationID != nil {
+		outgoingMsg.IntegrationID = *messageDTO.IntegrationID
+	} else if message.GetIntegrationId() != nil {
+		outgoingMsg.IntegrationID = message.GetIntegrationId().String()
+	}
+
+	// Handle parent message ID safely
+	if messageDTO.ParentMessageID != nil {
+		outgoingMsg.ParentMessageID = *messageDTO.ParentMessageID
+	} else if message.GetParentMessageId() != nil {
 		outgoingMsg.ParentMessageID = message.GetParentMessageId().String()
+	}
+
+	// Handle sender user information safely
+	if messageDTO.SenderUser != nil {
+		outgoingMsg.SenderUser = &UserDTO{
+			ID:        messageDTO.SenderUser.ID,
+			Username:  messageDTO.SenderUser.Username,
+			Email:     messageDTO.SenderUser.Email,
+			FirstName: messageDTO.SenderUser.FirstName,
+			LastName:  messageDTO.SenderUser.LastName,
+		}
+	}
+
+	// Handle integration bot information safely
+	if messageDTO.IntegrationBot != nil {
+		outgoingMsg.IntegrationBot = &IntegrationBotDTO{
+			ID:          messageDTO.IntegrationBot.ID,
+			ServiceName: messageDTO.IntegrationBot.ServiceName,
+			CreatedAt:   messageDTO.IntegrationBot.CreatedAt,
+			IsRevoked:   messageDTO.IntegrationBot.IsRevoked,
+		}
 	}
 
 	if h.redisClient != nil {
@@ -354,19 +395,62 @@ func (h *WebSocketHandler) broadcastToChannel(channelID string, message WebSocke
 }
 
 func (h *WebSocketHandler) BroadcastMessage(message *domain.Message) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	messageDTO, err := h.messageService.ToMessageDTO(ctx, message)
+	if err != nil {
+		log.Printf("Failed to convert message to DTO: %v", err)
+		return
+	}
+
 	outgoingMsg := OutgoingMessagePayload{
-		ID:        message.GetId().String(),
-		Content:   message.GetContent().GetText(),
-		ChannelID: message.GetChannelId().String(),
-		Timestamp: message.GetCreatedAt(),
+		ID:        messageDTO.ID,
+		Content:   messageDTO.ContentText,
+		ChannelID: messageDTO.ChannelID,
+		Timestamp: messageDTO.CreatedAt,
 	}
 
-	if message.GetSenderUserId() != nil {
-		outgoingMsg.SenderID = message.GetSenderUserId().String()
+	// Handle sender ID safely
+	if messageDTO.SenderUserID != nil {
+		outgoingMsg.SenderUserID = *messageDTO.SenderUserID
+	} else if message.GetSenderUserId() != nil {
+		outgoingMsg.SenderUserID = message.GetSenderUserId().String()
 	}
 
-	if message.GetParentMessageId() != nil {
+	// Handle integration ID safely
+	if messageDTO.IntegrationID != nil {
+		outgoingMsg.IntegrationID = *messageDTO.IntegrationID
+	} else if message.GetIntegrationId() != nil {
+		outgoingMsg.IntegrationID = message.GetIntegrationId().String()
+	}
+
+	// Handle parent message ID safely
+	if messageDTO.ParentMessageID != nil {
+		outgoingMsg.ParentMessageID = *messageDTO.ParentMessageID
+	} else if message.GetParentMessageId() != nil {
 		outgoingMsg.ParentMessageID = message.GetParentMessageId().String()
+	}
+
+	// Handle sender user information safely
+	if messageDTO.SenderUser != nil {
+		outgoingMsg.SenderUser = &UserDTO{
+			ID:        messageDTO.SenderUser.ID,
+			Username:  messageDTO.SenderUser.Username,
+			Email:     messageDTO.SenderUser.Email,
+			FirstName: messageDTO.SenderUser.FirstName,
+			LastName:  messageDTO.SenderUser.LastName,
+		}
+	}
+
+	// Handle integration bot information safely
+	if messageDTO.IntegrationBot != nil {
+		outgoingMsg.IntegrationBot = &IntegrationBotDTO{
+			ID:          messageDTO.IntegrationBot.ID,
+			ServiceName: messageDTO.IntegrationBot.ServiceName,
+			CreatedAt:   messageDTO.IntegrationBot.CreatedAt,
+			IsRevoked:   messageDTO.IntegrationBot.IsRevoked,
+		}
 	}
 
 	wsMessage := WebSocketMessage{
