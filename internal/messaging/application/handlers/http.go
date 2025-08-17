@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -30,7 +31,7 @@ func NewHttpHandler(
 	}
 }
 
-func (h *HTTPHandler) GetUserChannels(ctx *gin.Context) {
+func (h *HTTPHandler) handleGetUserChannels(ctx *gin.Context) {
 	userIDStr := ctx.GetHeader("X-User-ID")
 	if userIDStr == "" {
 		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
@@ -43,9 +44,9 @@ func (h *HTTPHandler) GetUserChannels(ctx *gin.Context) {
 		return
 	}
 
-	cacheKey := fmt.Sprintf("user_channels:%s", userID)
-	var cachedChannels []domain.Channel
-	if hit, _ := h.cache.GetWithMetrics(ctx, cacheKey, &cachedChannels); hit {
+	cacheKey := fmt.Sprintf("user_channels:%s", userID.String())
+	var cachedChannels []domain.ChannelDTO
+	if hit, _ := h.cache.GetWithMetrics(ctx.Request.Context(), cacheKey, &cachedChannels); hit {
 		ctx.JSON(http.StatusOK, cachedChannels)
 		return
 	}
@@ -66,13 +67,13 @@ func (h *HTTPHandler) GetUserChannels(ctx *gin.Context) {
 		return
 	}
 
-	h.cache.Set(ctx, cacheKey, channelsDTO, 15*time.Minute)
+	h.cache.Set(ctx.Request.Context(), cacheKey, channelsDTO, 5*time.Minute)
 
 	ctx.JSON(http.StatusOK, channelsDTO)
 }
 
 // POST /api/v1/channels/
-func (h *HTTPHandler) CreateChannel(ctx *gin.Context) {
+func (h *HTTPHandler) handleCreateChannel(ctx *gin.Context) {
 	creatorID := ctx.GetHeader("X-User-ID")
 	if creatorID == "" {
 		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
@@ -113,7 +114,7 @@ func (h *HTTPHandler) CreateChannel(ctx *gin.Context) {
 }
 
 // GET /api/v1/channels/:channelId
-func (h *HTTPHandler) GetChannel(ctx *gin.Context) {
+func (h *HTTPHandler) handleGetChannel(ctx *gin.Context) {
 	var req ChannelIDUri
 	if err := ctx.ShouldBindUri(&req); err != nil {
 		ctx.JSON(http.StatusBadRequest, errorResponse(err))
@@ -126,7 +127,7 @@ func (h *HTTPHandler) GetChannel(ctx *gin.Context) {
 	}
 
 	cacheKey := fmt.Sprintf("channel:%s", channelId.String())
-	var cachedChannel interface{}
+	var cachedChannel domain.ChannelDTO
 	if hit, _ := h.cache.GetWithMetrics(ctx.Request.Context(), cacheKey, &cachedChannel); hit {
 		ctx.JSON(http.StatusOK, cachedChannel)
 		return
@@ -146,13 +147,13 @@ func (h *HTTPHandler) GetChannel(ctx *gin.Context) {
 		return
 	}
 
-	h.cache.Set(ctx.Request.Context(), cacheKey, channelDTO, 15*time.Minute)
+	h.cache.Set(ctx.Request.Context(), cacheKey, *channelDTO, 10*time.Minute)
 
 	ctx.JSON(http.StatusOK, channelDTO)
 }
 
 // POST /api/v1/channels/:channelId/bots
-func (h *HTTPHandler) AddBotToChannel(ctx *gin.Context) {
+func (h *HTTPHandler) handleAddBotToChannel(ctx *gin.Context) {
 	var channelIdUri ChannelIDUri
 
 	if err := ctx.ShouldBindUri(&channelIdUri); err != nil {
@@ -197,7 +198,7 @@ func (h *HTTPHandler) AddBotToChannel(ctx *gin.Context) {
 }
 
 // PUT /api/v1/channels/:channelId/archive
-func (h *HTTPHandler) ArchiveChannel(ctx *gin.Context) {
+func (h *HTTPHandler) handleArchiveChannel(ctx *gin.Context) {
 	var req ChannelIDUri
 	if err := ctx.ShouldBindUri(&req); err != nil {
 		ctx.JSON(http.StatusBadRequest, errorResponse(err))
@@ -208,7 +209,7 @@ func (h *HTTPHandler) ArchiveChannel(ctx *gin.Context) {
 }
 
 // PUT /api/v1/channels/:channelId/unarchive
-func (h *HTTPHandler) UnarchiveChannel(ctx *gin.Context) {
+func (h *HTTPHandler) handleUnarchiveChannel(ctx *gin.Context) {
 	var req ChannelIDUri
 	if err := ctx.ShouldBindUri(&req); err != nil {
 		ctx.JSON(http.StatusBadRequest, errorResponse(err))
@@ -221,7 +222,7 @@ func (h *HTTPHandler) UnarchiveChannel(ctx *gin.Context) {
 }
 
 // POST /api/v1/channels/:channelId/join
-func (h *HTTPHandler) JoinChannel(ctx *gin.Context) {
+func (h *HTTPHandler) handleJoinChannel(ctx *gin.Context) {
 	var req JoinChannelRequest
 	var uriReq ChannelIDUri
 
@@ -269,7 +270,7 @@ func (h *HTTPHandler) JoinChannel(ctx *gin.Context) {
 
 // POST /api/v1/channels/:channelId/messages
 // FIXME: redundant, should be removed
-func (h *HTTPHandler) SendMessage(ctx *gin.Context) {
+func (h *HTTPHandler) handleSendMessage(ctx *gin.Context) {
 	userID := ctx.GetHeader("X-User-ID")
 	if userID == "" {
 		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
@@ -333,16 +334,18 @@ func (h *HTTPHandler) SendMessage(ctx *gin.Context) {
 }
 
 // GET /api/v1/channels/:channelId/messages
-func (h *HTTPHandler) GetMessages(ctx *gin.Context) {
+func (h *HTTPHandler) handleGetMessages(ctx *gin.Context) {
 	var uriReq ChannelIDUri
 
 	if err := ctx.ShouldBindUri(&uriReq); err != nil {
+		log.Printf("Error binding URI: %v", err)
 		ctx.JSON(http.StatusBadRequest, errorResponse(err))
 		return
 	}
 
 	channelId, err := uuid.Parse(uriReq.ChannelID)
 	if err != nil {
+		log.Printf("Error parsing channel ID: %v", err)
 		ctx.JSON(http.StatusBadRequest, errorResponse(err))
 		return
 	}
@@ -355,7 +358,7 @@ func (h *HTTPHandler) GetMessages(ctx *gin.Context) {
 
 	messages, err := h.messageService.HandleListMessages(ctx, cmd)
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, errorResponse(err))
+		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
 		return
 	}
 
@@ -369,7 +372,7 @@ func (h *HTTPHandler) GetMessages(ctx *gin.Context) {
 }
 
 // POST /api/v1/channels/:channelId/messages/:messageId/reactions
-func (h *HTTPHandler) AddReaction(ctx *gin.Context) {
+func (h *HTTPHandler) handleAddReaction(ctx *gin.Context) {
 	var req AddReactionRequest
 	var channelIdUri ChannelIDUri
 	var messageIdUri MessageIDUri
@@ -422,7 +425,7 @@ func (h *HTTPHandler) AddReaction(ctx *gin.Context) {
 }
 
 // DELETE /api/v1/channels/:channelId/messages/:messageId/reactions
-func (h *HTTPHandler) RemoveReaction(ctx *gin.Context) {
+func (h *HTTPHandler) handleRemoveReaction(ctx *gin.Context) {
 	var req RemoveReactionRequest
 	var channelIdUri ChannelIDUri
 	var messageIdUri MessageIDUri

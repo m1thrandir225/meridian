@@ -46,23 +46,21 @@ func (s *GRPCServer) ValidateToken(ctx context.Context, req *identitypb.Validate
 		return nil, fmt.Errorf("invalid token: %v", err)
 	}
 
-	response := identitypb.ValidateTokenResponse{
+	response := &identitypb.ValidateTokenResponse{
 		UserId: claims.Custom.UserID,
 	}
 
 	s.cache.Set(ctx, cacheKey, response, 15*time.Minute)
 
-	return &response, nil
+	return response, nil
 }
 
 func (s *GRPCServer) GetUserByID(ctx context.Context, req *identitypb.GetUserByIDRequest) (*identitypb.GetUserByIDResponse, error) {
 
 	cacheKey := fmt.Sprintf("grpc_user:%s", req.UserId)
-	var cachedUser identitypb.User
+	var cachedUser identitypb.GetUserByIDResponse
 	if hit, _ := s.cache.GetWithMetrics(ctx, cacheKey, &cachedUser); hit {
-		return &identitypb.GetUserByIDResponse{
-			User: &cachedUser,
-		}, nil
+		return &cachedUser, nil
 	}
 
 	cmd := domain.GetUserCommand{
@@ -74,7 +72,7 @@ func (s *GRPCServer) GetUserByID(ctx context.Context, req *identitypb.GetUserByI
 		return nil, fmt.Errorf("failed to get user by ID: %v", err)
 	}
 
-	response := identitypb.GetUserByIDResponse{
+	response := &identitypb.GetUserByIDResponse{
 		User: &identitypb.User{
 			Id:        user.ID.String(),
 			Username:  user.Username.String(),
@@ -86,7 +84,7 @@ func (s *GRPCServer) GetUserByID(ctx context.Context, req *identitypb.GetUserByI
 
 	s.cache.Set(ctx, cacheKey, response, 15*time.Minute)
 
-	return &response, nil
+	return response, nil
 }
 
 func (s *GRPCServer) GetUsers(ctx context.Context, req *identitypb.GetUsersRequest) (*identitypb.GetUsersResponse, error) {
@@ -116,13 +114,13 @@ func (s *GRPCServer) GetUsers(ctx context.Context, req *identitypb.GetUsersReque
 		}
 	}
 
-	response := identitypb.GetUsersResponse{
+	response := &identitypb.GetUsersResponse{
 		Users: pbUsers,
 	}
 
 	s.cache.Set(ctx, cacheKey, response, 15*time.Minute)
 
-	return &response, nil
+	return response, nil
 }
 
 func StartGRPCServer(

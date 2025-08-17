@@ -173,16 +173,19 @@ func (s *MessageService) ToMessageDTOs(ctx context.Context, messages []domain.Me
 
 // ToMessageDTO returns the message as a DTO
 func (s *MessageService) ToMessageDTO(ctx context.Context, message *domain.Message) (*domain.MessageDTO, error) {
-	if message.GetSenderUserId() != nil {
-		user, err := s.getSenderUser(ctx, message.GetSenderUserId().String())
+	senderUserID := message.GetSenderUserId()
+	integrationID := message.GetIntegrationId()
+
+	if senderUserID != nil {
+		user, err := s.getSenderUser(ctx, senderUserID.String())
 		if err != nil {
 			return nil, err
 		}
 		dto := domain.ToMessageDTO(message, user, nil)
 		return &dto, nil
 	}
-	if message.GetIntegrationId() != nil {
-		integrationBot, err := s.getSenderIntegrationBot(ctx, message.GetIntegrationId().String())
+	if integrationID != nil {
+		integrationBot, err := s.getSenderIntegrationBot(ctx, integrationID.String())
 		if err != nil {
 			return nil, err
 		}
@@ -199,6 +202,7 @@ func (s *MessageService) getSenderUser(ctx context.Context, userID string) (*dom
 	if err != nil {
 		return nil, err
 	}
+
 	userId, err := uuid.Parse(pbUser.User.Id)
 	if err != nil {
 		return nil, err
@@ -214,6 +218,18 @@ func (s *MessageService) getSenderIntegrationBot(ctx context.Context, id string)
 	pbIntegration, err := s.integrationClient.GetIntegration(ctx, id)
 	if err != nil {
 		return nil, err
+	}
+
+	if pbIntegration == nil {
+		return nil, fmt.Errorf("integration response is nil")
+	}
+
+	if pbIntegration.Integration == nil {
+		return nil, fmt.Errorf("integration data is nil")
+	}
+
+	if pbIntegration.Integration.Id == "" {
+		return nil, fmt.Errorf("integration ID is empty")
 	}
 
 	integrationID, err := uuid.Parse(pbIntegration.Integration.Id)

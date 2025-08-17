@@ -64,7 +64,7 @@ func (h *HTTPHandler) handleRegisterIntegration(ctx *gin.Context) {
 		Token:          token,
 	}
 
-	cacheKey := fmt.Sprintf("integration:%s", integration.ID)
+	cacheKey := fmt.Sprintf("integration:%s", integration.ID.String())
 	h.cache.Set(ctx, cacheKey, resp, 15*time.Minute)
 
 	ctx.JSON(http.StatusOK, resp)

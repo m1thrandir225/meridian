@@ -20,23 +20,23 @@ func SetupRoutes(
 
 		channelsGroup := apiV1.Group("/channels")
 		{
-			channelsGroup.GET("/", httpHandler.GetUserChannels)
-			channelsGroup.POST("/", httpHandler.CreateChannel)
-			channelsGroup.GET("/:channelId", httpHandler.GetChannel)
-			channelsGroup.POST("/:channelId/join", httpHandler.JoinChannel)
-			channelsGroup.PUT("/:channelId/archive", httpHandler.ArchiveChannel)
-			channelsGroup.PUT("/:channelId/unarchive", httpHandler.UnarchiveChannel)
-			channelsGroup.POST("/:channelId/bots", httpHandler.AddBotToChannel)
+			channelsGroup.GET("/", httpHandler.handleGetUserChannels)
+			channelsGroup.POST("/", httpHandler.handleCreateChannel)
+			channelsGroup.GET("/:channelId", httpHandler.handleGetChannel)
+			channelsGroup.POST("/:channelId/join", httpHandler.handleJoinChannel)
+			channelsGroup.PUT("/:channelId/archive", httpHandler.handleArchiveChannel)
+			channelsGroup.PUT("/:channelId/unarchive", httpHandler.handleUnarchiveChannel)
+			channelsGroup.POST("/:channelId/bots", httpHandler.handleAddBotToChannel)
 
 			messagesGroup := channelsGroup.Group("/:channelId/messages")
 			{
-				messagesGroup.GET("/", httpHandler.GetMessages)
-				messagesGroup.POST("/", httpHandler.SendMessage)
+				messagesGroup.GET("", httpHandler.handleGetMessages)
+				messagesGroup.POST("", httpHandler.handleSendMessage)
 
 				reactionsGroup := messagesGroup.Group("/:messageId/reactions")
 				{
-					reactionsGroup.PUT("/", httpHandler.AddReaction)
-					reactionsGroup.DELETE("/", httpHandler.RemoveReaction)
+					reactionsGroup.PUT("/", httpHandler.handleAddReaction)
+					reactionsGroup.DELETE("/", httpHandler.handleRemoveReaction)
 				}
 			}
 		}
