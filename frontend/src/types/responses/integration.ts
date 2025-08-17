@@ -1,3 +1,5 @@
+import type { IntegrationBot } from '../models/integration_bot'
+
 export type CreateIntegrationRequest = {
   service_name: string
   target_channel_ids: string[]
@@ -17,16 +19,13 @@ export type RevokeIntegrationRequest = {
   integration_id: string
 }
 
-export type WebhookMessageRequest = {
-  content_text: string
-  target_channel_id?: string
-  parent_message_id?: string
-  metadata?: Record<string, string>
+export type UpdateIntegrationRequest = {
+  integration_id: string
+  target_channel_ids: string[]
 }
 
-export type CallbackMessageRequest = {
-  content_text: string
-  target_channel_id?: string
-  parent_message_id?: string
-  metadata?: Record<string, string>
+export type UpdateIntegrationResponse = IntegrationBot
+
+export type ListIntegrationResponse = {
+  integrations: IntegrationBot[]
 }

@@ -9,6 +9,7 @@ import ProfileView from '@/views/settings/ProfileView.vue'
 import PasswordView from '@/views/settings/PasswordView.vue'
 import AppearanceView from '@/views/settings/AppearanceView.vue'
 import { useAuthStore } from '@/stores/auth'
+import BotManagementView from '@/views/BotManagementView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -30,6 +31,12 @@ const router = createRouter({
       path: '/bot-registration',
       name: 'bot-registration',
       component: BotRegistrationView,
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/bot-management',
+      name: 'bot-management',
+      component: BotManagementView,
       meta: { requiresAuth: true },
     },
     // Settings routes

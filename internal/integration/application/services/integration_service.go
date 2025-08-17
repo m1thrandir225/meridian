@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/google/uuid"
 	"github.com/m1thrandir225/meridian/internal/integration/domain"
 	"github.com/m1thrandir225/meridian/internal/integration/infrastructure/persistence"
 	"github.com/m1thrandir225/meridian/pkg/kafka"
@@ -116,6 +117,62 @@ func (s *IntegrationService) GetIntegration(ctx context.Context, cmd domain.GetI
 		return nil, err
 	}
 
+	return integration, nil
+}
+
+func (s *IntegrationService) ListIntegrations(ctx context.Context, cmd domain.ListIntegrationsCommand) ([]*domain.Integration, error) {
+	if cmd.CreatorUserID == "" {
+		return nil, errors.New("creator user ID cannot be empty")
+	}
+
+	creatorUserID, err := uuid.Parse(cmd.CreatorUserID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid creator user ID: %w", err)
+	}
+
+	integrations, err := s.repo.FindByCreatorUserID(ctx, creatorUserID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find integrations: %w", err)
+	}
+
+	return integrations, nil
+}
+
+func (s *IntegrationService) UpdateIntegration(ctx context.Context, cmd domain.UpdateIntegrationCommand) (*domain.Integration, error) {
+	integrationID, err := domain.NewIntegrationIDFromString(cmd.IntegrationID)
+
+	integration, err := s.repo.FindByID(ctx, integrationID.Value())
+	if err != nil {
+		return nil, err
+	}
+
+	requestorId, err := domain.NewUserIDRef(cmd.RequestorID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid requestor ID: %w", err)
+	}
+
+	if integration.CreatorUserID != requestorId {
+		return nil, domain.ErrForbidden
+	}
+	if integration.IsRevoked {
+		return nil, domain.ErrIntegrationRevoked
+	}
+
+	targetChannels := make([]domain.ChannelIDRef, len(cmd.TargetChannelIDs))
+	for i, channelID := range cmd.TargetChannelIDs {
+		targetChannels[i] = domain.ChannelIDRef(channelID)
+	}
+
+	if err := integration.UpdateTargetChannels(targetChannels); err != nil {
+		return nil, fmt.Errorf("failed to update target channels: %w", err)
+	}
+
+	if err := s.repo.Save(ctx, integration); err != nil {
+		return nil, fmt.Errorf("failed to save updated integration: %w", err)
+	}
+
+	s.dispatchEvents(ctx, integration)
+	log.Printf("Successfully updated integration %s", integration.ID.String())
 	return integration, nil
 }
 

@@ -15,6 +15,16 @@ type GetIntegrationCommand struct {
 	IntegrationID string
 }
 
+type ListIntegrationsCommand struct {
+	CreatorUserID string
+}
+
+type UpdateIntegrationCommand struct {
+	IntegrationID    string
+	RequestorID      string
+	TargetChannelIDs []string
+}
+
 type RegisterIntegrationAsBotInChannelCommand struct {
 	IntegrationID string
 	ChannelIDs    []string

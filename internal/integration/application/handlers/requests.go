@@ -25,6 +25,10 @@ type CallbackMessageRequest struct {
 	Metadata        map[string]string `json:"metadata,omitempty"`
 }
 
+type UpdateIntegrationRequest struct {
+	TargetChannelIDs []string `json:"target_channel_ids" binding:"required"`
+}
+
 func errorResponse(err error) gin.H {
 	return gin.H{"error": err.Error()}
 }

@@ -2,7 +2,10 @@ import config from '@/lib/config'
 import type {
   CreateIntegrationRequest,
   CreateIntegrationResponse,
+  ListIntegrationResponse,
   RevokeIntegrationRequest,
+  UpdateIntegrationRequest,
+  UpdateIntegrationResponse,
 } from '@/types/responses/integration'
 import { apiRequest } from './api.service'
 
@@ -26,6 +29,23 @@ const integrationService = {
       params: undefined,
       protected: true,
       data: input,
+    }),
+  updateIntegration: (input: UpdateIntegrationRequest) =>
+    apiRequest<UpdateIntegrationResponse>({
+      method: 'PUT',
+      url: `${integrationApiURL}/${input.integration_id}`,
+      headers: undefined,
+      params: undefined,
+      protected: true,
+      data: input,
+    }),
+  listIntegrations: () =>
+    apiRequest<ListIntegrationResponse>({
+      method: 'GET',
+      url: integrationApiURL,
+      headers: undefined,
+      params: undefined,
+      protected: true,
     }),
 }
 

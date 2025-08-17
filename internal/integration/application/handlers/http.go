@@ -34,6 +34,37 @@ func NewHttpHandler(
 	}
 }
 
+// GET /api/v1/integrations
+func (h *HTTPHandler) handleListIntegrations(ctx *gin.Context) {
+	requestorID := ctx.GetHeader("X-User-ID")
+	if requestorID == "" {
+		ctx.JSON(http.StatusUnauthorized, errorResponse(fmt.Errorf("missing requestor ID")))
+		return
+	}
+
+	cmd := domain.ListIntegrationsCommand{
+		CreatorUserID: requestorID,
+	}
+
+	integrations, err := h.integrationService.ListIntegrations(ctx, cmd)
+	if err != nil {
+		log.Printf("ERROR: Failed to list integrations: %v", err)
+		ctx.JSON(http.StatusInternalServerError, errorResponse(fmt.Errorf("internal server error")))
+		return
+	}
+
+	// Convert to DTOs
+	var dtos []IntegrationDTO
+	for _, integration := range integrations {
+		dto := ToIntegrationDTO(integration, "")
+		dtos = append(dtos, dto)
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"integrations": dtos,
+	})
+}
+
 // POST /api/v1/integrations
 func (h *HTTPHandler) handleRegisterIntegration(ctx *gin.Context) {
 	creatorID := ctx.GetHeader("X-User-ID")
@@ -130,6 +161,61 @@ func (h *HTTPHandler) handleRevokeIntegration(ctx *gin.Context) {
 	h.cache.Delete(ctx, cacheKey)
 
 	ctx.Status(http.StatusNoContent)
+}
+
+// PUT /api/v1/integrations
+func (h *HTTPHandler) handleUpdateIntegration(ctx *gin.Context) {
+	requestorID := ctx.GetHeader("X-User-ID")
+	if requestorID == "" {
+		ctx.JSON(http.StatusUnauthorized, errorResponse(fmt.Errorf("missing requestor ID")))
+		return
+	}
+
+	integrationID := ctx.Param("id")
+	if integrationID == "" {
+		ctx.JSON(http.StatusBadRequest, errorResponse(fmt.Errorf("missing integration ID")))
+		return
+	}
+
+	var req UpdateIntegrationRequest
+	if err := ctx.BindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, errorResponse(err))
+		return
+	}
+
+	cmd := domain.UpdateIntegrationCommand{
+		IntegrationID:    integrationID,
+		RequestorID:      requestorID,
+		TargetChannelIDs: req.TargetChannelIDs,
+	}
+
+	integration, err := h.integrationService.UpdateIntegration(ctx, cmd)
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			ctx.JSON(http.StatusNotFound, errorResponse(fmt.Errorf("integration not found")))
+		} else if errors.Is(err, domain.ErrForbidden) {
+			ctx.JSON(http.StatusForbidden, errorResponse(fmt.Errorf("forbidden")))
+		} else if errors.Is(err, domain.ErrIntegrationRevoked) {
+			ctx.JSON(http.StatusBadRequest, errorResponse(fmt.Errorf("cannot update revoked integration")))
+		} else {
+			log.Printf("ERROR: Failed to update integration: %v", err)
+			ctx.JSON(http.StatusInternalServerError, errorResponse(fmt.Errorf("internal server error")))
+		}
+		return
+	}
+
+	for _, channelID := range req.TargetChannelIDs {
+		channelCacheKey := fmt.Sprintf("channel:%s", channelID)
+		h.cache.Delete(ctx, channelCacheKey)
+		log.Printf("Invalidated cache for channel: %s", channelID)
+
+		userChannelsCacheKey := fmt.Sprintf("user_channels:%s", requestorID)
+		h.cache.Delete(ctx, userChannelsCacheKey)
+		log.Printf("Invalidated user channels cache for user: %s", requestorID)
+	}
+
+	resp := ToIntegrationDTO(integration, "")
+	ctx.JSON(http.StatusOK, resp)
 }
 
 func (h *HTTPHandler) handleGetMetrics(ctx *gin.Context) {

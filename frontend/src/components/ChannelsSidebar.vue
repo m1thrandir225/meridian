@@ -159,6 +159,31 @@ const createChannel = handleSubmit(async (values) => {
             </RouterLink>
           </div>
         </div>
+        <div class="mt-6 pt-4 border-t">
+          <div class="flex items-center justify-between px-2 py-1 mb-2">
+            <h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Integrations
+            </h3>
+          </div>
+          <div class="space-y-0.5">
+            <RouterLink
+              to="/bot-registration"
+              class="flex items-center gap-2 px-2 py-1.5 rounded text-sm transition-colors hover:bg-accent/50"
+              active-class="bg-accent text-accent-foreground"
+            >
+              <Plus class="h-3 w-3" />
+              <span class="flex-1 truncate">Create Bot</span>
+            </RouterLink>
+            <RouterLink
+              to="/bot-management"
+              class="flex items-center gap-2 px-2 py-1.5 rounded text-sm transition-colors hover:bg-accent/50"
+              active-class="bg-accent text-accent-foreground"
+            >
+              <Bot class="h-3 w-3" />
+              <span class="flex-1 truncate">Manage Bots</span>
+            </RouterLink>
+          </div>
+        </div>
       </div>
     </SidebarContent>
 

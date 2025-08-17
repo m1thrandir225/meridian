@@ -30,6 +30,8 @@ func SetupIntegrationRouter(
 		{
 			integrations.POST("", handler.handleRegisterIntegration)
 			integrations.DELETE("/:id", handler.handleRevokeIntegration)
+			integrations.PUT("/:id", handler.handleUpdateIntegration)
+			integrations.GET("", handler.handleListIntegrations)
 		}
 
 		webhookGroup := apiV1.Group("/integrations/webhook")

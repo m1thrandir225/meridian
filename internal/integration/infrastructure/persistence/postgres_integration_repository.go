@@ -80,6 +80,33 @@ func (r *PostgresIntegrationRepository) FindByTokenLookupHash(ctx context.Contex
 	return r.scanIntegration(row)
 }
 
+func (r *PostgresIntegrationRepository) FindByCreatorUserID(ctx context.Context, creatorUserID uuid.UUID) ([]*domain.Integration, error) {
+	query := `SELECT id, service_name, creator_user_id, api_token_hash,
+	                 token_lookup_hash, target_channel_ids, created_at, is_revoked
+	          FROM integrations WHERE creator_user_id = $1 ORDER BY created_at DESC`
+
+	rows, err := r.db.Query(ctx, query, creatorUserID.String())
+	if err != nil {
+		return nil, fmt.Errorf("failed to query integrations: %w", err)
+	}
+	defer rows.Close()
+
+	var integrations []*domain.Integration
+	for rows.Next() {
+		integration, err := r.scanIntegration(rows)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan integration: %w", err)
+		}
+		integrations = append(integrations, integration)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating over rows: %w", err)
+	}
+
+	return integrations, nil
+}
+
 func (r *PostgresIntegrationRepository) scanIntegration(row pgx.Row) (*domain.Integration, error) {
 	var integ domain.Integration
 	var id uuid.UUID
