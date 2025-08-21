@@ -53,7 +53,8 @@ export const useAppearanceStore = defineStore(
       return {
         // Primary colors
         primary: `${baseHue} 91% ${isDark ? '65%' : '56%'}`,
-        primaryForeground: isDark ? '0 0% 98%' : '0 0% 2%',
+        // Use white for light theme and very light gray for dark theme for better readability
+        primaryForeground: isDark ? '0 0% 100%' : '0 0% 100%',
 
         // Background colors - tinted with accent
         background: isDark
@@ -88,7 +89,8 @@ export const useAppearanceStore = defineStore(
         sidebar: isDark ? `${baseHue} 25% 8%` : `${baseHue} 35% 95%`,
         sidebarForeground: isDark ? `${baseHue} 8% 88%` : `${baseHue} 18% 15%`,
         sidebarPrimary: `${baseHue} 91% ${isDark ? '65%' : '56%'}`,
-        sidebarPrimaryForeground: isDark ? '0 0% 98%' : '0 0% 2%',
+        // Also update sidebar primary foreground for consistency
+        sidebarPrimaryForeground: isDark ? '0 0% 100%' : '0 0% 100%',
         sidebarAccent: isDark ? `${baseHue} 30% 20%` : `${baseHue} 40% 88%`,
         sidebarAccentForeground: isDark ? `${baseHue} 10% 85%` : `${baseHue} 25% 20%`,
         sidebarBorder: isDark ? `${baseHue} 20% 15%` : `${baseHue} 30% 82%`,

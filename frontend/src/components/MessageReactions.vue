@@ -47,37 +47,20 @@ const handleReactionClick = (reactionType: string) => {
     messageStore.addReaction(props.message.id, reactionType)
   }
 }
-
-const quickReactions = ['👍', '❤️', '😂', '😮', '😢', '😡']
 </script>
 
 <template>
-  <div class="flex flex-wrap gap-1 mt-2">
-    <!-- Existing reactions -->
+  <div v-if="reactionGroups.length > 0" class="flex flex-wrap gap-1 mt-2">
     <Button
       v-for="group in reactionGroups"
       :key="group.type"
       variant="secondary"
       size="sm"
-      class="h-6 px-2 text-xs"
+      class="h-6 px-2 text-xs transition-all duration-200 hover:scale-105"
       :class="{ 'bg-primary text-primary-foreground': group.hasUserReacted }"
       @click="handleReactionClick(group.type)"
     >
       {{ group.type }} {{ group.count }}
     </Button>
-
-    <!-- Quick reaction buttons (visible on hover) -->
-    <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-      <Button
-        v-for="emoji in quickReactions"
-        :key="emoji"
-        variant="ghost"
-        size="sm"
-        class="h-6 w-6 p-0 text-xs"
-        @click="handleReactionClick(emoji)"
-      >
-        {{ emoji }}
-      </Button>
-    </div>
   </div>
 </template>

@@ -11,6 +11,7 @@ import { useAuthStore } from '@/stores/auth'
 import websocketService from '@/services/websocket.service'
 import { getUserInitials, getUserDisplayName } from '@/lib/utils'
 import type { Message } from '@/types/models/message'
+import MessageActionsPopup from './MessageActionsPopup.vue'
 import MessageReactions from './MessageReactions.vue'
 
 // Props and emits
@@ -35,20 +36,25 @@ const messageStore = useMessageStore()
 const channelStore = useChannelStore()
 const authStore = useAuthStore()
 
-// Chat scroll management
+// State
 const messagesContainer = ref<HTMLElement | null>(null)
 const typingTimeout = ref<number | null>(null)
 const isTyping = ref<boolean>(false)
 const newMessage = ref<string>('')
 const replyingTo = ref<Message | null>(null)
-
+// Remove the hover state management since we're using hover-card now
+// const hoveredMessageId = ref<string | null>(null)
+const messages = computed(() => messageStore.currentMessages)
+const currentChannel = computed(() => channelStore.getCurrentChannel)
+const isLoading = computed(() => messageStore.loading)
 // Computed styles based on appearance settings
-const messageContainerClasses = computed(() => {
-  const baseClasses = 'flex gap-3 group transition-all duration-200 rounded-lg hover:bg-accent/25'
+const messageContainerClasses = () => {
+  const baseClasses =
+    'flex gap-3 group transition-all duration-200 rounded-lg hover:bg-accent/25 border border-transparent'
   const sizeClasses = appearanceStore.messageDisplayMode === 'compact' ? 'px-2 py-1' : 'px-3 py-2'
 
   return `${baseClasses} ${sizeClasses}`
-})
+}
 
 const messageTextClasses = computed(() => {
   const baseClasses = 'leading-relaxed mb-2'
@@ -65,10 +71,10 @@ const messageSpacing = computed(() => {
   return appearanceStore.messageDisplayMode === 'compact' ? 'space-y-1' : 'space-y-4'
 })
 
-const messages = computed(() => messageStore.currentMessages)
-const currentChannel = computed(() => channelStore.getCurrentChannel)
-const isLoading = computed(() => messageStore.loading)
+// Methods
+// Remove the handleMessageHover function since we don't need it anymore
 
+// Update scrollToBottom to remove hover check
 const scrollToBottom = () => {
   nextTick(() => {
     if (messagesContainer.value) {
@@ -194,6 +200,10 @@ onMounted(() => {
     scrollToBottom()
   })
 })
+
+const handleReply = (message: Message) => {
+  startReply(message)
+}
 </script>
 
 <template>
@@ -243,99 +253,89 @@ onMounted(() => {
       </div>
 
       <div v-else :class="messageSpacing">
-        <div
+        <MessageActionsPopup
           v-for="message in messages"
           :key="message.id"
-          :class="messageContainerClasses"
-          class="flex gap-3"
+          :message="message"
+          @reply="handleReply"
         >
-          <!-- Avatar -->
-          <Avatar :class="avatarSize" v-if="message.sender_user_id">
-            <AvatarFallback v-if="message.sender_user_id">
-              {{
-                message.sender_user_id === authStore.user?.id
-                  ? `${getUserInitials(authStore.userDisplayName())}`
-                  : getUserInitials(
-                      `${message.sender_user?.first_name} ${message.sender_user?.last_name}`,
-                    )
-              }}
-            </AvatarFallback>
-          </Avatar>
-          <Avatar :class="avatarSize" v-else-if="message.integration_id">
-            <AvatarFallback>
-              <Bot />
-            </AvatarFallback>
-          </Avatar>
+          <div :class="messageContainerClasses()" class="flex gap-3 relative w-full">
+            <!-- Avatar -->
+            <Avatar :class="avatarSize" v-if="message.sender_user_id">
+              <AvatarFallback v-if="message.sender_user_id">
+                {{
+                  message.sender_user_id === authStore.user?.id
+                    ? `${getUserInitials(authStore.userDisplayName())}`
+                    : getUserInitials(
+                        `${message.sender_user?.first_name} ${message.sender_user?.last_name}`,
+                      )
+                }}
+              </AvatarFallback>
+            </Avatar>
+            <Avatar :class="avatarSize" v-else-if="message.integration_id">
+              <AvatarFallback>
+                <Bot />
+              </AvatarFallback>
+            </Avatar>
 
-          <!-- Message Content -->
-          <div class="flex-1 min-w-0">
-            <div v-if="message.parent_message_id" class="mb-1">
-              <div class="flex items-center gap-1 text-xs text-muted-foreground">
-                <Reply class="h-3 w-3" />
-                <span>Replying to</span>
-                <span class="font-medium">
+            <!-- Message Content -->
+            <div class="flex-1 min-w-0">
+              <div v-if="message.parent_message_id" class="mb-1">
+                <div class="flex items-center gap-1 text-xs text-muted-foreground">
+                  <Reply class="h-3 w-3" />
+                  <span>Replying to</span>
+                  <span class="font-medium" v-if="getParentMessage(message)?.sender_user_id">
+                    {{
+                      getParentMessage(message)?.sender_user_id === authStore.user?.id
+                        ? 'You'
+                        : getUserDisplayName(
+                            getParentMessage(message)?.sender_user?.first_name ?? '',
+                            getParentMessage(message)?.sender_user?.last_name ?? '',
+                          )
+                    }}
+                  </span>
+                  <span class="font-medium" v-else-if="getParentMessage(message)?.integration_id">
+                    {{ getParentMessage(message)?.integration_bot?.service_name }}
+                  </span>
+                </div>
+                <div class="text-xs text-muted-foreground truncate max-w-xs">
+                  {{ getParentMessage(message)?.content_text }}
+                </div>
+              </div>
+
+              <div class="flex items-center gap-2 mb-1">
+                <span
+                  class="font-semibold text-primary text-[10px]"
+                  v-if="message.sender_user_id && message.sender_user_id !== authStore.user?.id"
+                >
+                  @{{ message.sender_user?.username }}
+                </span>
+                <span class="font-medium text-sm" v-if="message.sender_user_id">
                   {{
-                    getParentMessage(message)?.sender_user_id === authStore.user?.id
+                    message.sender_user_id === authStore.user?.id
                       ? 'You'
                       : getUserDisplayName(
-                          getParentMessage(message)?.sender_user?.first_name ?? '',
-                          getParentMessage(message)?.sender_user?.last_name ?? '',
+                          message.sender_user?.first_name ?? '',
+                          message.sender_user?.last_name ?? '',
                         )
                   }}
                 </span>
+                <span class="font-medium text-sm" v-else-if="message.integration_id">
+                  {{ message.integration_bot?.service_name }}
+                </span>
+                <span class="text-xs text-muted-foreground">
+                  {{ formatTime(message.created_at) }}
+                </span>
               </div>
-              <div class="text-xs text-muted-foreground truncate max-w-xs">
-                {{ getParentMessage(message)?.content_text }}
+
+              <div :class="messageTextClasses">
+                {{ message.content_text }}
               </div>
-            </div>
 
-            <div class="flex items-center gap-2 mb-1">
-              <span
-                class="font-semibold text-primary text-[10px]"
-                v-if="message.sender_user_id && message.sender_user_id !== authStore.user?.id"
-              >
-                @{{ message.sender_user?.username }}
-              </span>
-              <span class="font-medium text-sm" v-if="message.sender_user_id">
-                {{
-                  message.sender_user_id === authStore.user?.id
-                    ? 'You'
-                    : getUserDisplayName(
-                        message.sender_user?.first_name ?? '',
-                        message.sender_user?.last_name ?? '',
-                      )
-                }}
-              </span>
-              <span class="font-medium text-sm" v-else-if="message.integration_id">
-                {{ message.integration_bot?.service_name }}
-              </span>
-              <span class="text-xs text-muted-foreground">
-                {{ formatTime(message.created_at) }}
-              </span>
+              <MessageReactions :message="message" />
             </div>
-
-            <div :class="messageTextClasses">
-              {{ message.content_text }}
-            </div>
-
-            <!-- Message actions visible on hover-->
-            <div
-              class="flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity"
-            >
-              <Button
-                variant="ghost"
-                size="sm"
-                class="h-6 px-2 text-xs"
-                @click="startReply(message)"
-              >
-                <Reply class="h-3 w-3 mr-1" />
-                Reply
-              </Button>
-            </div>
-
-            <MessageReactions :message="message" />
           </div>
-        </div>
+        </MessageActionsPopup>
       </div>
     </div>
 
