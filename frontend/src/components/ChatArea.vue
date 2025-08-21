@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, watch, onMounted, onUnmounted } from 'vue'
-import { Hash, Users, Send, Smile, Menu, Paperclip, Bot } from 'lucide-vue-next'
+import { Hash, Users, Send, Smile, Menu, Paperclip, Bot, Reply } from 'lucide-vue-next'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -10,6 +10,7 @@ import { useMessageStore } from '@/stores/message'
 import { useAuthStore } from '@/stores/auth'
 import websocketService from '@/services/websocket.service'
 import { getUserInitials, getUserDisplayName } from '@/lib/utils'
+import type { Message } from '@/types/models/message'
 
 // Props and emits
 interface Props {
@@ -40,6 +41,7 @@ const scrollToBottomTimeout = ref<number | null>(null)
 const typingTimeout = ref<number | null>(null)
 const isTyping = ref<boolean>(false)
 const newMessage = ref<string>('')
+const replyingTo = ref<Message | null>(null)
 
 // Computed styles based on appearance settings
 const messageContainerClasses = computed(() => {
@@ -88,15 +90,38 @@ const sendMessage = () => {
   if (newMessage.value.trim() && currentChannel.value?.id) {
     console.log('Sending message:', newMessage.value)
 
-    messageStore.sendMessage(newMessage.value, currentChannel.value.id)
+    messageStore.sendMessage(newMessage.value, currentChannel.value.id, replyingTo.value?.id)
 
     // Clear input
     newMessage.value = ''
+    replyingTo.value = null
 
     stopTyping()
   }
 }
 
+const startReply = (message: Message) => {
+  replyingTo.value = message
+
+  nextTick(() => {
+    const input = document.querySelector(
+      'input[placeholder="Type a message..."]',
+    ) as HTMLInputElement
+    if (input) {
+      input.focus()
+    }
+  })
+}
+
+const cancelReply = () => {
+  replyingTo.value = null
+}
+
+const getParentMessage = (message: Message): Message | null => {
+  if (!message.parent_message_id) return null
+
+  return messages.value.find((m) => m.id === message.parent_message_id) ?? null
+}
 const startTyping = () => {
   if (!currentChannel.value?.id || isTyping.value) return
 
@@ -330,6 +355,26 @@ onMounted(() => {
 
           <!-- Message Content -->
           <div class="flex-1 min-w-0">
+            <div v-if="message.parent_message_id" class="mb-1">
+              <div class="flex items-center gap-1 text-xs text-muted-foreground">
+                <Reply class="h-3 w-3" />
+                <span>Replying to</span>
+                <span class="font-medium">
+                  {{
+                    getParentMessage(message)?.sender_user_id === authStore.user?.id
+                      ? 'You'
+                      : getUserDisplayName(
+                          getParentMessage(message)?.sender_user?.first_name ?? '',
+                          getParentMessage(message)?.sender_user?.last_name ?? '',
+                        )
+                  }}
+                </span>
+              </div>
+              <div class="text-xs text-muted-foreground truncate max-w-xs">
+                {{ getParentMessage(message)?.content_text }}
+              </div>
+            </div>
+
             <div class="flex items-center gap-2 mb-1">
               <span
                 class="font-semibold text-primary text-[10px]"
@@ -359,6 +404,21 @@ onMounted(() => {
               {{ message.content_text }}
             </div>
 
+            <!-- Message actions visible on hover-->
+            <div
+              class="flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+              <Button
+                variant="ghost"
+                size="sm"
+                class="h-6 px-2 text-xs"
+                @click="startReply(message)"
+              >
+                <Reply class="h-3 w-3 mr-1" />
+                Reply
+              </Button>
+            </div>
+
             <!-- Reactions (if any) -->
             <!-- <div v-if="message.reactions && message.reactions.length > 0" class="flex gap-1 mt-2">
               <Badge
@@ -372,6 +432,31 @@ onMounted(() => {
             </div> -->
           </div>
         </div>
+      </div>
+    </div>
+
+    <div v-if="replyingTo" class="px-4 py-2 bg-muted/50 border-t border-border">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2 text-sm">
+          <Reply class="h-4 w-4 text-muted-foreground" />
+          <span class="text-muted-foreground">Replying to</span>
+          <span class="font-medium">
+            {{
+              replyingTo.sender_user_id === authStore.user?.id
+                ? 'You'
+                : getUserDisplayName(
+                    replyingTo.sender_user?.first_name ?? '',
+                    replyingTo.sender_user?.last_name ?? '',
+                  )
+            }}
+          </span>
+        </div>
+        <Button variant="ghost" size="sm" class="h-6 w-6 p-0" @click="cancelReply">
+          <X class="h-3 w-3" />
+        </Button>
+      </div>
+      <div class="text-sm text-muted-foreground truncate max-w-md mt-1">
+        {{ replyingTo.content_text }}
       </div>
     </div>
 

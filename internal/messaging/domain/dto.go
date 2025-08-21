@@ -44,13 +44,13 @@ func ToChannelDTO(channel *Channel, members []*User, integrationBots []*Integrat
 }
 
 type MessageDTO struct {
-	ID              string    `json:"id"`
-	ChannelID       string    `json:"channel_id"`
-	SenderUserID    *string   `json:"sender_user_id,omitempty"`
-	IntegrationID   *string   `json:"integration_id,omitempty"`
-	ContentText     string    `json:"content_text"`
-	CreatedAt       time.Time `json:"created_at"`
-	ParentMessageID *string
+	ID              string             `json:"id"`
+	ChannelID       string             `json:"channel_id"`
+	SenderUserID    *string            `json:"sender_user_id,omitempty"`
+	IntegrationID   *string            `json:"integration_id,omitempty"`
+	ContentText     string             `json:"content_text"`
+	CreatedAt       time.Time          `json:"created_at"`
+	ParentMessageID *string            `json:"parent_message_id,omitempty"`
 	SenderUser      *UserDTO           `json:"sender_user,omitempty"`
 	IntegrationBot  *IntegrationBotDTO `json:"integration_bot,omitempty"`
 	Reactions       []ReactionDTO      `json:"reactions,omitempty"`

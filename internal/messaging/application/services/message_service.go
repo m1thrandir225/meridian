@@ -54,6 +54,16 @@ func (s *MessageService) HandleMessageSent(ctx context.Context, cmd domain.SendM
 	if err != nil {
 		return nil, err
 	}
+
+	//If the message is a reply, we need to load the messages in the domain
+	if cmd.ParentMessageID != nil {
+		messages, err := s.repo.FindMessages(ctx, cmd.ChannelID, 1000, 0)
+		if err != nil {
+			return nil, fmt.Errorf("error finding messages: %w", err)
+		}
+		channel.Messages = messages
+	}
+
 	message, err := channel.PostMessage(cmd.SenderUserID, cmd.Content, cmd.ParentMessageID)
 	if err != nil {
 		return nil, err
