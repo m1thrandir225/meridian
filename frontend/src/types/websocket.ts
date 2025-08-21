@@ -26,6 +26,15 @@ export interface IncomingMessagePayload {
   }
 }
 
+export interface IncomingReactionPayload {
+  id: string
+  message_id: string
+  channel_id: string
+  user_id: string
+  reaction_type: string
+  timestamp: string
+}
+
 export interface TypingPayload {
   channel_id: string
   user_id: string
@@ -35,4 +44,10 @@ export interface SendMessagePayload {
   content: string
   channel_id: string
   parent_message_id?: string
+}
+
+export interface SendReactionPayload {
+  message_id: string
+  channel_id: string
+  reaction_type: string
 }

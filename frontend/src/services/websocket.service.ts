@@ -114,6 +114,28 @@ class WebsocketService {
     })
   }
 
+  sendAddReaction(channelId: string, messageId: string, reactionType: string) {
+    this.send({
+      type: 'add_reaction',
+      payload: {
+        channel_id: channelId,
+        message_id: messageId,
+        reaction_type: reactionType,
+      },
+    })
+  }
+
+  sendRemoveReaction(channelId: string, messageId: string, reactionType: string) {
+    this.send({
+      type: 'remove_reaction',
+      payload: {
+        channel_id: channelId,
+        message_id: messageId,
+        reaction_type: reactionType,
+      },
+    })
+  }
+
   on(event: string, handler: (payload: unknown) => void) {
     if (!this.messageHandlers.has(event)) {
       this.messageHandlers.set(event, [])

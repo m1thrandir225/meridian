@@ -1,3 +1,5 @@
+import type { Reaction } from './reaction'
+
 export interface Message {
   id: string
   channel_id: string
@@ -6,6 +8,7 @@ export interface Message {
   content_text: string
   parent_message_id?: string
   created_at: string
+  reactions?: Reaction[]
   sender_user?: {
     id: string
     username: string

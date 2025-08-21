@@ -109,7 +109,7 @@ func ToMessageDTO(message *Message, sender *User, integration *IntegrationBot) M
 
 	reactionsDTO := make([]ReactionDTO, len(message.GetReactions()))
 	for i, reaction := range message.GetReactions() {
-		reactionsDTO[i] = ToReactionDTO(&reaction)
+		reactionsDTO[i] = ToReactionDTO(reaction)
 	}
 
 	var integrationBot *IntegrationBotDTO
@@ -146,7 +146,7 @@ type ReactionDTO struct {
 	Timestamp    time.Time `json:"timestamp"`
 }
 
-func ToReactionDTO(reaction *Reaction) ReactionDTO {
+func ToReactionDTO(reaction Reaction) ReactionDTO {
 	return ReactionDTO{
 		ID:           reaction.GetId().String(),
 		MessageID:    reaction.GetMessageId().String(),

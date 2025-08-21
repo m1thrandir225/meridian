@@ -110,6 +110,24 @@ func (h *WebSocketHandler) HandleWebSocket(c *gin.Context) {
 					Payload: map[string]string{"message": "Failed to send message", "error": err.Error()},
 				})
 			}
+		case "add_reaction":
+			err := h.handleIncomingReaction(userID, msg.Payload)
+			if err != nil {
+				log.Printf("Failed to handle reaction from user %s: %v", userID, err)
+				h.sendToClient(userID, WebSocketMessage{
+					Type:    "error",
+					Payload: map[string]string{"message": "Failed to add reaction", "error": err.Error()},
+				})
+			}
+		case "remove_reaction":
+			err := h.handleRemoveReaction(userID, msg.Payload)
+			if err != nil {
+				log.Printf("Failed to handle reaction from user %s: %v", userID, err)
+				h.sendToClient(userID, WebSocketMessage{
+					Type:    "error",
+					Payload: map[string]string{"message": "Failed to remove reaction", "error": err.Error()},
+				})
+			}
 		case "typing_start":
 			h.handleTypingIndicator(userID, msg.Payload, "typing_start")
 		case "typing_stop":
@@ -237,6 +255,153 @@ func (h *WebSocketHandler) handleIncomingMessage(senderID string, payload interf
 		go h.broadcastToChannel(incomingMsg.ChannelID, WebSocketMessage{
 			Type:    "new_message",
 			Payload: outgoingMsg,
+		})
+	}
+
+	return nil
+}
+func (h *WebSocketHandler) handleIncomingReaction(userID string, payload interface{}) error {
+	// Parse the reaction payload
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+
+	var incomingReaction IncomingReactionPayload
+	if err := json.Unmarshal(payloadBytes, &incomingReaction); err != nil {
+		return err
+	}
+
+	// Validate required fields
+	if incomingReaction.MessageID == "" {
+		return fmt.Errorf("message_id is required")
+	}
+	if incomingReaction.ChannelID == "" {
+		return fmt.Errorf("channel_id is required")
+	}
+	if incomingReaction.ReactionType == "" {
+		return fmt.Errorf("reaction_type is required")
+	}
+
+	// Parse UUIDs
+	userUUID, err := uuid.Parse(userID)
+	if err != nil {
+		return fmt.Errorf("invalid user ID: %w", err)
+	}
+
+	channelUUID, err := uuid.Parse(incomingReaction.ChannelID)
+	if err != nil {
+		return fmt.Errorf("invalid channel ID: %w", err)
+	}
+
+	messageUUID, err := uuid.Parse(incomingReaction.MessageID)
+	if err != nil {
+		return fmt.Errorf("invalid message ID: %w", err)
+	}
+
+	cmd := domain.AddReactionCommand{
+		ChannelID:    channelUUID,
+		MessageID:    messageUUID,
+		UserID:       userUUID,
+		ReactionType: incomingReaction.ReactionType,
+	}
+
+	// Handle through domain service
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	reaction, err := h.messageService.HandleAddReaction(ctx, cmd)
+	if err != nil {
+		return fmt.Errorf("failed to add reaction: %w", err)
+	}
+
+	outgoingReaction := OutgoingReactionPayload{
+		ID:           reaction.GetId().String(),
+		MessageID:    reaction.GetMessageId().String(),
+		ChannelID:    incomingReaction.ChannelID,
+		UserID:       reaction.GetUserId().String(),
+		ReactionType: reaction.GetReactionType(),
+		Timestamp:    reaction.GetCreatedAt(),
+	}
+
+	if h.redisClient != nil {
+		go h.publishReactionToRedis(outgoingReaction)
+	} else {
+		go h.broadcastToChannel(incomingReaction.ChannelID, WebSocketMessage{
+			Type:    "reaction_added",
+			Payload: outgoingReaction,
+		})
+	}
+
+	return nil
+}
+
+func (h *WebSocketHandler) handleRemoveReaction(userID string, payload interface{}) error {
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+
+	var incomingReaction IncomingReactionPayload
+	if err := json.Unmarshal(payloadBytes, &incomingReaction); err != nil {
+		return err
+	}
+
+	if incomingReaction.MessageID == "" {
+		return fmt.Errorf("message_id is required")
+	}
+	if incomingReaction.ChannelID == "" {
+		return fmt.Errorf("channel_id is required")
+	}
+	if incomingReaction.ReactionType == "" {
+		return fmt.Errorf("reaction_type is required")
+	}
+
+	userUUID, err := uuid.Parse(userID)
+	if err != nil {
+		return fmt.Errorf("invalid user ID: %w", err)
+	}
+
+	channelUUID, err := uuid.Parse(incomingReaction.ChannelID)
+	if err != nil {
+		return fmt.Errorf("invalid channel ID: %w", err)
+	}
+
+	messageUUID, err := uuid.Parse(incomingReaction.MessageID)
+	if err != nil {
+		return fmt.Errorf("invalid message ID: %w", err)
+	}
+
+	cmd := domain.RemoveReactionCommand{
+		ChannelID:    channelUUID,
+		MessageID:    messageUUID,
+		UserID:       userUUID,
+		ReactionType: incomingReaction.ReactionType,
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	reaction, err := h.messageService.HandleRemoveReaction(ctx, cmd)
+	if err != nil {
+		return fmt.Errorf("failed to remove reaction: %w", err)
+	}
+
+	outgoingReaction := OutgoingReactionPayload{
+		ID:           reaction.GetId().String(),
+		MessageID:    reaction.GetMessageId().String(),
+		ChannelID:    incomingReaction.ChannelID,
+		UserID:       reaction.GetUserId().String(),
+		ReactionType: reaction.GetReactionType(),
+		Timestamp:    reaction.GetCreatedAt(),
+	}
+
+	if h.redisClient != nil {
+		go h.publishReactionRemovedToRedis(outgoingReaction)
+	} else {
+		go h.broadcastToChannel(incomingReaction.ChannelID, WebSocketMessage{
+			Type:    "reaction_removed",
+			Payload: outgoingReaction,
 		})
 	}
 
@@ -377,6 +542,55 @@ func (h *WebSocketHandler) subscribeToRedisMessages() {
 			h.broadcastToChannel(channelID, wsMessage)
 		}
 	}
+}
+
+func (h *WebSocketHandler) publishReactionToRedis(reaction OutgoingReactionPayload) {
+	if h.redisClient == nil {
+		return
+	}
+
+	ctx := context.Background()
+
+	reactionJSON, err := json.Marshal(WebSocketMessage{
+		Type:    "reaction_added",
+		Payload: reaction,
+	})
+
+	if err != nil {
+		log.Printf("Failed to marshal reaction: %v", err)
+		return
+	}
+
+	channelKey := fmt.Sprintf("channel:%s", reaction.ChannelID)
+	err = h.redisClient.Publish(ctx, channelKey, reactionJSON).Err()
+	if err != nil {
+		log.Printf("Failed to publish reaction to Redis: %v", err)
+	}
+}
+
+func (h *WebSocketHandler) publishReactionRemovedToRedis(reaction OutgoingReactionPayload) {
+	if h.redisClient == nil {
+		return
+	}
+
+	ctx := context.Background()
+
+	reactionJSON, err := json.Marshal(WebSocketMessage{
+		Type:    "reaction_removed",
+		Payload: reaction,
+	})
+
+	if err != nil {
+		log.Printf("Failed to marshal reaction removal: %v", err)
+		return
+	}
+
+	channelKey := fmt.Sprintf("channel:%s", reaction.ChannelID)
+	err = h.redisClient.Publish(ctx, channelKey, reactionJSON).Err()
+	if err != nil {
+		log.Printf("Failed to publish reaction removal to Redis: %v", err)
+	}
+
 }
 
 func (h *WebSocketHandler) broadcastToChannel(channelID string, message WebSocketMessage) {

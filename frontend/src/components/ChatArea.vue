@@ -11,6 +11,7 @@ import { useAuthStore } from '@/stores/auth'
 import websocketService from '@/services/websocket.service'
 import { getUserInitials, getUserDisplayName } from '@/lib/utils'
 import type { Message } from '@/types/models/message'
+import MessageReactions from './MessageReactions.vue'
 
 // Props and emits
 interface Props {
@@ -36,8 +37,6 @@ const authStore = useAuthStore()
 
 // Chat scroll management
 const messagesContainer = ref<HTMLElement | null>(null)
-const isUserInteracting = ref(false)
-const scrollToBottomTimeout = ref<number | null>(null)
 const typingTimeout = ref<number | null>(null)
 const isTyping = ref<boolean>(false)
 const newMessage = ref<string>('')
@@ -179,91 +178,6 @@ const formatTime = (timestamp: string) => {
   })
 }
 
-// const toggleReaction = (messageId: string, emoji: string) => {
-//   const message = messages.value.find((m) => m.id === messageId)
-//   if (!message) return
-
-//   const existingReaction = message.reactions.find((r) => r.emoji === emoji)
-
-//   if (existingReaction) {
-//     if (existingReaction.userReacted) {
-//       existingReaction.count--
-//       existingReaction.userReacted = false
-//       if (existingReaction.count === 0) {
-//         message.reactions = message.reactions.filter((r) => r.emoji !== emoji)
-//       }
-//     } else {
-//       existingReaction.count++
-//       existingReaction.userReacted = true
-//     }
-//   } else {
-//     message.reactions.push({
-//       emoji,
-//       count: 1,
-//       userReacted: true,
-//     })
-//   }
-// }
-
-//const quickReactions = ['👍', '❤️', '😂', '😮', '😢', '😡']
-
-// Track hover state for messages
-//const hoveredMessageId = ref<string | null>(null)
-
-// const setHoveredMessage = (messageId: string | null) => {
-//   hoveredMessageId.value = messageId
-// }
-
-// const getMessageStyle = (messageId: string) => {
-//   const isHovered = hoveredMessageId.value === messageId
-//   if (!isHovered)
-//     return {
-//       border: '2px solid transparent',
-//     }
-
-//   return {
-//     border: `2px solid hsl(${appearanceStore.accentColorClass})`,
-//     marginLeft: '4px',
-//     paddingLeft: '8px',
-//   }
-// }
-
-// Auto-scroll functionality
-// const scrollToBottom = () => {
-//   if (messagesContainer.value && !isUserInteracting.value) {
-//     nextTick(() => {
-//       messagesContainer.value!.scrollTop = messagesContainer.value!.scrollHeight
-//     })
-//   }
-// }
-
-// const handleScrollInteraction = () => {
-//   isUserInteracting.value = true
-
-//   if (scrollToBottomTimeout.value) {
-//     clearTimeout(scrollToBottomTimeout.value)
-//   }
-
-//   // Resume auto-scroll after user stops scrolling for 3 seconds
-//   scrollToBottomTimeout.value = window.setTimeout(() => {
-//     isUserInteracting.value = false
-//   }, 3000)
-// }
-
-// const handleMessageHover = (hovering: boolean) => {
-//   if (hovering) {
-//     isUserInteracting.value = true
-//   } else {
-//     // Short delay before resuming auto-scroll when user stops hovering
-//     if (scrollToBottomTimeout.value) {
-//       clearTimeout(scrollToBottomTimeout.value)
-//     }
-//     scrollToBottomTimeout.value = window.setTimeout(() => {
-//       isUserInteracting.value = false
-//     }, 1000)
-//   }
-// }
-
 // Watch for new messages and auto-scroll
 watch(
   () => messages.value.length,
@@ -328,7 +242,7 @@ onMounted(() => {
         </div>
       </div>
 
-      <div v-else class="space-y-4">
+      <div v-else :class="messageSpacing">
         <div
           v-for="message in messages"
           :key="message.id"
@@ -336,7 +250,7 @@ onMounted(() => {
           class="flex gap-3"
         >
           <!-- Avatar -->
-          <Avatar class="h-8 w-8" v-if="message.sender_user_id">
+          <Avatar :class="avatarSize" v-if="message.sender_user_id">
             <AvatarFallback v-if="message.sender_user_id">
               {{
                 message.sender_user_id === authStore.user?.id
@@ -347,7 +261,7 @@ onMounted(() => {
               }}
             </AvatarFallback>
           </Avatar>
-          <Avatar class="h-8 w-8" v-else-if="message.integration_id">
+          <Avatar :class="avatarSize" v-else-if="message.integration_id">
             <AvatarFallback>
               <Bot />
             </AvatarFallback>
@@ -400,7 +314,7 @@ onMounted(() => {
               </span>
             </div>
 
-            <div class="text-sm">
+            <div :class="messageTextClasses">
               {{ message.content_text }}
             </div>
 
@@ -419,17 +333,7 @@ onMounted(() => {
               </Button>
             </div>
 
-            <!-- Reactions (if any) -->
-            <!-- <div v-if="message.reactions && message.reactions.length > 0" class="flex gap-1 mt-2">
-              <Badge
-                v-for="reaction in message.reactions"
-                :key="reaction.type"
-                variant="secondary"
-                class="text-xs"
-              >
-                {{ reaction.type }} {{ reaction.count }}
-              </Badge>
-            </div> -->
+            <MessageReactions :message="message" />
           </div>
         </div>
       </div>

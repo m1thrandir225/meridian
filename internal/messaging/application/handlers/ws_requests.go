@@ -27,6 +27,21 @@ type OutgoingMessagePayload struct {
 	IntegrationBot  *IntegrationBotDTO `json:"integration_bot,omitempty"`
 }
 
+type IncomingReactionPayload struct {
+	MessageID    string `json:"message_id"`
+	ChannelID    string `json:"channel_id"`
+	ReactionType string `json:"reaction_type"`
+}
+
+type OutgoingReactionPayload struct {
+	ID           string    `json:"id"`
+	MessageID    string    `json:"message_id"`
+	ChannelID    string    `json:"channel_id"`
+	UserID       string    `json:"user_id"`
+	ReactionType string    `json:"reaction_type"`
+	Timestamp    time.Time `json:"timestamp"`
+}
+
 type UserDTO struct {
 	ID        string `json:"id"`
 	Username  string `json:"username"`

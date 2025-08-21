@@ -267,12 +267,12 @@ func (c *Channel) RemoveReaction(messageID, userID uuid.UUID, reactionType strin
 	}
 
 	found := false
-	var reaction Reaction
-	for i, reaction := range targetMessage.GetReactions() {
-		if reaction.GetUserId() == userID && reaction.GetReactionType() == reactionType {
+	var removedReaction Reaction
+	for i, r := range targetMessage.GetReactions() {
+		if r.GetUserId() == userID && r.GetReactionType() == reactionType {
 			lastIdx := len(targetMessage.GetReactions()) - 1
 			targetMessage.GetReactions()[i] = targetMessage.GetReactions()[lastIdx]
-			reaction = targetMessage.GetReactions()[lastIdx]
+			removedReaction = targetMessage.GetReactions()[lastIdx]
 			targetMessage.setReactions(targetMessage.GetReactions()[:lastIdx])
 
 			found = true
@@ -285,7 +285,7 @@ func (c *Channel) RemoveReaction(messageID, userID uuid.UUID, reactionType strin
 	}
 	c.Version++
 	c.addEvent(CreateReactionRemovedEvent(c, messageID, userID, reactionType))
-	return &reaction, nil
+	return &removedReaction, nil
 }
 
 func (c *Channel) AddBotMember(integrationID uuid.UUID) error {
