@@ -13,3 +13,4 @@ CREATE TABLE channel_invites (
 CREATE INDEX idx_channel_invites_channel_id ON channel_invites (channel_id);
 CREATE INDEX idx_channel_invites_invite_code ON channel_invites (invite_code);
 CREATE INDEX idx_channel_invites_expires_at ON channel_invites (expires_at);
+CREATE INDEX idx_channel_invites_is_active ON channel_invites (is_active);

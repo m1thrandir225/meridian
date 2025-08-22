@@ -17,4 +17,6 @@ type ChannelRepository interface {
 	SaveReaction(ctx context.Context, reaction *models.Reaction) error
 	DeleteReaction(ctx context.Context, messageID, userID uuid.UUID, reactionType string) error
 	FindReactionsByMessageID(ctx context.Context, messageID uuid.UUID) ([]models.Reaction, error)
+	FindByInviteCode(ctx context.Context, inviteCode string) (*models.Channel, error)
+	FindByInviteID(ctx context.Context, inviteID uuid.UUID) (*models.Channel, error)
 }

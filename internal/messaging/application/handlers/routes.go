@@ -28,6 +28,9 @@ func SetupRoutes(
 			channelsGroup.PUT("/:channelId/unarchive", httpHandler.handleUnarchiveChannel)
 			channelsGroup.POST("/:channelId/bots", httpHandler.handleAddBotToChannel)
 
+			channelsGroup.POST("/:channelId/invites", httpHandler.handleCreateChannelInvite)
+			channelsGroup.GET("/:channelId/invites", httpHandler.handleGetChannelInvites)
+
 			messagesGroup := channelsGroup.Group("/:channelId/messages")
 			{
 				messagesGroup.GET("", httpHandler.handleGetMessages)
@@ -39,6 +42,11 @@ func SetupRoutes(
 					reactionsGroup.DELETE("/", httpHandler.handleRemoveReaction)
 				}
 			}
+		}
+		invitesGroup := apiV1.Group("/invites")
+		{
+			invitesGroup.POST("/accept", httpHandler.handleAcceptChannelInvite)
+			invitesGroup.DELETE("/:inviteId", httpHandler.handleDeactivateChannelInvite)
 		}
 	}
 }

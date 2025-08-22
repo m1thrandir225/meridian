@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -473,6 +474,175 @@ func (h *HTTPHandler) handleRemoveReaction(ctx *gin.Context) {
 		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
 		return
 	}
+	ctx.Status(http.StatusOK)
+}
+
+// POST /api/v1/channels/:channelId/invites
+func (h *HTTPHandler) handleCreateChannelInvite(ctx *gin.Context) {
+	var channelIdUri ChannelIDUri
+	if err := ctx.ShouldBindUri(&channelIdUri); err != nil {
+		ctx.JSON(http.StatusBadRequest, errorResponse(err))
+		return
+	}
+
+	channelId, err := uuid.Parse(channelIdUri.ChannelID)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, errorResponse(err))
+		return
+	}
+	var req CreateChannelInviteRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, errorResponse(err))
+		return
+	}
+
+	creatorID := ctx.GetHeader("X-User-ID")
+	if creatorID == "" {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	creatorUserID, err := uuid.Parse(creatorID)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, errorResponse(err))
+		return
+	}
+
+	var maxUses *int
+	if req.MaxUses != 0 {
+		maxUses = &req.MaxUses
+	}
+
+	cmd := domain.CreateChannelInviteCommand{
+		ChannelID:       channelId,
+		CreatedByUserID: creatorUserID,
+		ExpiresAt:       req.ExpiresAt,
+		MaxUses:         maxUses,
+	}
+
+	_, invite, err := h.channelService.HandleCreateChannelInvite(ctx, cmd)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
+		return
+	}
+
+	inviteDTO := domain.ToChannelInviteDTO(invite)
+
+	ctx.JSON(http.StatusCreated, inviteDTO)
+}
+
+// GET /api/v1/channels/:channelId/invites
+func (h *HTTPHandler) handleGetChannelInvites(ctx *gin.Context) {
+	var channelIdUri ChannelIDUri
+	if err := ctx.ShouldBindUri(&channelIdUri); err != nil {
+		ctx.JSON(http.StatusBadRequest, errorResponse(err))
+		return
+	}
+
+	channelId, err := uuid.Parse(channelIdUri.ChannelID)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, errorResponse(err))
+		return
+	}
+
+	cmd := domain.GetChannelInvitesCommand{
+		ChannelID: channelId,
+	}
+
+	channel, err := h.channelService.HandleGetChannelInvites(ctx, cmd)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
+		return
+	}
+
+	invites := channel.GetActiveInvites()
+	invitesDTO := make([]domain.ChannelInviteDTO, len(invites))
+	for i, invite := range invites {
+		invitesDTO[i] = domain.ToChannelInviteDTO(&invite)
+	}
+
+	ctx.JSON(http.StatusOK, invitesDTO)
+}
+
+// POST /api/v1/invites/accept
+func (h *HTTPHandler) handleAcceptChannelInvite(ctx *gin.Context) {
+	var req AcceptChannelInviteRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, errorResponse(err))
+		return
+	}
+
+	userIdStr := ctx.GetHeader("X-User-ID")
+	if userIdStr == "" {
+		ctx.JSON(http.StatusUnauthorized, errorResponse(errors.New("unauthorized")))
+		return
+	}
+
+	userId, err := uuid.Parse(userIdStr)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, errorResponse(err))
+		return
+	}
+
+	cmd := domain.AcceptChannelInviteCommand{
+		InviteCode: req.InviteCode,
+		UserID:     userId,
+	}
+
+	channel, err := h.channelService.HandleAcceptChannelInvite(ctx, cmd)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
+		return
+	}
+
+	channelDTO, err := h.channelService.ReturnChannelDTO(ctx, channel)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
+		return
+	}
+
+	cacheKey := fmt.Sprintf("user_channels:%s", userId.String())
+	h.cache.Delete(ctx.Request.Context(), cacheKey)
+
+	ctx.JSON(http.StatusOK, channelDTO)
+}
+
+// DELETE /api/v1/invites/:inviteId
+func (h *HTTPHandler) handleDeactivateChannelInvite(ctx *gin.Context) {
+	var inviteIdUri InvideIDUri
+	if err := ctx.ShouldBindUri(&inviteIdUri); err != nil {
+		ctx.JSON(http.StatusBadRequest, errorResponse(err))
+		return
+	}
+	inviteId, err := uuid.Parse(inviteIdUri.InvideID)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, errorResponse(err))
+		return
+	}
+
+	userIDStr := ctx.GetHeader("X-User-ID")
+	if userIDStr == "" {
+		ctx.JSON(http.StatusUnauthorized, errorResponse(errors.New("unauthorized")))
+		return
+	}
+
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, errorResponse(err))
+		return
+	}
+
+	cmd := domain.DeactivateChannelInviteCommand{
+		InviteID: inviteId,
+		UserID:   userID,
+	}
+
+	_, err = h.channelService.HandleDeactivateChannelInvite(ctx, cmd)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
+		return
+	}
+
 	ctx.Status(http.StatusOK)
 }
 

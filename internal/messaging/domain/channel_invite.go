@@ -5,9 +5,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/m1thrandir225/meridian/pkg/common"
 )
 
+// ChannelInvite represents an invite to a channel
 type ChannelInvite struct {
 	ID              uuid.UUID
 	ChannelID       uuid.UUID
@@ -18,7 +18,6 @@ type ChannelInvite struct {
 	CurrentUses     int
 	CreatedAt       time.Time
 	IsActive        bool
-	events          []common.DomainEvent
 }
 
 func NewChannelInvite(channelID, createdByUserID uuid.UUID, inviteCode string, expiresAt time.Time, maxUse *int) *ChannelInvite {
@@ -32,20 +31,7 @@ func NewChannelInvite(channelID, createdByUserID uuid.UUID, inviteCode string, e
 		CurrentUses:     0,
 		CreatedAt:       time.Now().UTC(),
 		IsActive:        true,
-		events:          []common.DomainEvent{},
 	}
-}
-
-func (ci *ChannelInvite) addEvent(event common.DomainEvent) {
-	ci.events = append(ci.events, event)
-}
-
-func (ci *ChannelInvite) GetPendingEvents() []common.DomainEvent {
-	return ci.events
-}
-
-func (ci *ChannelInvite) ClearEvents() {
-	ci.events = []common.DomainEvent{}
 }
 
 func (ci *ChannelInvite) GetID() uuid.UUID {

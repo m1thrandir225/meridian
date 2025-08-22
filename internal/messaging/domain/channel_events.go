@@ -83,6 +83,32 @@ type BotJoinedChannelEvent struct {
 	Timestamp time.Time
 }
 
+type ChannelInviteCreatedEvent struct {
+	common.BaseDomainEvent
+	ChannelInviteID uuid.UUID
+	ChannelID       uuid.UUID
+	CreatedByUserID uuid.UUID
+	InviteCode      string
+	ExpiresAt       time.Time
+	MaxUses         *int
+}
+
+type ChannelInviteUsedEvent struct {
+	common.BaseDomainEvent
+	ChannelInviteID uuid.UUID
+	ChannelID       uuid.UUID
+	UserID          uuid.UUID
+	InviteCode      string
+	Timestamp       time.Time
+}
+
+type ChannelInviteDeactivatedEvent struct {
+	common.BaseDomainEvent
+	ChannelInviteID     uuid.UUID
+	ChannelID           uuid.UUID
+	DeactivatedByUserID uuid.UUID
+}
+
 func CreateChannelCreatedEvent(channel *Channel) ChannelCreatedEvent {
 	base := common.NewBaseDomainEvent("ChannelCreated", channel.ID, channel.Version)
 	return ChannelCreatedEvent{
@@ -215,5 +241,43 @@ func CreateBotJoinedChannelEvent(channel *Channel, member Member) BotJoinedChann
 		ChannelID:       channel.ID,
 		Member:          member,
 		Timestamp:       time.Now().UTC(),
+	}
+}
+
+func CreateChannelInviteCreatedEvent(invite *ChannelInvite, channel *Channel) ChannelInviteCreatedEvent {
+	base := common.NewBaseDomainEvent("ChannelInviteCreated", invite.ID, channel.Version)
+
+	return ChannelInviteCreatedEvent{
+		BaseDomainEvent: base,
+		ChannelInviteID: invite.ID,
+		ChannelID:       invite.ChannelID,
+		CreatedByUserID: invite.CreatedByUserID,
+		InviteCode:      invite.InviteCode,
+		ExpiresAt:       invite.ExpiresAt,
+		MaxUses:         invite.MaxUse,
+	}
+}
+
+func CreateChannelInviteUsedEvent(invite *ChannelInvite, channel *Channel) ChannelInviteUsedEvent {
+	base := common.NewBaseDomainEvent("ChannelInviteUsed", invite.ID, channel.Version)
+
+	return ChannelInviteUsedEvent{
+		BaseDomainEvent: base,
+		ChannelInviteID: invite.ID,
+		ChannelID:       invite.ChannelID,
+		UserID:          invite.CreatedByUserID,
+		InviteCode:      invite.InviteCode,
+		Timestamp:       invite.CreatedAt,
+	}
+}
+
+func CreateChannelInviteDeactivatedEvent(invite *ChannelInvite, channel *Channel) ChannelInviteDeactivatedEvent {
+	base := common.NewBaseDomainEvent("ChannelInviteDeactivated", invite.ID, channel.Version)
+
+	return ChannelInviteDeactivatedEvent{
+		BaseDomainEvent:     base,
+		ChannelInviteID:     invite.ID,
+		ChannelID:           invite.ChannelID,
+		DeactivatedByUserID: invite.CreatedByUserID,
 	}
 }

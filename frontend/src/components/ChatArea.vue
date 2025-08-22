@@ -13,6 +13,7 @@ import { getUserInitials, getUserDisplayName } from '@/lib/utils'
 import type { Message } from '@/types/models/message'
 import MessageActionsPopup from './MessageActionsPopup.vue'
 import MessageReactions from './MessageReactions.vue'
+import ChannelInviteModal from './ChannelInviteModal.vue'
 
 // Props and emits
 interface Props {
@@ -228,6 +229,9 @@ const handleReply = (message: Message) => {
         </div>
       </div>
       <div class="flex items-center gap-2">
+        <div v-if="currentChannel" class="px-2">
+          <ChannelInviteModal :channel-id="currentChannel.id" :channel-name="currentChannel.name" />
+        </div>
         <Button
           variant="ghost"
           size="icon"

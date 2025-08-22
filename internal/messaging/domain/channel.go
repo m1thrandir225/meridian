@@ -1,13 +1,19 @@
 package domain
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/m1thrandir225/meridian/pkg/common"
 )
 
+// Channel represents a chat channel in the system
+// It is the aggregate root for the channel domain
+// It contains all the information about a channel, including its members, messages, and invites
 type Channel struct {
 	ID              uuid.UUID
 	Name            string
@@ -16,24 +22,14 @@ type Channel struct {
 	CreatorUserID   uuid.UUID
 	Members         []Member
 	Messages        []Message
+	Invites         []ChannelInvite
 	LastMessageTime time.Time
 	IsArchived      bool
 	Version         int64
 	pendingEvents   []common.DomainEvent
 }
 
-func (c *Channel) addEvent(event common.DomainEvent) {
-	c.pendingEvents = append(c.pendingEvents, event)
-}
-
-func (c *Channel) GetPendingEvents() []common.DomainEvent {
-	return c.pendingEvents
-}
-
-func (c *Channel) ClearPendingEvents() {
-	c.pendingEvents = []common.DomainEvent{}
-}
-
+// NewChannel creates a new channel
 func NewChannel(name, topic string, creatorUserID uuid.UUID) (*Channel, error) {
 	if name == "" {
 		return nil, errors.New("channel name cannot be empty")
@@ -51,6 +47,7 @@ func NewChannel(name, topic string, creatorUserID uuid.UUID) (*Channel, error) {
 		CreationTime:    now,
 		Members:         []Member{creator},
 		Messages:        []Message{},
+		Invites:         []ChannelInvite{},
 		LastMessageTime: now,
 		IsArchived:      false,
 		Version:         1,
@@ -60,6 +57,19 @@ func NewChannel(name, topic string, creatorUserID uuid.UUID) (*Channel, error) {
 	return channel, nil
 }
 
+func (c *Channel) addEvent(event common.DomainEvent) {
+	c.pendingEvents = append(c.pendingEvents, event)
+}
+
+func (c *Channel) GetPendingEvents() []common.DomainEvent {
+	return c.pendingEvents
+}
+
+func (c *Channel) ClearPendingEvents() {
+	c.pendingEvents = []common.DomainEvent{}
+}
+
+// AddMember adds a member to a channel
 func (c *Channel) AddMember(userID uuid.UUID) error {
 	for _, member := range c.Members {
 		if member.GetId() == userID {
@@ -75,6 +85,7 @@ func (c *Channel) AddMember(userID uuid.UUID) error {
 	return nil
 }
 
+// RemoveMember removes a member from a channel
 func (c *Channel) RemoveMember(userID uuid.UUID) error {
 	found := false
 	var searchMember Member
@@ -96,6 +107,7 @@ func (c *Channel) RemoveMember(userID uuid.UUID) error {
 	return nil
 }
 
+// ArchiveChannel archives a channel
 func (c *Channel) ArchiveChannel(userID uuid.UUID) error {
 	if c.CreatorUserID != userID {
 		return errors.New("only the channel owner can archive it")
@@ -108,6 +120,7 @@ func (c *Channel) ArchiveChannel(userID uuid.UUID) error {
 	return nil
 }
 
+// UnarchiveChannel unarchives a channel
 func (c *Channel) UnarchiveChannel(userId uuid.UUID) error {
 	if c.CreatorUserID != userId {
 		return errors.New("only the channel owner can archive it")
@@ -120,6 +133,7 @@ func (c *Channel) UnarchiveChannel(userId uuid.UUID) error {
 	return nil
 }
 
+// SetTopic sets the topic of a channel
 func (c *Channel) SetTopic(userID uuid.UUID, topic string) error {
 	if c.CreatorUserID != userID {
 		return errors.New("user does not have permission to do this action")
@@ -132,7 +146,8 @@ func (c *Channel) SetTopic(userID uuid.UUID, topic string) error {
 	return nil
 }
 
-func (c *Channel) CanUserPostMessage(userID uuid.UUID) bool {
+// canUserPostMessage checks if a user is allowed to post a message
+func (c *Channel) canUserPostMessage(userID uuid.UUID) bool {
 	for _, member := range c.Members {
 		if member.GetId() == userID {
 			return true
@@ -141,9 +156,9 @@ func (c *Channel) CanUserPostMessage(userID uuid.UUID) bool {
 	return false
 }
 
-// Normal chat message sent by a user
+// PostMessage posts a message to a channel
 func (c *Channel) PostMessage(senderUserID uuid.UUID, content MessageContent, parentMessageID *uuid.UUID) (*Message, error) {
-	if !c.CanUserPostMessage(senderUserID) {
+	if !c.canUserPostMessage(senderUserID) {
 		return nil, errors.New("user is not allowed to post in this channel")
 	}
 
@@ -184,7 +199,7 @@ func (c *Channel) PostMessage(senderUserID uuid.UUID, content MessageContent, pa
 	return &message, nil
 }
 
-// Also a message but one sent by an integration service bot
+// PostNotification posts a notification to a channel
 func (c *Channel) PostNotification(integrationID uuid.UUID, content MessageContent) (*Message, error) {
 	now := time.Now().UTC()
 	messageID, err := uuid.NewV7()
@@ -210,8 +225,9 @@ func (c *Channel) PostNotification(integrationID uuid.UUID, content MessageConte
 	return &message, nil
 }
 
+// AddReaction adds a reaction to a message
 func (c *Channel) AddReaction(messageID, userID uuid.UUID, reactionType string) (*Reaction, error) {
-	if !c.CanUserPostMessage(userID) {
+	if !c.canUserPostMessage(userID) {
 		return nil, errors.New("user is not allowed to react in this channel")
 	}
 	var targetMessage *Message
@@ -253,6 +269,7 @@ func (c *Channel) AddReaction(messageID, userID uuid.UUID, reactionType string) 
 	return &reaction, nil
 }
 
+// RemoveReaction removes a reaction from a message
 func (c *Channel) RemoveReaction(messageID, userID uuid.UUID, reactionType string) (*Reaction, error) {
 	var targetMessage *Message
 	for i := range c.Messages {
@@ -288,6 +305,7 @@ func (c *Channel) RemoveReaction(messageID, userID uuid.UUID, reactionType strin
 	return &removedReaction, nil
 }
 
+// AddBotMember adds a bot to a channel
 func (c *Channel) AddBotMember(integrationID uuid.UUID) error {
 	for _, member := range c.Members {
 		if member.GetId() == integrationID {
@@ -302,4 +320,124 @@ func (c *Channel) AddBotMember(integrationID uuid.UUID) error {
 	c.addEvent(CreateBotJoinedChannelEvent(c, member))
 	c.Version++
 	return nil
+}
+
+// CreateInvite creates a new invite for a channelj
+func (c *Channel) CreateInvite(createdByUserID uuid.UUID, expiresAt time.Time, maxUses *int) (*ChannelInvite, error) {
+	isMember := false
+	for _, member := range c.Members {
+		if member.GetId() == createdByUserID {
+			isMember = true
+			break
+		}
+	}
+	if !isMember {
+		return nil, errors.New("user is not a member of the channel")
+	}
+	inviteCode, err := c.generateInviteCode()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate invite code: %w", err)
+	}
+
+	invite := NewChannelInvite(
+		c.ID,
+		createdByUserID,
+		inviteCode,
+		expiresAt,
+		maxUses,
+	)
+
+	c.Invites = append(c.Invites, *invite)
+	c.Version++
+
+	c.addEvent(CreateChannelInviteCreatedEvent(invite, c))
+
+	return invite, nil
+}
+
+// AcceptInvite accepts an invite to a channel and adds the user to the channel
+func (c *Channel) AcceptInvite(inviteCode string, userID uuid.UUID) error {
+	var targetInvite *ChannelInvite
+	for i := range c.Invites {
+		if c.Invites[i].GetInviteCode() == inviteCode {
+			targetInvite = &c.Invites[i]
+			break
+		}
+	}
+
+	if targetInvite == nil {
+		return errors.New("invite not found")
+	}
+
+	if !targetInvite.CanBeUsed() {
+		return errors.New("invite has expired or reached max uses")
+	}
+
+	for _, member := range c.Members {
+		if member.GetId() == userID {
+			return nil
+		}
+	}
+
+	err := targetInvite.Use()
+	if err != nil {
+		return nil
+	}
+
+	err = c.AddMember(userID)
+	if err != nil {
+		return err
+	}
+
+	c.addEvent(CreateChannelInviteUsedEvent(targetInvite, c))
+	return nil
+}
+
+// DeactivateInvite deactivates an invite to a channel
+func (c *Channel) DeactivateInvite(inviteID uuid.UUID, userID uuid.UUID) error {
+	if c.CreatorUserID != userID {
+		var inviteCreatorID uuid.UUID
+		for _, invite := range c.Invites {
+			if invite.GetID() == inviteID {
+				inviteCreatorID = invite.GetCreatedByUserID()
+				break
+			}
+		}
+
+		if inviteCreatorID != userID {
+			return errors.New("user does not have permission to deactivate this invite")
+		}
+	}
+
+	for i := range c.Invites {
+		if c.Invites[i].GetID() == inviteID {
+			c.Invites[i].Deactivate()
+			c.Version++
+			c.addEvent(CreateChannelInviteDeactivatedEvent(&c.Invites[i], c))
+			return nil
+		}
+	}
+
+	return errors.New("invite not found")
+}
+
+// GetActiveInvites gets all active invites for a channel
+func (c *Channel) GetActiveInvites() []ChannelInvite {
+	var activeInvites []ChannelInvite
+	for _, invite := range c.Invites {
+		if invite.GetIsActive() {
+			activeInvites = append(activeInvites, invite)
+		}
+	}
+	return activeInvites
+}
+
+// generateInviteCode generates a random 4 byte hexcode
+func (c *Channel) generateInviteCode() (string, error) {
+	bytes := make([]byte, 4)
+
+	if _, err := rand.Read(bytes); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(bytes), nil
 }

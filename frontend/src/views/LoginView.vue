@@ -5,10 +5,10 @@ import authService from '@/services/auth.service'
 import { useAuthStore } from '@/stores/auth'
 import type { LoginRequest } from '@/types/responses/auth'
 import { useMutation } from '@tanstack/vue-query'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 const authStore = useAuthStore()
-
+const route = useRoute()
 const router = useRouter()
 
 const { mutateAsync, status } = useMutation({
@@ -16,9 +16,14 @@ const { mutateAsync, status } = useMutation({
   mutationFn: (input: LoginRequest) => authService.login(input),
   onSuccess: (response) => {
     authStore.login(response)
-    router.push({
-      name: 'home',
-    })
+    const redirect = route.query.redirect as string
+    if (redirect) {
+      router.push(redirect)
+    } else {
+      router.push({
+        name: 'home',
+      })
+    }
   },
 })
 

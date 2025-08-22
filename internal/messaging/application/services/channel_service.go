@@ -39,6 +39,7 @@ func (s *ChannelService) HandleGetUserChannels(ctx context.Context, cmd domain.G
 	return channels, nil
 }
 
+// HandleCreateChannel creates a new channel and publishes the events
 func (s *ChannelService) HandleCreateChannel(ctx context.Context, cmd domain.CreateChannelCommand) (*domain.Channel, error) {
 	channel, err := domain.NewChannel(cmd.Name, cmd.Topic, cmd.CreatorUserID)
 	if err != nil {
@@ -58,7 +59,7 @@ func (s *ChannelService) HandleCreateChannel(ctx context.Context, cmd domain.Cre
 	return channel, nil
 }
 
-// handleGetChannel returns the channel and publishes the events
+// HandleGetChannel returns the channel and publishes the events
 func (s *ChannelService) HandleGetChannel(ctx context.Context, cmd domain.GetChannelCommand) (*domain.Channel, error) {
 	channel, err := s.repo.FindById(ctx, cmd.ChannelID)
 	if err != nil {
@@ -98,6 +99,7 @@ func (s *ChannelService) HandleAddBotToChannel(ctx context.Context, cmd domain.A
 	return channel, nil
 }
 
+// HandleJoinChannel joins a channel and publishes the events
 func (s *ChannelService) HandleJoinChannel(ctx context.Context, cmd domain.JoinChannelCommand) (*domain.Channel, error) {
 	channel, err := s.repo.FindById(ctx, cmd.ChannelID)
 	if err != nil {
@@ -213,6 +215,103 @@ func (s *ChannelService) HandleUnarchiveChannel(ctx context.Context, cmd domain.
 	return channel, err
 }
 
+// HandleCreateChannelInvite creates a new channel invite and publishes the events
+func (s *ChannelService) HandleCreateChannelInvite(
+	ctx context.Context,
+	cmd domain.CreateChannelInviteCommand,
+) (*domain.Channel, *domain.ChannelInvite, error) {
+	channel, err := s.repo.FindById(ctx, cmd.ChannelID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	invite, err := channel.CreateInvite(
+		cmd.CreatedByUserID,
+		cmd.ExpiresAt,
+		cmd.MaxUses,
+	)
+
+	if err := s.repo.Save(ctx, channel); err != nil {
+		return nil, nil, err
+	}
+
+	if err := s.eventPub.PublishEvents(ctx, channel.GetPendingEvents()); err != nil {
+		return nil, nil, err
+	}
+	channel.ClearPendingEvents()
+
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return channel, invite, nil
+}
+
+func (s *ChannelService) HandleAcceptChannelInvite(
+	ctx context.Context,
+	cmd domain.AcceptChannelInviteCommand,
+) (*domain.Channel, error) {
+	channel, err := s.repo.FindByInviteCode(ctx, cmd.InviteCode)
+	if err != nil {
+		return nil, err
+	}
+
+	err = channel.AcceptInvite(cmd.InviteCode, cmd.UserID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.repo.Save(ctx, channel); err != nil {
+		return nil, err
+	}
+
+	if err := s.eventPub.PublishEvents(ctx, channel.GetPendingEvents()); err != nil {
+		return nil, err
+	}
+	channel.ClearPendingEvents()
+
+	return channel, nil
+}
+
+func (s *ChannelService) HandleGetChannelInvites(
+	ctx context.Context,
+	cmd domain.GetChannelInvitesCommand,
+) (*domain.Channel, error) {
+	channel, err := s.repo.FindById(ctx, cmd.ChannelID)
+	if err != nil {
+		return nil, err
+	}
+
+	return channel, nil
+}
+
+func (s *ChannelService) HandleDeactivateChannelInvite(
+	ctx context.Context,
+	cmd domain.DeactivateChannelInviteCommand,
+) (*domain.Channel, error) {
+	channel, err := s.repo.FindByInviteID(ctx, cmd.InviteID)
+	if err != nil {
+		return nil, err
+	}
+
+	err = channel.DeactivateInvite(cmd.InviteID, cmd.UserID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.repo.Save(ctx, channel); err != nil {
+		return nil, err
+	}
+
+	if err := s.eventPub.PublishEvents(ctx, channel.GetPendingEvents()); err != nil {
+		return nil, err
+	}
+
+	channel.ClearPendingEvents()
+
+	return channel, nil
+}
+
 // getChannelMembers returns the users and integration bots for a channel
 func (s *ChannelService) getChannelMembers(ctx context.Context, channel *domain.Channel) ([]*domain.User, []*domain.IntegrationBot, error) {
 	userIDs := make([]string, 0)
@@ -279,6 +378,7 @@ func (s *ChannelService) getChannelMembers(ctx context.Context, channel *domain.
 	return users, integrationBots, nil
 }
 
+// ReturnChannelDTO returns a channel DTO
 func (s *ChannelService) ReturnChannelDTO(ctx context.Context, channel *domain.Channel) (*domain.ChannelDTO, error) {
 	users, integrationBots, err := s.getChannelMembers(ctx, channel)
 	if err != nil {
@@ -289,6 +389,7 @@ func (s *ChannelService) ReturnChannelDTO(ctx context.Context, channel *domain.C
 	return &dto, nil
 }
 
+// ReturnChannelDTOs returns a list of channel DTOs
 func (s *ChannelService) ReturnChannelDTOs(ctx context.Context, channels []*domain.Channel) ([]domain.ChannelDTO, error) {
 	dtos := make([]domain.ChannelDTO, len(channels))
 	for i, channel := range channels {

@@ -10,6 +10,7 @@ import PasswordView from '@/views/settings/PasswordView.vue'
 import AppearanceView from '@/views/settings/AppearanceView.vue'
 import { useAuthStore } from '@/stores/auth'
 import BotManagementView from '@/views/BotManagementView.vue'
+import InviteAcceptView from '@/views/InviteAcceptView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -37,6 +38,13 @@ const router = createRouter({
       path: '/bot-management',
       name: 'bot-management',
       component: BotManagementView,
+      meta: { requiresAuth: true },
+    },
+    //Invite routes
+    {
+      path: '/invites/:inviteCode',
+      name: 'invite-accept',
+      component: InviteAcceptView,
       meta: { requiresAuth: true },
     },
     // Settings routes
@@ -88,8 +96,11 @@ const router = createRouter({
 
 router.beforeEach((to, from, next) => {
   const isAuthenticated = useAuthStore().checkAuth()
+
   if (to.meta.requiresAuth && !isAuthenticated) {
-    next({ name: 'login' })
+    const redirect = to.fullPath
+
+    next({ name: 'login', query: { redirect } })
   } else {
     next()
   }

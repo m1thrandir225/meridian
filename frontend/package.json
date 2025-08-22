@@ -16,6 +16,7 @@
     "format": "prettier --write src/"
   },
   "dependencies": {
+    "@internationalized/date": "^3.8.2",
     "@tailwindcss/vite": "^4.1.11",
     "@tanstack/vue-query": "^5.83.1",
     "@tanstack/vue-query-devtools": "^5.84.0",

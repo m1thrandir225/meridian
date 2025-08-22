@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import type { SidebarProps } from '@/components/ui/sidebar'
-import { Loader2, Plus, Settings, Waves } from 'lucide-vue-next'
+import { Bot, Loader2, Plus, Settings, Waves } from 'lucide-vue-next'
 import { onMounted, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 
@@ -58,13 +58,18 @@ const { isFieldDirty, handleSubmit } = useForm({
 const { mutateAsync, status } = useMutation({
   mutationKey: ['createChannel'],
   mutationFn: (input: CreateChannelRequest) => channelService.createChannel(input),
-  onSuccess: (response) => {
+  onSuccess: async (response) => {
     isNewChannelDialogOpen.value = false
     toast.success('Sucessfully created a new channel')
-    router.push({
-      name: 'channel',
-      params: { id: response.id },
-    })
+
+    await channelStore.fetchChannels()
+
+    setTimeout(() => {
+      router.push({
+        name: 'channel',
+        params: { id: response.id },
+      })
+    }, 1000)
   },
   onError: (error) => {
     toast.error(error.message)
@@ -166,14 +171,6 @@ const createChannel = handleSubmit(async (values) => {
             </h3>
           </div>
           <div class="space-y-0.5">
-            <RouterLink
-              to="/bot-registration"
-              class="flex items-center gap-2 px-2 py-1.5 rounded text-sm transition-colors hover:bg-accent/50"
-              active-class="bg-accent text-accent-foreground"
-            >
-              <Plus class="h-3 w-3" />
-              <span class="flex-1 truncate">Create Bot</span>
-            </RouterLink>
             <RouterLink
               to="/bot-management"
               class="flex items-center gap-2 px-2 py-1.5 rounded text-sm transition-colors hover:bg-accent/50"

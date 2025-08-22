@@ -155,3 +155,29 @@ func ToReactionDTO(reaction Reaction) ReactionDTO {
 		Timestamp:    reaction.GetCreatedAt(),
 	}
 }
+
+type ChannelInviteDTO struct {
+	ID              string    `json:"id"`
+	ChannelID       string    `json:"channel_id"`
+	CreatedByUserID string    `json:"created_by_user_id"`
+	InviteCode      string    `json:"invite_code"`
+	ExpiresAt       time.Time `json:"expires_at"`
+	MaxUses         *int      `json:"max_uses,omitempty"`
+	CurrentUses     int       `json:"current_uses"`
+	CreatedAt       time.Time `json:"created_at"`
+	IsActive        bool      `json:"is_active"`
+}
+
+func ToChannelInviteDTO(invite *ChannelInvite) ChannelInviteDTO {
+	return ChannelInviteDTO{
+		ID:              invite.GetID().String(),
+		ChannelID:       invite.GetChannelID().String(),
+		CreatedByUserID: invite.GetCreatedByUserID().String(),
+		ExpiresAt:       invite.GetExpiresAt(),
+		MaxUses:         invite.GetMaxUse(),
+		CurrentUses:     invite.GetCurrentUses(),
+		InviteCode:      invite.GetInviteCode(),
+		CreatedAt:       invite.GetCreatedAt(),
+		IsActive:        invite.GetIsActive(),
+	}
+}

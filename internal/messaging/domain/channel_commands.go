@@ -1,6 +1,8 @@
 package domain
 
 import (
+	"time"
+
 	"github.com/google/uuid"
 )
 
@@ -187,4 +189,41 @@ type AddBotToChannelCommand struct {
 
 func (c AddBotToChannelCommand) CommandName() string {
 	return "AddBotToChannel"
+}
+
+type CreateChannelInviteCommand struct {
+	ChannelID       uuid.UUID
+	CreatedByUserID uuid.UUID
+	ExpiresAt       time.Time
+	MaxUses         *int
+}
+
+func (c CreateChannelInviteCommand) CommandName() string {
+	return "CreateChannelInvite"
+}
+
+type AcceptChannelInviteCommand struct {
+	InviteCode string
+	UserID     uuid.UUID
+}
+
+func (c AcceptChannelInviteCommand) CommandName() string {
+	return "AcceptChannelInvite"
+}
+
+type GetChannelInvitesCommand struct {
+	ChannelID uuid.UUID
+}
+
+func (c GetChannelInvitesCommand) CommandName() string {
+	return "GetChannelInvites"
+}
+
+type DeactivateChannelInviteCommand struct {
+	InviteID uuid.UUID
+	UserID   uuid.UUID
+}
+
+func (c DeactivateChannelInviteCommand) CommandName() string {
+	return "DeactivateChannelInvite"
 }
