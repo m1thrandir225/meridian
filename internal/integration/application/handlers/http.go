@@ -317,7 +317,7 @@ func (h *HTTPHandler) handleCallbackMessage(ctx *gin.Context) {
 
 	var req CallbackMessageRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		ctx.JSON(http.StatusBadRequest, errorResponse(err))
 		return
 	}
 

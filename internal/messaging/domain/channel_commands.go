@@ -51,7 +51,7 @@ type LeaveChannelCommand struct {
 }
 
 func (c LeaveChannelCommand) CommandName() string {
-	return "LeaveChanel"
+	return "LeaveChannel"
 }
 
 type SendMessageCommand struct {

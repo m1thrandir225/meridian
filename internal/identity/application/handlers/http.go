@@ -30,7 +30,7 @@ func NewHTTPHandler(userService *services.IdentityService, cache *cache.RedisCac
 func (h *HTTPHandler) handleRegisterRequest(ctx *gin.Context) {
 	var req RegisterUserRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		ctx.JSON(http.StatusBadRequest, errorResponse(err))
 	}
 
 	cmd := domain.RegisterUserCommand{
@@ -44,12 +44,12 @@ func (h *HTTPHandler) handleRegisterRequest(ctx *gin.Context) {
 	user, err := h.userService.RegisterUser(ctx, cmd)
 	if err != nil {
 		if errors.Is(err, domain.ErrUsernameTaken) || errors.Is(err, domain.ErrEmailTaken) {
-			ctx.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+			ctx.JSON(http.StatusConflict, errorResponse(err))
 		} else if errors.Is(err, domain.ErrPasswordPolicy) || errors.Is(err, domain.ErrUsernameInvalid) || errors.Is(err, domain.ErrEmailInvalid) {
-			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			ctx.JSON(http.StatusBadRequest, errorResponse(err))
 		} else {
 			log.Printf("ERROR registering user: %v", err)
-			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to register user"})
+			ctx.JSON(http.StatusInternalServerError, errorResponse(err))
 		}
 		return
 	}
@@ -68,7 +68,7 @@ func (h *HTTPHandler) handleRegisterRequest(ctx *gin.Context) {
 func (h *HTTPHandler) handleLoginRequest(ctx *gin.Context) {
 	var req AuthenticateUserRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		ctx.JSON(http.StatusBadRequest, errorResponse(err))
 	}
 
 	cmd := domain.AuthenticateUserCommand{
@@ -79,10 +79,10 @@ func (h *HTTPHandler) handleLoginRequest(ctx *gin.Context) {
 	accessToken, refreshToken, claims, err := h.userService.AuthenticateUser(ctx, cmd)
 	if err != nil {
 		if errors.Is(err, domain.ErrAuthFailed) {
-			ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
+			ctx.JSON(http.StatusUnauthorized, errorResponse(err))
 		} else {
 			log.Printf("ERROR authenticating user: %v", err)
-			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Authentication process failed"})
+			ctx.JSON(http.StatusInternalServerError, errorResponse(err))
 		}
 		return
 	}
@@ -94,7 +94,7 @@ func (h *HTTPHandler) handleLoginRequest(ctx *gin.Context) {
 	user, err := h.userService.GetUser(ctx, getUserCMD)
 	if err != nil {
 		log.Printf("ERROR fetching user: %v", err)
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user, reason: " + err.Error()})
+		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
 		return
 	}
 
@@ -121,7 +121,7 @@ func (h *HTTPHandler) handleLoginRequest(ctx *gin.Context) {
 func (h *HTTPHandler) handleGetCurrentUser(ctx *gin.Context) {
 	userId, exists := auth.UserIDFromContext(ctx.Request.Context())
 	if !exists {
-		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: User ID not found in token"})
+		ctx.JSON(http.StatusUnauthorized, errorResponse(ErrUnauthorized))
 		return
 	}
 
@@ -139,7 +139,7 @@ func (h *HTTPHandler) handleGetCurrentUser(ctx *gin.Context) {
 	user, err := h.userService.GetUser(ctx, cmd)
 	if err != nil {
 		log.Printf("ERROR fetching user: %v", err)
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user, reason: " + err.Error()})
+		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
 		return
 	}
 
@@ -164,18 +164,18 @@ func (req *UpdateProfileRequest) HasAnyField() bool {
 func (h *HTTPHandler) handleUpdateCurrentUserRequest(ctx *gin.Context) {
 	userId, exists := auth.UserIDFromContext(ctx.Request.Context())
 	if !exists {
-		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: User ID not found in token"})
+		ctx.JSON(http.StatusUnauthorized, errorResponse(ErrUnauthorized))
 		return
 	}
 
 	var req UpdateProfileRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		ctx.JSON(http.StatusBadRequest, errorResponse(err))
 		return
 	}
 
 	if !req.HasAnyField() {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "At least one field must be provided to update profile"})
+		ctx.JSON(http.StatusBadRequest, errorResponse(errors.New("at least one field must be provided to update profile")))
 	}
 
 	var cmd domain.UpdateUserProfileCommand
@@ -196,7 +196,7 @@ func (h *HTTPHandler) handleUpdateCurrentUserRequest(ctx *gin.Context) {
 	updatedUser, err := h.userService.UpdateUserProfile(ctx, cmd)
 	if err != nil {
 		log.Printf("ERROR updating user profile: %v", err)
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user profile, reason: " + err.Error()})
+		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
 		return
 	}
 
@@ -216,12 +216,12 @@ func (h *HTTPHandler) handleUpdateCurrentUserRequest(ctx *gin.Context) {
 func (h *HTTPHandler) handleUpdateUserPasswordRequest(ctx *gin.Context) {
 	userId, exists := auth.UserIDFromContext(ctx.Request.Context())
 	if !exists {
-		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: User ID not found in token"})
+		ctx.JSON(http.StatusUnauthorized, errorResponse(ErrUnauthorized))
 		return
 	}
 	var req UpdatePasswordRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		ctx.JSON(http.StatusBadRequest, errorResponse(err))
 		return
 	}
 	cmd := domain.UpdateUserPasswordCommand{
@@ -232,7 +232,7 @@ func (h *HTTPHandler) handleUpdateUserPasswordRequest(ctx *gin.Context) {
 	err := h.userService.UpdateUserPassword(ctx, cmd)
 	if err != nil {
 		log.Printf("ERROR updating user password: %v", err)
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user password, reason: " + err.Error()})
+		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
 		return
 	}
 	ctx.Status(http.StatusAccepted)
@@ -242,7 +242,7 @@ func (h *HTTPHandler) handleUpdateUserPasswordRequest(ctx *gin.Context) {
 func (h *HTTPHandler) handleDeleteUserRequest(ctx *gin.Context) {
 	userId, exists := auth.UserIDFromContext(ctx.Request.Context())
 	if !exists {
-		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: User ID not found in token"})
+		ctx.JSON(http.StatusUnauthorized, errorResponse(ErrUnauthorized))
 		return
 	}
 
@@ -252,7 +252,7 @@ func (h *HTTPHandler) handleDeleteUserRequest(ctx *gin.Context) {
 	err := h.userService.DeleteUser(ctx, cmd)
 	if err != nil {
 		log.Printf("ERROR deleting user: %v", err)
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete user, reason: " + err.Error()})
+		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
 		return
 	}
 	ctx.Status(http.StatusAccepted)
@@ -262,7 +262,7 @@ func (h *HTTPHandler) handleDeleteUserRequest(ctx *gin.Context) {
 func (h *HTTPHandler) handleRefreshTokenRequest(ctx *gin.Context) {
 	var req RefreshTokenRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		ctx.JSON(http.StatusBadRequest, errorResponse(err))
 	}
 
 	cmd := domain.RefreshTokenCommand{
@@ -274,7 +274,7 @@ func (h *HTTPHandler) handleRefreshTokenRequest(ctx *gin.Context) {
 	newAccessToken, newRefreshToken, err := h.userService.RefreshAuthentication(ctx, cmd)
 	if err != nil {
 		log.Printf("Refresh token failed: %v", err)
-		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid refresh token"})
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, errorResponse(err))
 		return
 	}
 

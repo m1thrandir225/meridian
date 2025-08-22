@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 	"sync"
@@ -15,7 +14,9 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/m1thrandir225/meridian/internal/messaging/application/services"
 	"github.com/m1thrandir225/meridian/internal/messaging/domain"
+	"github.com/m1thrandir225/meridian/pkg/logging"
 	"github.com/redis/go-redis/v9"
+	"go.uber.org/zap"
 )
 
 type WebSocketHandler struct {
@@ -26,9 +27,16 @@ type WebSocketHandler struct {
 	messageService *services.MessageService
 	redisClient    *redis.Client
 	identityClient *services.IdentityClient
+	logger         *logging.Logger
 }
 
-func NewWebSocketHandler(channelService *services.ChannelService, messageService *services.MessageService, redisClient *redis.Client, identityClient *services.IdentityClient) *WebSocketHandler {
+func NewWebSocketHandler(
+	channelService *services.ChannelService,
+	messageService *services.MessageService,
+	redisClient *redis.Client,
+	identityClient *services.IdentityClient,
+	logger *logging.Logger,
+) *WebSocketHandler {
 	handler := &WebSocketHandler{
 		upgrader: websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool {
@@ -40,6 +48,7 @@ func NewWebSocketHandler(channelService *services.ChannelService, messageService
 		messageService: messageService,
 		redisClient:    redisClient,
 		identityClient: identityClient,
+		logger:         logger,
 	}
 
 	if redisClient != nil {
@@ -50,24 +59,26 @@ func NewWebSocketHandler(channelService *services.ChannelService, messageService
 }
 
 func (h *WebSocketHandler) HandleWebSocket(c *gin.Context) {
+	logger := h.logger.WithMethod("HandleWebSocket")
+	logger.Info("Handling WebSocket")
+
 	token := c.Query("token")
 	if token == "" {
-		log.Printf("No token provided")
+		h.logger.Error("No token provided")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
 	}
 
 	userID, err := h.validateToken(c.Request.Context(), token)
 	if err != nil {
-		log.Printf("Failed to validate token: %v", err)
+		logger.Error("Failed to validate token", zap.Error(err))
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
 	}
 
 	conn, err := h.upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
-		log.Printf("Failed to upgrade connection")
-		log.Printf("Failed to upgrade connection: %v", err)
+		logger.Error("Failed to upgrade connection", zap.Error(err))
 		return
 	}
 	defer conn.Close()
@@ -75,7 +86,7 @@ func (h *WebSocketHandler) HandleWebSocket(c *gin.Context) {
 	h.addClient(userID, conn)
 	defer h.removeClient(userID)
 
-	log.Printf("WebSocket connection established for user: %s", userID)
+	logger.Info("WebSocket connection established", zap.String("user_id", userID))
 
 	// Send connection confirmation
 	h.sendToClient(userID, WebSocketMessage{
@@ -89,7 +100,7 @@ func (h *WebSocketHandler) HandleWebSocket(c *gin.Context) {
 		err := conn.ReadJSON(&msg)
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("WebSocket error: %v", err)
+				logger.Error("WebSocket error", zap.Error(err))
 			}
 			break
 		}
@@ -104,7 +115,7 @@ func (h *WebSocketHandler) HandleWebSocket(c *gin.Context) {
 		case "message":
 			err := h.handleIncomingMessage(userID, msg.Payload)
 			if err != nil {
-				log.Printf("Failed to handle message from user %s: %v", userID, err)
+				logger.Error("Failed to handle message from user", zap.String("user_id", userID), zap.Error(err))
 				h.sendToClient(userID, WebSocketMessage{
 					Type:    "error",
 					Payload: map[string]string{"message": "Failed to send message", "error": err.Error()},
@@ -113,7 +124,7 @@ func (h *WebSocketHandler) HandleWebSocket(c *gin.Context) {
 		case "add_reaction":
 			err := h.handleIncomingReaction(userID, msg.Payload)
 			if err != nil {
-				log.Printf("Failed to handle reaction from user %s: %v", userID, err)
+				logger.Error("Failed to handle reaction from user", zap.String("user_id", userID), zap.Error(err))
 				h.sendToClient(userID, WebSocketMessage{
 					Type:    "error",
 					Payload: map[string]string{"message": "Failed to add reaction", "error": err.Error()},
@@ -122,7 +133,7 @@ func (h *WebSocketHandler) HandleWebSocket(c *gin.Context) {
 		case "remove_reaction":
 			err := h.handleRemoveReaction(userID, msg.Payload)
 			if err != nil {
-				log.Printf("Failed to handle reaction from user %s: %v", userID, err)
+				logger.Error("Failed to handle reaction from user", zap.String("user_id", userID), zap.Error(err))
 				h.sendToClient(userID, WebSocketMessage{
 					Type:    "error",
 					Payload: map[string]string{"message": "Failed to remove reaction", "error": err.Error()},
@@ -133,39 +144,48 @@ func (h *WebSocketHandler) HandleWebSocket(c *gin.Context) {
 		case "typing_stop":
 			h.handleTypingIndicator(userID, msg.Payload, "typing_stop")
 		default:
-			log.Printf("Unknown message type: %s from user: %s", msg.Type, userID)
+			logger.Error("Unknown message type", zap.String("message_type", msg.Type), zap.String("user_id", userID))
 		}
 	}
 }
 
 func (h *WebSocketHandler) handleIncomingMessage(senderID string, payload interface{}) error {
+	logger := h.logger.WithMethod("handleIncomingMessage")
+	logger.Info("Handling incoming message")
+
 	// Parse the message payload
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
+		logger.Error("Failed to marshal payload", zap.Error(err))
 		return err
 	}
 
 	var incomingMsg IncomingMessagePayload
 	if err := json.Unmarshal(payloadBytes, &incomingMsg); err != nil {
+		logger.Error("Failed to unmarshal payload", zap.Error(err))
 		return err
 	}
 
 	// Validate required fields
 	if incomingMsg.ChannelID == "" {
+		logger.Error("Channel ID is required")
 		return fmt.Errorf("channel_id is required")
 	}
 	if incomingMsg.Content == "" {
+		logger.Error("Content is required")
 		return fmt.Errorf("content is required")
 	}
 
 	// Parse UUIDs
 	senderUUID, err := uuid.Parse(senderID)
 	if err != nil {
+		logger.Error("Invalid sender ID", zap.Error(err))
 		return fmt.Errorf("invalid sender ID: %w", err)
 	}
 
 	channelUUID, err := uuid.Parse(incomingMsg.ChannelID)
 	if err != nil {
+		logger.Error("Invalid channel ID", zap.Error(err))
 		return fmt.Errorf("invalid channel ID: %w", err)
 	}
 
@@ -173,6 +193,7 @@ func (h *WebSocketHandler) handleIncomingMessage(senderID string, payload interf
 	if incomingMsg.ParentMessageID != "" {
 		parentUUID, err := uuid.Parse(incomingMsg.ParentMessageID)
 		if err != nil {
+			logger.Error("Invalid parent message ID", zap.Error(err))
 			return fmt.Errorf("invalid parent message ID: %w", err)
 		}
 		parentMessageUUID = &parentUUID
@@ -193,10 +214,12 @@ func (h *WebSocketHandler) handleIncomingMessage(senderID string, payload interf
 
 	message, err := h.messageService.HandleMessageSent(ctx, cmd)
 	if err != nil {
+		logger.Error("Failed to send message", zap.Error(err))
 		return fmt.Errorf("failed to send message: %w", err)
 	}
 	messageDTO, err := h.messageService.ToMessageDTO(ctx, message)
 	if err != nil {
+		logger.Error("Failed to convert message to DTO", zap.Error(err))
 		return fmt.Errorf("failed to convert message to DTO: %w", err)
 	}
 
@@ -261,41 +284,52 @@ func (h *WebSocketHandler) handleIncomingMessage(senderID string, payload interf
 	return nil
 }
 func (h *WebSocketHandler) handleIncomingReaction(userID string, payload interface{}) error {
+	logger := h.logger.WithMethod("handleIncomingReaction")
+	logger.Info("Handling incoming reaction")
+
 	// Parse the reaction payload
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
+		logger.Error("Failed to marshal payload", zap.Error(err))
 		return err
 	}
 
 	var incomingReaction IncomingReactionPayload
 	if err := json.Unmarshal(payloadBytes, &incomingReaction); err != nil {
+		logger.Error("Failed to unmarshal payload", zap.Error(err))
 		return err
 	}
 
 	// Validate required fields
 	if incomingReaction.MessageID == "" {
+		logger.Error("Message ID is required")
 		return fmt.Errorf("message_id is required")
 	}
 	if incomingReaction.ChannelID == "" {
+		logger.Error("Channel ID is required")
 		return fmt.Errorf("channel_id is required")
 	}
 	if incomingReaction.ReactionType == "" {
+		logger.Error("Reaction type is required")
 		return fmt.Errorf("reaction_type is required")
 	}
 
 	// Parse UUIDs
 	userUUID, err := uuid.Parse(userID)
 	if err != nil {
+		logger.Error("Invalid user ID", zap.Error(err))
 		return fmt.Errorf("invalid user ID: %w", err)
 	}
 
 	channelUUID, err := uuid.Parse(incomingReaction.ChannelID)
 	if err != nil {
+		logger.Error("Invalid channel ID", zap.Error(err))
 		return fmt.Errorf("invalid channel ID: %w", err)
 	}
 
 	messageUUID, err := uuid.Parse(incomingReaction.MessageID)
 	if err != nil {
+		logger.Error("Invalid message ID", zap.Error(err))
 		return fmt.Errorf("invalid message ID: %w", err)
 	}
 
@@ -312,6 +346,7 @@ func (h *WebSocketHandler) handleIncomingReaction(userID string, payload interfa
 
 	reaction, err := h.messageService.HandleAddReaction(ctx, cmd)
 	if err != nil {
+		logger.Error("Failed to add reaction", zap.Error(err))
 		return fmt.Errorf("failed to add reaction: %w", err)
 	}
 
@@ -337,38 +372,49 @@ func (h *WebSocketHandler) handleIncomingReaction(userID string, payload interfa
 }
 
 func (h *WebSocketHandler) handleRemoveReaction(userID string, payload interface{}) error {
+	logger := h.logger.WithMethod("handleRemoveReaction")
+	logger.Info("Handling remove reaction")
+
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
+		logger.Error("Failed to marshal payload", zap.Error(err))
 		return err
 	}
 
 	var incomingReaction IncomingReactionPayload
 	if err := json.Unmarshal(payloadBytes, &incomingReaction); err != nil {
+		logger.Error("Failed to unmarshal payload", zap.Error(err))
 		return err
 	}
 
 	if incomingReaction.MessageID == "" {
+		logger.Error("Message ID is required")
 		return fmt.Errorf("message_id is required")
 	}
 	if incomingReaction.ChannelID == "" {
+		logger.Error("Channel ID is required")
 		return fmt.Errorf("channel_id is required")
 	}
 	if incomingReaction.ReactionType == "" {
+		logger.Error("Reaction type is required")
 		return fmt.Errorf("reaction_type is required")
 	}
 
 	userUUID, err := uuid.Parse(userID)
 	if err != nil {
+		logger.Error("Invalid user ID", zap.Error(err))
 		return fmt.Errorf("invalid user ID: %w", err)
 	}
 
 	channelUUID, err := uuid.Parse(incomingReaction.ChannelID)
 	if err != nil {
+		logger.Error("Invalid channel ID", zap.Error(err))
 		return fmt.Errorf("invalid channel ID: %w", err)
 	}
 
 	messageUUID, err := uuid.Parse(incomingReaction.MessageID)
 	if err != nil {
+		logger.Error("Invalid message ID", zap.Error(err))
 		return fmt.Errorf("invalid message ID: %w", err)
 	}
 
@@ -384,6 +430,7 @@ func (h *WebSocketHandler) handleRemoveReaction(userID string, payload interface
 
 	reaction, err := h.messageService.HandleRemoveReaction(ctx, cmd)
 	if err != nil {
+		logger.Error("Failed to remove reaction", zap.Error(err))
 		return fmt.Errorf("failed to remove reaction: %w", err)
 	}
 
@@ -409,19 +456,23 @@ func (h *WebSocketHandler) handleRemoveReaction(userID string, payload interface
 }
 
 func (h *WebSocketHandler) handleTypingIndicator(userID string, payload interface{}, typingType string) {
+	logger := h.logger.WithMethod("handleTypingIndicator")
+	logger.Info("Handling typing indicator")
+
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
-		log.Printf("Failed to marshal typing payload: %v", err)
+		logger.Error("Failed to marshal typing payload", zap.Error(err))
 		return
 	}
 
 	var typingPayload TypingPayload
 	if err := json.Unmarshal(payloadBytes, &typingPayload); err != nil {
-		log.Printf("Failed to unmarshal typing payload: %v", err)
+		logger.Error("Failed to unmarshal typing payload", zap.Error(err))
 		return
 	}
 
 	if typingPayload.ChannelID == "" {
+		logger.Error("Channel ID is required")
 		return
 	}
 
@@ -443,23 +494,33 @@ func (h *WebSocketHandler) handleTypingIndicator(userID string, payload interfac
 }
 
 func (h *WebSocketHandler) addClient(userID string, conn *websocket.Conn) {
+	logger := h.logger.WithMethod("addClient")
+	logger.Info("Adding client")
+
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.clients[userID] = conn
 }
 
 func (h *WebSocketHandler) removeClient(userID string) {
+	logger := h.logger.WithMethod("removeClient")
+	logger.Info("Removing client")
+
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	delete(h.clients, userID)
 }
 
 func (h *WebSocketHandler) sendToClient(userID string, message WebSocketMessage) error {
+	logger := h.logger.WithMethod("sendToClient")
+	logger.Info("Sending to client")
+
 	h.mu.RLock()
 	conn, exists := h.clients[userID]
 	h.mu.RUnlock()
 
 	if !exists {
+		logger.Error("Client not connected")
 		return nil // Client not connected
 	}
 
@@ -467,6 +528,9 @@ func (h *WebSocketHandler) sendToClient(userID string, message WebSocketMessage)
 }
 
 func (h *WebSocketHandler) publishMessageToRedis(message OutgoingMessagePayload) {
+	logger := h.logger.WithMethod("publishMessageToRedis")
+	logger.Info("Publishing message to Redis")
+
 	if h.redisClient == nil {
 		return
 	}
@@ -479,14 +543,14 @@ func (h *WebSocketHandler) publishMessageToRedis(message OutgoingMessagePayload)
 	})
 
 	if err != nil {
-		log.Printf("Failed to marshal message: %v", err)
+		logger.Error("Failed to marshal message", zap.Error(err))
 		return
 	}
 
 	channelKey := fmt.Sprintf("channel:%s", message.ChannelID)
 	err = h.redisClient.Publish(ctx, channelKey, messageJSON).Err()
 	if err != nil {
-		log.Printf("Failed to publish message to Redis: %v", err)
+		logger.Error("Failed to publish message to Redis", zap.Error(err))
 	}
 
 	messageKey := fmt.Sprintf("message:%s", message.ID)
@@ -501,6 +565,9 @@ func (h *WebSocketHandler) publishMessageToRedis(message OutgoingMessagePayload)
 }
 
 func (h *WebSocketHandler) publishTypingToRedis(channelID string, typingMsg WebSocketMessage) {
+	logger := h.logger.WithMethod("publishTypingToRedis")
+	logger.Info("Publishing typing to Redis")
+
 	if h.redisClient == nil {
 		return
 	}
@@ -509,18 +576,21 @@ func (h *WebSocketHandler) publishTypingToRedis(channelID string, typingMsg WebS
 
 	typingJSON, err := json.Marshal(typingMsg)
 	if err != nil {
-		log.Printf("Failed to marshal typing message: %v", err)
+		logger.Error("Failed to marshal typing message", zap.Error(err))
 		return
 	}
 
 	channelKey := fmt.Sprintf("channel:%s", channelID)
 	err = h.redisClient.Publish(ctx, channelKey, typingJSON).Err()
 	if err != nil {
-		log.Printf("Failed to publish typing message to Redis: %v", err)
+		logger.Error("Failed to publish typing message to Redis", zap.Error(err))
 	}
 }
 
 func (h *WebSocketHandler) subscribeToRedisMessages() {
+	logger := h.logger.WithMethod("subscribeToRedisMessages")
+	logger.Info("Subscribing to Redis messages")
+
 	if h.redisClient == nil {
 		return
 	}
@@ -534,7 +604,7 @@ func (h *WebSocketHandler) subscribeToRedisMessages() {
 	for msg := range ch {
 		var wsMessage WebSocketMessage
 		if err := json.Unmarshal([]byte(msg.Payload), &wsMessage); err != nil {
-			log.Printf("Failed to unmarshal message: %v", err)
+			logger.Error("Failed to unmarshal message", zap.Error(err))
 			continue
 		}
 		if strings.HasPrefix(msg.Channel, "channel:") {
@@ -545,6 +615,9 @@ func (h *WebSocketHandler) subscribeToRedisMessages() {
 }
 
 func (h *WebSocketHandler) publishReactionToRedis(reaction OutgoingReactionPayload) {
+	logger := h.logger.WithMethod("publishReactionToRedis")
+	logger.Info("Publishing reaction to Redis")
+
 	if h.redisClient == nil {
 		return
 	}
@@ -557,18 +630,21 @@ func (h *WebSocketHandler) publishReactionToRedis(reaction OutgoingReactionPaylo
 	})
 
 	if err != nil {
-		log.Printf("Failed to marshal reaction: %v", err)
+		logger.Error("Failed to marshal reaction", zap.Error(err))
 		return
 	}
 
 	channelKey := fmt.Sprintf("channel:%s", reaction.ChannelID)
 	err = h.redisClient.Publish(ctx, channelKey, reactionJSON).Err()
 	if err != nil {
-		log.Printf("Failed to publish reaction to Redis: %v", err)
+		logger.Error("Failed to publish reaction to Redis", zap.Error(err))
 	}
 }
 
 func (h *WebSocketHandler) publishReactionRemovedToRedis(reaction OutgoingReactionPayload) {
+	logger := h.logger.WithMethod("publishReactionRemovedToRedis")
+	logger.Info("Publishing reaction removed to Redis")
+
 	if h.redisClient == nil {
 		return
 	}
@@ -581,19 +657,22 @@ func (h *WebSocketHandler) publishReactionRemovedToRedis(reaction OutgoingReacti
 	})
 
 	if err != nil {
-		log.Printf("Failed to marshal reaction removal: %v", err)
+		logger.Error("Failed to marshal reaction removal", zap.Error(err))
 		return
 	}
 
 	channelKey := fmt.Sprintf("channel:%s", reaction.ChannelID)
 	err = h.redisClient.Publish(ctx, channelKey, reactionJSON).Err()
 	if err != nil {
-		log.Printf("Failed to publish reaction removal to Redis: %v", err)
+		logger.Error("Failed to publish reaction removal to Redis", zap.Error(err))
 	}
 
 }
 
 func (h *WebSocketHandler) broadcastToChannel(channelID string, message WebSocketMessage) {
+	logger := h.logger.WithMethod("broadcastToChannel")
+	logger.Info("Broadcasting to channel")
+
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 
@@ -601,7 +680,7 @@ func (h *WebSocketHandler) broadcastToChannel(channelID string, message WebSocke
 		err := conn.WriteJSON(message)
 		//TODO: check if the current user is a member of the channel
 		if err != nil {
-			log.Printf("Failed to send message to user %s: %v", userID, err)
+			logger.Error("Failed to send message to user", zap.String("user_id", userID), zap.Error(err))
 			conn.Close()
 			delete(h.clients, userID)
 		}
@@ -609,12 +688,15 @@ func (h *WebSocketHandler) broadcastToChannel(channelID string, message WebSocke
 }
 
 func (h *WebSocketHandler) BroadcastMessage(message *domain.Message) {
+	logger := h.logger.WithMethod("BroadcastMessage")
+	logger.Info("Broadcasting message")
+
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	messageDTO, err := h.messageService.ToMessageDTO(ctx, message)
 	if err != nil {
-		log.Printf("Failed to convert message to DTO: %v", err)
+		logger.Error("Failed to convert message to DTO", zap.Error(err))
 		return
 	}
 
@@ -680,12 +762,19 @@ func (h *WebSocketHandler) BroadcastMessage(message *domain.Message) {
 }
 
 func (h *WebSocketHandler) SendToUser(userID string, message WebSocketMessage) error {
+	logger := h.logger.WithMethod("SendToUser")
+	logger.Info("Sending to user")
+
 	return h.sendToClient(userID, message)
 }
 
 func (h *WebSocketHandler) validateToken(ctx context.Context, token string) (string, error) {
+	logger := h.logger.WithMethod("validateToken")
+	logger.Info("Validating token")
+
 	resp, err := h.identityClient.ValidateToken(ctx, token)
 	if err != nil {
+		logger.Error("Failed to validate token", zap.Error(err))
 		return "", fmt.Errorf("failed to validate token: %w", err)
 	}
 

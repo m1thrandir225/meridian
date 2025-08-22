@@ -7,6 +7,7 @@ import (
 	"github.com/m1thrandir225/meridian/internal/identity/application/services"
 	"github.com/m1thrandir225/meridian/pkg/auth"
 	"github.com/m1thrandir225/meridian/pkg/cache"
+	"github.com/m1thrandir225/meridian/pkg/logging"
 )
 
 func SetupIdentityRouter(
@@ -14,11 +15,13 @@ func SetupIdentityRouter(
 	cache *cache.RedisCache,
 	tokenVerifier auth.TokenVerifier,
 	integrationGrpcURL string,
+	logger *logging.Logger,
 ) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
+
 	router := gin.New()
-	router.Use(gin.Logger())
-	router.Use(gin.Recovery())
+	router.Use(logging.GinLoggingMiddleware(logger))
+	router.Use(logging.GinRecoveryMiddleware(logger))
 
 	handler := NewHTTPHandler(service, cache)
 	authHandler := NewAuthHandler(service, cache, tokenVerifier, integrationGrpcURL)

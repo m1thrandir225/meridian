@@ -9,6 +9,8 @@ import (
 
 const API_TOKEN_BYTES = 32
 
+// Integration is the aggregate root for the integration domain
+// It represents a single integration with a service, such as a bot or a webhook
 type Integration struct {
 	ID               IntegrationID
 	ServiceName      string
@@ -18,6 +20,7 @@ type Integration struct {
 	CreatedAt        time.Time
 	IsRevoked        bool
 	TargetChannelIDs []ChannelIDRef
+	Version          int64
 	events           []common.DomainEvent
 }
 
@@ -45,8 +48,11 @@ func NewIntegration(serviceName string, creatorID UserIDRef, targetChannels []Ch
 		TokenLookupHash:  GenerateLookupHash(rawToken),
 		IsRevoked:        false,
 		TargetChannelIDs: targetChannels,
+		Version:          1,
 		events:           make([]common.DomainEvent, 0),
 	}
+
+	integration.addEvent(CreateIntegrationRegisteredEvent(integration))
 
 	return integration, nil
 }
@@ -62,11 +68,15 @@ func (i *Integration) Events() []common.DomainEvent {
 func (i *Integration) ClearEvents() {
 	i.events = nil
 }
+
 func (i *Integration) Revoke() error {
 	if i.IsRevoked {
 		return ErrIntegrationRevoked
 	}
 	i.IsRevoked = true
+	i.Version++
+
+	i.addEvent(CreateAPITokenRevokedEvent(i))
 	return nil
 }
 
@@ -75,6 +85,9 @@ func (i *Integration) UpdateTargetChannels(newChannels []ChannelIDRef) error {
 		return ErrNoTargetChannels
 	}
 	i.TargetChannelIDs = newChannels
+	i.Version++
+
+	i.addEvent(CreateIntegrationTargetChannelsUpdatedEvent(i))
 	return nil
 }
 

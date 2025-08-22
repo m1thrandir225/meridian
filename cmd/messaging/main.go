@@ -14,7 +14,9 @@ import (
 
 	"github.com/m1thrandir225/meridian/pkg/cache"
 	"github.com/m1thrandir225/meridian/pkg/kafka"
+	"github.com/m1thrandir225/meridian/pkg/logging"
 	"github.com/redis/go-redis/v9"
+	"go.uber.org/zap"
 
 	"github.com/IBM/sarama"
 	"github.com/gin-gonic/gin"
@@ -34,6 +36,8 @@ type Config struct {
 	IdentityGRPCURL    string
 	IntegrationGRPCURL string
 	RedisURL           string
+	Environment        string
+	LogLevel           string
 }
 
 func loadConfig() (*Config, error) {
@@ -77,6 +81,18 @@ func loadConfig() (*Config, error) {
 		return nil, fmt.Errorf("missing INTEGRATION_GRPC_URL")
 	}
 
+	environment := os.Getenv("MESSAGING_ENVIRONMENT")
+	if environment == "" {
+		environment = "development"
+		fmt.Printf("WARN: MESSAGING_ENVIRONMENT is not set, using default %s\n", environment)
+	}
+
+	level := os.Getenv("MESSAGING_LOG_LEVEL")
+	if level == "" {
+		level = "info"
+		fmt.Printf("WARN: MESSAGING_LOG_LEVEL is not set, using default %s\n", level)
+	}
+
 	return &Config{
 		HTTPPort:           httpPort,
 		DatabaseURL:        dbURL,
@@ -86,6 +102,8 @@ func loadConfig() (*Config, error) {
 		IdentityGRPCURL:    identityGRPCURL,
 		RedisURL:           redisURL,
 		IntegrationGRPCURL: integrationGRPCURL,
+		Environment:        environment,
+		LogLevel:           level,
 	}, nil
 }
 
@@ -96,11 +114,16 @@ func main() {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 
-	logger := log.New(os.Stdout, "[MessagingService] ", log.LstdFlags|log.Lshortfile)
-	logger.Println("Starting message service...")
+	logger := logging.NewLogger(logging.Config{
+		ServiceName: "[MessagingService]",
+		Environment: cfg.Environment,
+		LogLevel:    cfg.LogLevel,
+	})
+	logger.Info("Starting service...")
 
 	dbPool, err := pgxpool.New(ctx, cfg.DatabaseURL)
 	if err != nil {
+		logger.Fatal("Unable to connect to database", zap.Error(err))
 	}
 	defer dbPool.Close()
 
@@ -119,56 +142,79 @@ func main() {
 
 	producer, err := sarama.NewSyncProducer(cfg.KafkaBrokers, config)
 	if err != nil {
-		logger.Fatalf("Failed to create Kafka sync producer: %v", err)
+		logger.Fatal("Failed to create Kafka sync producer", zap.Error(err))
 	}
 
 	defer func() {
 		if err := producer.Close(); err != nil {
-			logger.Printf("ERROR closing Kafka producer: %v", err)
+			logger.Error("ERROR closing Kafka producer", zap.Error(err))
 		}
 	}()
 
-	logger.Println("Kafka sync producer initialized.")
+	logger.Info("Kafka sync producer initialized.")
 
 	eventPublisher := kafka.NewSaramaEventPublisher(producer, cfg.KafkaDefaultTopic)
-	logger.Println("Kafka event publisher initialized.")
+	logger.Info("Kafka event publisher initialized.")
 
 	repository := persistence.NewPostgresChannelRepository(dbPool)
-	logger.Println("Database pool initialized.")
+	logger.Info("Database pool initialized.")
 
 	identityClient, err := services.NewIdentityClient(cfg.IdentityGRPCURL)
 	if err != nil {
-		logger.Fatalf("Failed to create identity client: %v", err)
+		logger.Fatal("Failed to create identity client", zap.Error(err))
 	}
 	defer identityClient.Close()
 
 	integrationClient, err := services.NewIntegrationClient(cfg.IntegrationGRPCURL)
 	if err != nil {
-		logger.Fatalf("Failed to create integration client: %v", err)
+		logger.Fatal("Failed to create integration client", zap.Error(err))
 	}
 	defer integrationClient.Close()
 
-	channelService := services.NewChannelService(repository, eventPublisher, identityClient, integrationClient)
-	logger.Println("Channel service initialized.")
+	channelService := services.NewChannelService(
+		repository,
+		eventPublisher,
+		identityClient,
+		integrationClient,
+		logger,
+	)
+	logger.Info("Channel service initialized.")
 
-	messageService := services.NewMessageService(repository, eventPublisher, identityClient, integrationClient)
-	logger.Println("Message service initialized.")
+	messageService := services.NewMessageService(
+		repository,
+		eventPublisher,
+		identityClient,
+		integrationClient,
+		logger,
+	)
+	logger.Info("Message service initialized.")
 
-	httpHandler := handlers.NewHttpHandler(channelService, messageService, redisCache)
-	logger.Println("HTTP Handler initialized")
+	httpHandler := handlers.NewHttpHandler(
+		channelService,
+		messageService,
+		redisCache,
+		logger,
+	)
+	logger.Info("HTTP Handler initialized")
 
-	wsHandler := handlers.NewWebSocketHandler(channelService, messageService, redisClient, identityClient)
-	logger.Println("WebSocket Handler initialized")
+	wsHandler := handlers.NewWebSocketHandler(
+		channelService,
+		messageService,
+		redisClient,
+		identityClient,
+		logger,
+	)
+	logger.Info("WebSocket Handler initialized")
 
 	// -- GIN ROUTE SETUP --
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.Default()
 
-	router.Use(gin.Logger())
-	router.Use(gin.Recovery())
+	router.Use(logging.GinLoggingMiddleware(logger))
+	router.Use(logging.GinRecoveryMiddleware(logger))
 
 	handlers.SetupRoutes(router, httpHandler, wsHandler)
-	logger.Println("HTTP Routes initialized")
+	logger.Info("HTTP Routes initialized")
 
 	// -- HTTP SERVER  --
 	httpServer := &http.Server{
@@ -177,22 +223,23 @@ func main() {
 	}
 
 	go func() {
-		logger.Printf("Starting gRPC server on %s", cfg.GRPCPort)
+		logger.Info("Starting gRPC server", zap.String("port", cfg.GRPCPort))
 		if err := handlers.StartGRPCServer(
 			cfg.GRPCPort,
 			channelService,
 			messageService,
 			wsHandler,
 			redisCache,
+			logger,
 		); err != nil {
-			logger.Fatalf("Failed to start gRPC server: %v", err)
+			logger.Fatal("Failed to start gRPC server", zap.Error(err))
 		}
 	}()
 
 	go func() {
-		logger.Printf("HTTP Server listening on %s", cfg.HTTPPort)
+		logger.Info("HTTP Server listening", zap.String("port", cfg.HTTPPort))
 		if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			logger.Fatalf("Failed to start HTTP server: %v", err)
+			logger.Fatal("Failed to start HTTP server", zap.Error(err))
 		}
 	}()
 
@@ -200,7 +247,7 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	logger.Println("Shutting down the server")
+	logger.Info("Shutting down the server")
 	cancel()
 
 	_, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)

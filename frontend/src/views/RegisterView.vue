@@ -5,6 +5,7 @@ import authService from '@/services/auth.service'
 import type { RegisterRequest } from '@/types/responses/auth'
 import { useMutation } from '@tanstack/vue-query'
 import { useRouter } from 'vue-router'
+import { toast } from 'vue-sonner'
 
 const router = useRouter()
 
@@ -15,6 +16,10 @@ const { mutateAsync, status } = useMutation({
     router.push({
       name: 'login',
     })
+  },
+  onError: (error) => {
+    console.log(error)
+    toast.error(error.message)
   },
 })
 

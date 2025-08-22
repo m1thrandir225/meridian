@@ -13,13 +13,13 @@ func AuthenticationMiddleware(verifier auth.TokenVerifier) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		authHeader := ctx.GetHeader("Authorization")
 		if authHeader == "" {
-			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Authorization header required"})
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, errorResponse(ErrUnauthorized))
 			return
 		}
 
 		parts := strings.Split(authHeader, " ")
 		if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
-			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Authorization header format must be Bearer {token}"})
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, errorResponse(ErrInvalidAuthorizationFormat))
 			return
 		}
 		tokenString := parts[1]
@@ -27,13 +27,13 @@ func AuthenticationMiddleware(verifier auth.TokenVerifier) gin.HandlerFunc {
 		claims, err := verifier.Verify(tokenString)
 		if err != nil {
 			log.Printf("Token verification failed: %v", err)
-			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, errorResponse(ErrInvalidToken))
 			return
 		}
 
 		if claims == nil {
 			log.Printf("AuthenticationMiddleware: Token verification returned nil claims")
-			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid token claims"})
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, errorResponse(ErrInvalidToken))
 			return
 		}
 

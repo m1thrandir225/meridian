@@ -6,18 +6,20 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/m1thrandir225/meridian/internal/integration/application/services"
 	"github.com/m1thrandir225/meridian/pkg/cache"
+	"github.com/m1thrandir225/meridian/pkg/logging"
 )
 
 func SetupIntegrationRouter(
 	service *services.IntegrationService,
 	cache *cache.RedisCache,
 	messageClient *services.MessagingClient,
+	logger *logging.Logger,
 ) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
 
-	router.Use(gin.Logger())
-	router.Use(gin.Recovery())
+	router.Use(logging.GinLoggingMiddleware(logger))
+	router.Use(logging.GinRecoveryMiddleware(logger))
 
 	handler := NewHttpHandler(service, cache, messageClient)
 

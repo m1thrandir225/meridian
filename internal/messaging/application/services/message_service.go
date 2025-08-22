@@ -9,6 +9,8 @@ import (
 	"github.com/m1thrandir225/meridian/internal/messaging/domain"
 	"github.com/m1thrandir225/meridian/internal/messaging/infrastructure/persistence"
 	"github.com/m1thrandir225/meridian/pkg/kafka"
+	"github.com/m1thrandir225/meridian/pkg/logging"
+	"go.uber.org/zap"
 )
 
 type MessageService struct {
@@ -16,25 +18,32 @@ type MessageService struct {
 	eventPub          kafka.EventPublisher
 	identityClient    *IdentityClient
 	integrationClient *IntegrationClient
+	logger            *logging.Logger
 }
 
-func NewMessageService(repo persistence.ChannelRepository, eventPub kafka.EventPublisher, identityClient *IdentityClient, integrationClient *IntegrationClient) *MessageService {
+func NewMessageService(repo persistence.ChannelRepository, eventPub kafka.EventPublisher, identityClient *IdentityClient, integrationClient *IntegrationClient, logger *logging.Logger) *MessageService {
 	return &MessageService{
 		repo:              repo,
 		eventPub:          eventPub,
 		identityClient:    identityClient,
 		integrationClient: integrationClient,
+		logger:            logger,
 	}
 }
 
 func (s *MessageService) HandleListMessages(ctx context.Context, cmd domain.ListMessagesForChannelCommand) ([]domain.Message, error) {
+	logger := s.logger.WithMethod("HandleListMessages")
+	logger.Info("Listing messages for channel", zap.String("channel_id", cmd.ChannelID.String()))
+
 	channel, err := s.repo.FindById(ctx, cmd.ChannelID)
 	if err != nil {
+		logger.Error("Failed to find channel", zap.Error(err))
 		return nil, err
 	}
 
 	messages, err := s.repo.FindMessages(context.Background(), cmd.ChannelID, cmd.Limit, cmd.Offset)
 	if err != nil {
+		logger.Error("Failed to find messages", zap.Error(err))
 		return nil, err
 	}
 
@@ -42,16 +51,22 @@ func (s *MessageService) HandleListMessages(ctx context.Context, cmd domain.List
 
 	err = s.eventPub.PublishEvents(ctx, channel.GetPendingEvents())
 	if err != nil {
+		logger.Error("Failed to publish events", zap.Error(err))
 		return nil, err
 	}
 	channel.ClearPendingEvents()
 
+	logger.Info("Messages listed", zap.Int("count", len(messages)))
 	return messages, nil
 }
 
 func (s *MessageService) HandleMessageSent(ctx context.Context, cmd domain.SendMessageCommand) (*domain.Message, error) {
+	logger := s.logger.WithMethod("HandleMessageSent")
+	logger.Info("Sending message", zap.String("channel_id", cmd.ChannelID.String()))
+
 	channel, err := s.repo.FindById(ctx, cmd.ChannelID)
 	if err != nil {
+		logger.Error("Failed to find channel", zap.Error(err))
 		return nil, err
 	}
 
@@ -59,6 +74,7 @@ func (s *MessageService) HandleMessageSent(ctx context.Context, cmd domain.SendM
 	if cmd.ParentMessageID != nil {
 		messages, err := s.repo.FindMessages(ctx, cmd.ChannelID, 1000, 0)
 		if err != nil {
+			logger.Error("Failed to find messages", zap.Error(err))
 			return nil, fmt.Errorf("error finding messages: %w", err)
 		}
 		channel.Messages = messages
@@ -66,18 +82,23 @@ func (s *MessageService) HandleMessageSent(ctx context.Context, cmd domain.SendM
 
 	message, err := channel.PostMessage(cmd.SenderUserID, cmd.Content, cmd.ParentMessageID)
 	if err != nil {
+		logger.Error("Failed to post message", zap.Error(err))
 		return nil, err
 	}
 
 	if err := s.repo.SaveMessage(ctx, message); err != nil {
+		logger.Error("Failed to save message", zap.Error(err))
 		return nil, err
 	}
 
 	err = s.eventPub.PublishEvents(ctx, channel.GetPendingEvents())
 	if err != nil {
+		logger.Error("Failed to publish events", zap.Error(err))
 		return nil, err
 	}
 	channel.ClearPendingEvents()
+
+	logger.Info("Message sent", zap.String("message_id", message.GetId().String()))
 	return message, err
 }
 
@@ -85,68 +106,91 @@ func (s *MessageService) HandleMessageSent(ctx context.Context, cmd domain.SendM
 // Might be redundant, but keeping it for now
 // TODO: Remove this if it's redundant
 func (s *MessageService) HandleNotificationSent(ctx context.Context, cmd domain.SendNotificationCommand) (*domain.Message, error) {
+	logger := s.logger.WithMethod("HandleNotificationSent")
+	logger.Info("Sending notification", zap.String("channel_id", cmd.ChannelID.String()))
+
 	channel, err := s.repo.FindById(ctx, cmd.ChannelID)
 	if err != nil {
+		logger.Error("Failed to find channel", zap.Error(err))
 		return nil, err
 	}
 	message, err := channel.PostNotification(cmd.IntegrationID, cmd.Content)
 	if err != nil {
+		logger.Error("Failed to post notification", zap.Error(err))
 		return nil, err
 	}
 
 	if err := s.repo.SaveMessage(ctx, message); err != nil {
+		logger.Error("Failed to save message", zap.Error(err))
 		return nil, err
 	}
 
 	err = s.eventPub.PublishEvents(ctx, channel.GetPendingEvents())
 	if err != nil {
+		logger.Error("Failed to publish events", zap.Error(err))
 		return nil, err
 	}
 	channel.ClearPendingEvents()
 
+	logger.Info("Notification sent", zap.String("message_id", message.GetId().String()))
 	return message, err
 }
 
 // HandleAddReaction adds a reaction to a message
 func (s *MessageService) HandleAddReaction(ctx context.Context, cmd domain.AddReactionCommand) (*domain.Reaction, error) {
+	logger := s.logger.WithMethod("HandleAddReaction")
+	logger.Info("Adding reaction", zap.String("channel_id", cmd.ChannelID.String()))
+
 	channel, err := s.repo.FindById(ctx, cmd.ChannelID)
 	if err != nil {
+		logger.Error("Failed to find channel", zap.Error(err))
 		return nil, err
 	}
 
 	// FIXME:  should the channel return all the messages??
 	messages, err := s.repo.FindMessages(ctx, cmd.ChannelID, 100, 0)
 	if err != nil {
+		logger.Error("Failed to find messages", zap.Error(err))
 		return nil, err
 	}
 	channel.Messages = messages
 
 	newReaction, err := channel.AddReaction(cmd.MessageID, cmd.UserID, cmd.ReactionType)
 	if err != nil {
+		logger.Error("Failed to add reaction", zap.Error(err))
 		return nil, err
 	}
 
 	if err := s.repo.SaveReaction(ctx, newReaction); err != nil {
+		logger.Error("Failed to save reaction", zap.Error(err))
 		return nil, err
 	}
 
 	err = s.eventPub.PublishEvents(ctx, channel.GetPendingEvents())
 	if err != nil {
+		logger.Error("Failed to publish events", zap.Error(err))
 		return nil, err
 	}
 	channel.ClearPendingEvents()
+
+	logger.Info("Reaction added", zap.String("reaction_id", newReaction.GetId().String()))
 	return newReaction, nil
 }
 
 // HandleRemoveReaction removes a reaction from a message
 func (s *MessageService) HandleRemoveReaction(ctx context.Context, cmd domain.RemoveReactionCommand) (*domain.Reaction, error) {
+	logger := s.logger.WithMethod("HandleRemoveReaction")
+	logger.Info("Removing reaction", zap.String("channel_id", cmd.ChannelID.String()))
+
 	channel, err := s.repo.FindById(ctx, cmd.ChannelID)
 	if err != nil {
+		logger.Error("Failed to find channel", zap.Error(err))
 		return nil, err
 	}
 
 	messages, err := s.repo.FindMessages(ctx, cmd.ChannelID, 100, 0)
 	if err != nil {
+		logger.Error("Failed to find messages", zap.Error(err))
 		return nil, err
 	}
 
@@ -154,22 +198,30 @@ func (s *MessageService) HandleRemoveReaction(ctx context.Context, cmd domain.Re
 
 	reaction, err := channel.RemoveReaction(cmd.MessageID, cmd.UserID, cmd.ReactionType)
 	if err != nil {
+		logger.Error("Failed to remove reaction", zap.Error(err))
 		return nil, err
 	}
 
 	if err := s.repo.DeleteReaction(ctx, cmd.MessageID, cmd.UserID, cmd.ReactionType); err != nil {
+		logger.Error("Failed to delete reaction", zap.Error(err))
 		return nil, err
 	}
 
 	err = s.eventPub.PublishEvents(ctx, channel.GetPendingEvents())
 	if err != nil {
+		logger.Error("Failed to publish events", zap.Error(err))
 		return nil, err
 	}
 	channel.ClearPendingEvents()
+
+	logger.Info("Reaction removed", zap.String("reaction_id", reaction.GetId().String()))
 	return reaction, nil
 }
 
 func (s *MessageService) ToMessageDTOs(ctx context.Context, messages []domain.Message) ([]domain.MessageDTO, error) {
+	logger := s.logger.WithMethod("ToMessageDTOs")
+	logger.Info("Converting messages to DTOs", zap.Int("count", len(messages)))
+
 	dtos := make([]domain.MessageDTO, len(messages))
 	for i, message := range messages {
 		dto, err := s.ToMessageDTO(ctx, &message)

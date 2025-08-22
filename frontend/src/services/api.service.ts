@@ -151,7 +151,7 @@ export const apiRequest = async <T>(config: ApiRequestOptions) => {
     return response.data
   } catch (e: unknown) {
     if (e instanceof AxiosError) {
-      throw new Error(e.response?.data.detail)
+      throw new Error(e.response?.data.error)
     } else {
       throw new Error('Unknown error happened.')
     }

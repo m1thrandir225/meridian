@@ -17,7 +17,9 @@ import (
 	"github.com/m1thrandir225/meridian/pkg/auth"
 	"github.com/m1thrandir225/meridian/pkg/cache"
 	"github.com/m1thrandir225/meridian/pkg/kafka"
+	"github.com/m1thrandir225/meridian/pkg/logging"
 	"github.com/redis/go-redis/v9"
+	"go.uber.org/zap"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/m1thrandir225/meridian/internal/identity/application/handlers"
@@ -37,6 +39,8 @@ type Config struct {
 	KafkaDefaultTopic    string
 	IntegrationGRPCURL   string
 	GRPCPort             string
+	Environment          string
+	LogLevel             string
 }
 
 func loadConfig() (*Config, error) {
@@ -97,6 +101,18 @@ func loadConfig() (*Config, error) {
 		return nil, fmt.Errorf("missing IDENTITY_REDIS_URL")
 	}
 
+	environment := os.Getenv("IDENTITY_ENVIRONMENT")
+	if environment == "" {
+		environment = "development"
+		fmt.Printf("WARN: IDENTITY_ENVIRONMENT is not set, using default %s\n", environment)
+	}
+
+	logLevel := os.Getenv("IDENTITY_LOG_LEVEL")
+	if logLevel == "" {
+		logLevel = "info"
+		fmt.Printf("WARN: IDENTITY_LOG_LEVEL is not set, using default %s\n", logLevel)
+	}
+
 	return &Config{
 		DatabaseURL:          dbURL,
 		KafkaBrokers:         strings.Split(kafkaBrokerStr, ","),
@@ -109,6 +125,8 @@ func loadConfig() (*Config, error) {
 		RefreshTokenValidity: refreshTokenValidity,
 		IntegrationGRPCURL:   integrationGRPCURL,
 		GRPCPort:             grpcPort,
+		Environment:          environment,
+		LogLevel:             logLevel,
 	}, nil
 }
 
@@ -117,22 +135,31 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	logger := logging.NewLogger(
+		logging.Config{
+			ServiceName: "[IdentityService]",
+			Environment: cfg.Environment,
+			LogLevel:    cfg.LogLevel,
+		},
+	)
+	defer logger.Sync()
+
 	ctx, cancel := context.WithCancel(context.Background())
 
-	logger := log.New(os.Stdout, "[IdentityService] ", log.LstdFlags|log.Lshortfile)
-	logger.Println("Starting identity service...")
+	logger.Info("Starting service...")
 
 	if err := os.Setenv("IDENTITY_PASETO_PUBLIC_KEY", cfg.PasetoPublicKey); err != nil {
-		log.Fatalf("Failed to set INTEGRITY_PASETO_PUBLIC_KEY for shared auth: %v", err)
+		logger.Fatal("Failed to set INTEGRITY_PASETO_PUBLIC_KEY for shared auth", zap.Error(err))
 	}
 
 	if err := auth.LoadPublicKeyFromEnv(); err != nil {
-		log.Fatalf("Failed to load PASETO public key for shared verifier: %v", err)
+		logger.Fatal("Failed to load PASETO public key for shared verifier", zap.Error(err))
 	}
 
 	dbPool, err := pgxpool.New(ctx, cfg.DatabaseURL)
 	if err != nil {
-		log.Fatalf("Unable to connect to database: %v", err)
+		logger.Fatal("Unable to connect to database", zap.Error(err))
 	}
 	defer dbPool.Close()
 
@@ -143,30 +170,37 @@ func main() {
 
 	redisCache := cache.NewRedisCache(redisClient)
 	if err != nil {
-		log.Fatalf("Failed to create Redis cache: %v", err)
+		logger.Fatal("Failed to create Redis cache", zap.Error(err))
 	}
 
 	kafkaCfg := sarama.NewConfig()
 	kafkaCfg.Producer.Return.Successes = true
 	syncProducer, err := sarama.NewSyncProducer(cfg.KafkaBrokers, kafkaCfg)
 	if err != nil {
-		log.Fatalf("Failed to create Kafka producer: %v", err)
+		logger.Fatal("Failed to create Kafka producer", zap.Error(err))
 	}
 	defer func() { _ = syncProducer.Close() }()
-	log.Println("Kafka producer established.")
+	logger.Info("Kafka producer established.")
 
 	repository := persistence.NewPostgresUserRepository(dbPool)
 	pasetoGenerator, err := token_generator.NewPasetoTokenGenerator(cfg.PasetoPrivateKey)
 	if err != nil {
-		log.Fatalf("Failed to create token generator: %v", err)
+		logger.Fatal("Failed to create token generator", zap.Error(err))
 	}
 	eventPublisher := kafka.NewSaramaEventPublisher(syncProducer, cfg.KafkaDefaultTopic)
 
-	service := services.NewUserService(repository, pasetoGenerator, cfg.AuthTokenValidity, cfg.RefreshTokenValidity, eventPublisher)
+	service := services.NewUserService(
+		repository,
+		pasetoGenerator,
+		cfg.AuthTokenValidity,
+		cfg.RefreshTokenValidity,
+		eventPublisher,
+		logger,
+	)
 
 	tokenVerifier, err := auth.NewPasetoTokenVerifier()
 	if err != nil {
-		log.Fatalf("Failed to create token verifier: %v", err)
+		logger.Fatal("Failed to create token verifier", zap.Error(err))
 	}
 
 	router := handlers.SetupIdentityRouter(
@@ -174,6 +208,7 @@ func main() {
 		redisCache,
 		tokenVerifier,
 		cfg.IntegrationGRPCURL,
+		logger,
 	)
 
 	httpServer := &http.Server{
@@ -185,19 +220,20 @@ func main() {
 	errChan := make(chan error, 1)
 
 	go func() {
-		logger.Printf("Starting gRPC server on %s", cfg.GRPCPort)
+		logger.Info("Starting gRPC server", zap.String("port", cfg.GRPCPort))
 		if err := handlers.StartGRPCServer(
 			cfg.GRPCPort,
 			tokenVerifier,
 			service,
 			redisCache,
+			logger,
 		); err != nil {
-			logger.Fatalf("Failed to start gRPC server: %v", err)
+			logger.Fatal("Failed to start gRPC server", zap.Error(err))
 		}
 	}()
 
 	go func() {
-		log.Printf("Starting Identity HTTP server on %s", cfg.HTTPPort)
+		logger.Info("Starting Identity HTTP server", zap.String("port", cfg.HTTPPort))
 		if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errChan <- fmt.Errorf("identity HTTP server error: %w", err)
 		}
@@ -206,7 +242,7 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	logger.Println("Shutting down http server.")
+	logger.Info("Shutting down http server.")
 	cancel()
 
 	_, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)

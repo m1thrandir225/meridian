@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/auth'
 import type { LoginRequest } from '@/types/responses/auth'
 import { useMutation } from '@tanstack/vue-query'
 import { useRoute, useRouter } from 'vue-router'
+import { toast } from 'vue-sonner'
 
 const authStore = useAuthStore()
 const route = useRoute()
@@ -24,6 +25,9 @@ const { mutateAsync, status } = useMutation({
         name: 'home',
       })
     }
+  },
+  onError: (error) => {
+    toast.error(error.message)
   },
 })
 

@@ -1,4 +1,4 @@
-SERVICES := identity messaging integration notification
+SERVICES := identity messaging integration
 DEFAULT_SERVICE := messaging
 GO := go
 GO_VERSION := $(shell $(GO) version)
@@ -13,20 +13,123 @@ MIGRATION_PATH_PATTERN = internal/%/infrastructure/persistence/migrations
 DB_URL_ENV_VAR_PATTERN = $(shell echo $(1) | tr '[:lower:]' '[:upper:]')_DB_URL
 GOLANGCI_LINT := $(GOBIN)/golangci-lint
 
+# Generate comprehensive .env file for all services
 $(COMPOSE_ENV_FILE):
-	@echo "# Messaging Service" >> $(COMPOSE_ENV_FILE)
+	@echo "Generating comprehensive .env file..."
+	@echo "# ========================================" > $(COMPOSE_ENV_FILE)
+	@echo "# Meridian Microservices Environment File" >> $(COMPOSE_ENV_FILE)
+	@echo "# ========================================" >> $(COMPOSE_ENV_FILE)
+	@echo "" >> $(COMPOSE_ENV_FILE)
+	@echo "# Global Environment Settings" >> $(COMPOSE_ENV_FILE)
+	@echo "ENVIRONMENT=development" >> $(COMPOSE_ENV_FILE)
+	@echo "LOG_LEVEL=info" >> $(COMPOSE_ENV_FILE)
+	@echo "" >> $(COMPOSE_ENV_FILE)
+	@echo "# ========================================" >> $(COMPOSE_ENV_FILE)
+	@echo "# Identity Service Configuration" >> $(COMPOSE_ENV_FILE)
+	@echo "# ========================================" >> $(COMPOSE_ENV_FILE)
+	@echo "IDENTITY_POSTGRES_USER=root" >> $(COMPOSE_ENV_FILE)
+	@echo "IDENTITY_POSTGRES_PASSWORD=secret" >> $(COMPOSE_ENV_FILE)
+	@echo "IDENTITY_DB_NAME=identity_db" >> $(COMPOSE_ENV_FILE)
+	@echo "IDENTITY_DB_PORT=5432" >> $(COMPOSE_ENV_FILE)
+	@echo "IDENTITY_REDIS_PORT=6379" >> $(COMPOSE_ENV_FILE)
+	@echo "IDENTITY_HTTP_PORT=8080" >> $(COMPOSE_ENV_FILE)
+	@echo "IDENTITY_GRPC_PORT=9090" >> $(COMPOSE_ENV_FILE)
+	@echo "IDENTITY_DB_URL=postgres://root:secret@identity_postgres:5432/identity_db?sslmode=disable" >> $(COMPOSE_ENV_FILE)
+	@echo "IDENTITY_DB_URL_MIGRATE=pgx5://root:secret@identity_postgres:5432/identity_db?sslmode=disable" >> $(COMPOSE_ENV_FILE)
+	@echo "IDENTITY_REDIS_URL=redis://identity_redis:6379" >> $(COMPOSE_ENV_FILE)
+	@echo "IDENTITY_KAFKA_BROKERS=kafka:9092" >> $(COMPOSE_ENV_FILE)
+	@echo "IDENTITY_KAFKA_DEFAULT_TOPIC=meridian.identity.events" >> $(COMPOSE_ENV_FILE)
+	@echo "IDENTITY_PASETO_PRIVATE_KEY=YOUR_PRIVATE_KEY_HERE" >> $(COMPOSE_ENV_FILE)
+	@echo "IDENTITY_PASETO_PUBLIC_KEY=YOUR_PUBLIC_KEY_HERE" >> $(COMPOSE_ENV_FILE)
+	@echo "AUTH_TOKEN_VALIDITY_MINUTES=60" >> $(COMPOSE_ENV_FILE)
+	@echo "REFRESH_TOKEN_VALIDITY_MINUTES=1440" >> $(COMPOSE_ENV_FILE)
+	@echo "INTEGRATION_GRPC_URL=integration:9091" >> $(COMPOSE_ENV_FILE)
+	@echo "IDENTITY_ENVIRONMENT=development" >> $(COMPOSE_ENV_FILE)
+	@echo "IDENTITY_LOG_LEVEL=info" >> $(COMPOSE_ENV_FILE)
+	@echo "" >> $(COMPOSE_ENV_FILE)
+	@echo "# ========================================" >> $(COMPOSE_ENV_FILE)
+	@echo "# Messaging Service Configuration" >> $(COMPOSE_ENV_FILE)
+	@echo "# ========================================" >> $(COMPOSE_ENV_FILE)
 	@echo "MESSAGING_POSTGRES_USER=root" >> $(COMPOSE_ENV_FILE)
 	@echo "MESSAGING_POSTGRES_PASSWORD=secret" >> $(COMPOSE_ENV_FILE)
 	@echo "MESSAGING_DB_NAME=messaging_db" >> $(COMPOSE_ENV_FILE)
 	@echo "MESSAGING_DB_PORT=5433" >> $(COMPOSE_ENV_FILE)
 	@echo "MESSAGING_REDIS_PORT=6380" >> $(COMPOSE_ENV_FILE)
 	@echo "MESSAGING_HTTP_PORT=8081" >> $(COMPOSE_ENV_FILE)
-	@echo "MESSAGING_DB_URL_MIGRATE=pgx5://root:secret@messaging_postgres:5433/messaging_db?sslmode=disable" >> $(COMPOSE_ENV_FILE)
+	@echo "MESSAGING_GRPC_PORT=9091" >> $(COMPOSE_ENV_FILE)
 	@echo "MESSAGING_DB_URL=postgres://root:secret@messaging_postgres:5433/messaging_db?sslmode=disable" >> $(COMPOSE_ENV_FILE)
+	@echo "MESSAGING_DB_URL_MIGRATE=pgx5://root:secret@messaging_postgres:5433/messaging_db?sslmode=disable" >> $(COMPOSE_ENV_FILE)
+	@echo "MESSAGING_REDIS_URL=redis://messaging_redis:6380" >> $(COMPOSE_ENV_FILE)
 	@echo "MESSAGING_KAFKA_BROKERS=kafka:9092" >> $(COMPOSE_ENV_FILE)
 	@echo "MESSAGING_KAFKA_DEFAULT_TOPIC=meridian.messaging.events" >> $(COMPOSE_ENV_FILE)
+	@echo "IDENTITY_GRPC_URL=identity:9090" >> $(COMPOSE_ENV_FILE)
+	@echo "INTEGRATION_GRPC_URL=integration:9091" >> $(COMPOSE_ENV_FILE)
+	@echo "MESSAGING_ENVIRONMENT=development" >> $(COMPOSE_ENV_FILE)
+	@echo "MESSAGING_LOG_LEVEL=info" >> $(COMPOSE_ENV_FILE)
 	@echo "" >> $(COMPOSE_ENV_FILE)
+	@echo "# ========================================" >> $(COMPOSE_ENV_FILE)
+	@echo "# Integration Service Configuration" >> $(COMPOSE_ENV_FILE)
+	@echo "# ========================================" >> $(COMPOSE_ENV_FILE)
+	@echo "INTEGRATION_POSTGRES_USER=root" >> $(COMPOSE_ENV_FILE)
+	@echo "INTEGRATION_POSTGRES_PASSWORD=secret" >> $(COMPOSE_ENV_FILE)
+	@echo "INTEGRATION_DB_NAME=integration_db" >> $(COMPOSE_ENV_FILE)
+	@echo "INTEGRATION_DB_PORT=5434" >> $(COMPOSE_ENV_FILE)
+	@echo "INTEGRATION_REDIS_PORT=6381" >> $(COMPOSE_ENV_FILE)
+	@echo "INTEGRATION_HTTP_PORT=8082" >> $(COMPOSE_ENV_FILE)
+	@echo "INTEGRATION_GRPC_PORT=9092" >> $(COMPOSE_ENV_FILE)
+	@echo "INTEGRATION_DB_URL=postgres://root:secret@integration_postgres:5434/integration_db?sslmode=disable" >> $(COMPOSE_ENV_FILE)
+	@echo "INTEGRATION_DB_URL_MIGRATE=pgx5://root:secret@integration_postgres:5434/integration_db?sslmode=disable" >> $(COMPOSE_ENV_FILE)
+	@echo "INTEGRATION_REDIS_URL=redis://integration_redis:6381" >> $(COMPOSE_ENV_FILE)
+	@echo "INTEGRATION_KAFKA_BROKERS=kafka:9092" >> $(COMPOSE_ENV_FILE)
+	@echo "INTEGRATION_KAFKA_DEFAULT_TOPIC=meridian.integration.events" >> $(COMPOSE_ENV_FILE)
+	@echo "MESSAGING_GRPC_URL=messaging:9091" >> $(COMPOSE_ENV_FILE)
+	@echo "INTEGRATION_ENVIRONMENT=development" >> $(COMPOSE_ENV_FILE)
+	@echo "INTEGRATION_LOG_LEVEL=info" >> $(COMPOSE_ENV_FILE)
+	@echo "" >> $(COMPOSE_ENV_FILE)
+	@echo "# ========================================" >> $(COMPOSE_ENV_FILE)
+	@echo "# Frontend Configuration" >> $(COMPOSE_ENV_FILE)
+	@echo "# ========================================" >> $(COMPOSE_ENV_FILE)
+	@echo "FRONTEND_PORT=3000" >> $(COMPOSE_ENV_FILE)
+	@echo "VITE_API_BASE_URL=http://localhost:8080" >> $(COMPOSE_ENV_FILE)
+	@echo "VITE_WS_BASE_URL=ws://localhost:8081" >> $(COMPOSE_ENV_FILE)
+	@echo "" >> $(COMPOSE_ENV_FILE)
+	@echo "Environment file generated successfully at $(COMPOSE_ENV_FILE)"
+	@echo "⚠️  Remember to update the PASETO keys with actual values!"
 
+.PHONY: generate-keys
+generate-keys: ## Generate PASETO security keys using the keygen script
+	@echo "🔑 Generating PASETO V4 security keys..."
+	@$(GO) run scripts/keygen.go
+	@echo ""
+	@echo " Copy the generated keys to your .env file:"
+	@echo "   - Replace IDENTITY_PASETO_PRIVATE_KEY with the private key"
+	@echo "   - Replace IDENTITY_PASETO_PUBLIC_KEY with the public key"
+
+.PHONY: generate-proto
+generate-proto: ## Generate gRPC Go code from protobuf files
+	@echo " Generating gRPC Go code from protobuf files..."
+	@echo "Generating messaging service protobuf..."
+	@protoc --go_out=. --go_opt=paths=source_relative \
+		--go-grpc_out=. --go-grpc_opt=paths=source_relative \
+		internal/messaging/infrastructure/api/messaging.proto
+	@echo "Generating integration service protobuf..."
+	@protoc --go_out=. --go_opt=paths=source_relative \
+		--go-grpc_out=. --go-grpc_opt=paths=source_relative \
+		internal/integration/infrastructure/api/integration.proto
+	@echo "Generating identity service protobuf..."
+	@protoc --go_out=. --go_opt=paths=source_relative \
+		--go-grpc_out=. --go-grpc_opt=paths=source_relative \
+		internal/identity/infrastructure/api/identity.proto
+	@echo "✅ gRPC code generation complete!"
+
+.PHONY: setup
+setup: generate-keys $(COMPOSE_ENV_FILE) ## Complete setup: generate keys and env file
+	@echo " Setup complete!"
+	@echo ""
+	@echo "Next steps:"
+	@echo "1. Update the PASETO keys in $(COMPOSE_ENV_FILE)"
+	@echo "2. Run 'make docker-up' to start services"
+	@echo "3. Run 'make migrate-up service=identity' to apply migrations"
 
 .PHONY: build
 build: tidy ## Build all service binaries
@@ -69,7 +172,6 @@ test: tidy ## Run Go tests for all modules
 	@echo "Running Go tests..."
 	@$(GO) test -v -race -cover ./...
 
-
 .PHONY: docker-build
 docker-build: $(COMPOSE_ENV_FILE) ## Build Docker images using Docker Compose
 	@echo "Building Docker images defined in $(COMPOSE_FILE)..."
@@ -100,10 +202,8 @@ docker-ps: $(COMPOSE_ENV_FILE) ## List running Docker Compose services
 	@echo "Listing running services..."
 	@$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) --env-file $(COMPOSE_ENV_FILE) ps
 
-
 get_db_url_var_name = $(call DB_URL_ENV_VAR_PATTERN,$(1))
 get_migration_path = $(subst %,$(1),$(MIGRATION_PATH_PATTERN))
-
 
 ifneq (,$(wildcard $(COMPOSE_ENV_FILE)))
     include $(COMPOSE_ENV_FILE)
@@ -153,6 +253,7 @@ migrate-status: ## Check migration status (e.g., make migrate-status service=mes
 	@$(if $(value $(DB_URL_VAR)),,$(error Environment variable $(DB_URL_VAR) is not set))
 	@echo "Checking migration status for service '$(SERVICE_NAME)'..."
 	@$(MIGRATE) -path $(MIGRATION_DIR) -database '$(value $(DB_URL_VAR))' version
+
 .PHONY: clean
 clean: ## Remove build artifacts
 	@echo "Cleaning build artifacts..."

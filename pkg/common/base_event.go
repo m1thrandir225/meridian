@@ -50,7 +50,7 @@ func (e BaseDomainEvent) AggregateVersion() int64 {
 	return e.AggrVersion
 }
 
-func NewBaseDomainEvent(eventName string, aggregateID uuid.UUID, version int64) BaseDomainEvent {
+func NewBaseDomainEvent(eventName string, aggregateID uuid.UUID, version int64, aggregateType string) BaseDomainEvent {
 	event, err := uuid.NewV7()
 	if err != nil {
 		panic("error while creating an id")
@@ -60,7 +60,7 @@ func NewBaseDomainEvent(eventName string, aggregateID uuid.UUID, version int64) 
 		Name:        eventName,
 		Time:        time.Now().UTC(),
 		AggrID:      aggregateID.String(),
-		AggrType:    "Channel",
+		AggrType:    aggregateType,
 		AggrVersion: version,
 	}
 }

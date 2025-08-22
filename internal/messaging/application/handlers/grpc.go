@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"fmt"
-	"log"
 	"net"
 
 	"github.com/google/uuid"
@@ -11,6 +10,8 @@ import (
 	"github.com/m1thrandir225/meridian/internal/messaging/domain"
 	messagingpb "github.com/m1thrandir225/meridian/internal/messaging/infrastructure/api"
 	"github.com/m1thrandir225/meridian/pkg/cache"
+	"github.com/m1thrandir225/meridian/pkg/logging"
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 )
 
@@ -20,6 +21,7 @@ type GRPCServer struct {
 	messagingpb.UnimplementedMessagingServiceServer
 	wsHandler *WebSocketHandler
 	cache     *cache.RedisCache
+	logger    *logging.Logger
 }
 
 func NewGRPCHandler(
@@ -27,21 +29,28 @@ func NewGRPCHandler(
 	messageService *services.MessageService,
 	wsHandler *WebSocketHandler,
 	cache *cache.RedisCache,
+	logger *logging.Logger,
 ) *GRPCServer {
 	return &GRPCServer{
 		channelService: channelService,
 		messageService: messageService,
 		wsHandler:      wsHandler,
 		cache:          cache,
+		logger:         logger,
 	}
 }
 
 func (h *GRPCServer) SendMessage(ctx context.Context, req *messagingpb.SendMessageRequest) (*messagingpb.SendMessageResponse, error) {
+	logger := h.logger.WithMethod("SendMessage")
+	logger.Info("Sending message")
+
 	if req.Content == "" {
+		logger.Error("Content is required")
 		return nil, fmt.Errorf("content is required")
 	}
 
 	if len(req.TargetChannelIds) == 0 {
+		logger.Error("At least one target channel is required")
 		return nil, fmt.Errorf("at least one target channel is required")
 	}
 
@@ -51,6 +60,7 @@ func (h *GRPCServer) SendMessage(ctx context.Context, req *messagingpb.SendMessa
 	for _, channelIDStr := range req.TargetChannelIds {
 		channelID, err := uuid.Parse(channelIDStr)
 		if err != nil {
+			logger.Error("Invalid channel ID", zap.String("channel_id", channelIDStr), zap.Error(err))
 			return nil, fmt.Errorf("invalid channel ID %s: %w", channelIDStr, err)
 		}
 
@@ -60,6 +70,7 @@ func (h *GRPCServer) SendMessage(ctx context.Context, req *messagingpb.SendMessa
 		if req.SenderType == "integration" {
 			integrationID, err := uuid.Parse(req.SenderId)
 			if err != nil {
+				logger.Error("Invalid integration ID", zap.String("integration_id", req.SenderId), zap.Error(err))
 				return nil, fmt.Errorf("invalid integration ID %s: %w", req.SenderId, err)
 			}
 
@@ -71,6 +82,7 @@ func (h *GRPCServer) SendMessage(ctx context.Context, req *messagingpb.SendMessa
 		} else {
 			userID, err := uuid.Parse(req.SenderId)
 			if err != nil {
+				logger.Error("Invalid user ID", zap.String("user_id", req.SenderId), zap.Error(err))
 				return nil, fmt.Errorf("invalid user ID %s: %w", req.SenderId, err)
 			}
 
@@ -90,10 +102,12 @@ func (h *GRPCServer) SendMessage(ctx context.Context, req *messagingpb.SendMessa
 		}
 
 		if err != nil {
+			logger.Error("Failed to send message to channel", zap.String("channel_id", channelIDStr), zap.Error(err))
 			return nil, fmt.Errorf("failed to send message to channel %s: %w", channelIDStr, err)
 		}
 
 		if message == nil {
+			logger.Error("Failed to send message to channel", zap.String("channel_id", channelIDStr), zap.Error(fmt.Errorf("message is nil")))
 			return nil, fmt.Errorf("failed to send message to channel %s: message is nil", channelIDStr)
 		}
 
@@ -123,6 +137,7 @@ func (h *GRPCServer) SendMessage(ctx context.Context, req *messagingpb.SendMessa
 		if h.wsHandler != nil {
 			h.wsHandler.BroadcastMessage(message)
 		}
+		logger.Info("Message sent to channel", zap.String("channel_id", channelIDStr), zap.String("message_id", message.GetId().String()))
 	}
 
 	return &messagingpb.SendMessageResponse{
@@ -133,8 +148,12 @@ func (h *GRPCServer) SendMessage(ctx context.Context, req *messagingpb.SendMessa
 }
 
 func (h *GRPCServer) RegisterBot(ctx context.Context, req *messagingpb.RegisterBotRequest) (*messagingpb.RegisterBotResponse, error) {
+	logger := h.logger.WithMethod("RegisterBot")
+	logger.Info("Registering bot")
+
 	integrationID, err := uuid.Parse(req.IntegrationId)
 	if err != nil {
+		logger.Error("Invalid integration ID", zap.String("integration_id", req.IntegrationId), zap.Error(err))
 		return nil, fmt.Errorf("invalid integration ID %s: %w", req.IntegrationId, err)
 	}
 
@@ -143,6 +162,7 @@ func (h *GRPCServer) RegisterBot(ctx context.Context, req *messagingpb.RegisterB
 	for _, channelIDStr := range req.ChannelIds {
 		channelID, err := uuid.Parse(channelIDStr)
 		if err != nil {
+			logger.Error("Invalid channel ID", zap.String("channel_id", channelIDStr), zap.Error(err))
 			return nil, fmt.Errorf("invalid channel ID %s: %w", channelIDStr, err)
 		}
 
@@ -153,7 +173,7 @@ func (h *GRPCServer) RegisterBot(ctx context.Context, req *messagingpb.RegisterB
 
 		channel, err := h.channelService.HandleAddBotToChannel(ctx, cmd)
 		if err != nil {
-			log.Printf("failed to add bot to channel %s: %v", channelIDStr, err)
+			logger.Error("Failed to add bot to channel", zap.String("channel_id", channelIDStr), zap.Error(err))
 			success = false
 			continue
 		}
@@ -161,6 +181,7 @@ func (h *GRPCServer) RegisterBot(ctx context.Context, req *messagingpb.RegisterB
 	}
 
 	if !success {
+		logger.Error("Failed to add bot to some channels")
 		return &messagingpb.RegisterBotResponse{
 			Success:       false,
 			IntegrationId: integrationID.String(),
@@ -172,7 +193,7 @@ func (h *GRPCServer) RegisterBot(ctx context.Context, req *messagingpb.RegisterB
 	for _, channelIDStr := range req.ChannelIds {
 		channelCacheKey := fmt.Sprintf("channel:%s", channelIDStr)
 		h.cache.Delete(ctx, channelCacheKey)
-		log.Printf("Invalidated cache for channel: %s", channelIDStr)
+		logger.Info("Invalidated cache for channel", zap.String("channel_id", channelIDStr))
 	}
 
 	channelIDs := make([]string, 0, len(channels))
@@ -186,6 +207,7 @@ func (h *GRPCServer) RegisterBot(ctx context.Context, req *messagingpb.RegisterB
 		ChannelIds:    channelIDs,
 	}
 
+	logger.Info("Bot registered successfully")
 	return response, nil
 
 }
@@ -195,6 +217,7 @@ func StartGRPCServer(
 	messageService *services.MessageService,
 	wsHandler *WebSocketHandler,
 	cache *cache.RedisCache,
+	logger *logging.Logger,
 ) error {
 	lis, err := net.Listen("tcp", ":"+port)
 	if err != nil {
@@ -202,9 +225,9 @@ func StartGRPCServer(
 	}
 
 	s := grpc.NewServer()
-	grpcHandler := NewGRPCHandler(channelService, messageService, wsHandler, cache)
+	grpcHandler := NewGRPCHandler(channelService, messageService, wsHandler, cache, logger)
 	messagingpb.RegisterMessagingServiceServer(s, grpcHandler)
 
-	log.Printf("Messaging gRPC server listening on port %s", port)
+	logger.Info("Messaging gRPC server listening", zap.String("port", port))
 	return s.Serve(lis)
 }

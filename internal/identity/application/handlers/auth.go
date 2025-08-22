@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -10,6 +11,15 @@ import (
 	"github.com/m1thrandir225/meridian/internal/identity/application/services"
 	"github.com/m1thrandir225/meridian/pkg/auth"
 	"github.com/m1thrandir225/meridian/pkg/cache"
+)
+
+var (
+	ErrInvalidToken                    = errors.New("invalid token")
+	ErrInvalidAPIKey                   = errors.New("invalid api key")
+	ErrUnauthorized                    = errors.New("unauthorized")
+	ErrInvalidAuthorizationFormat      = errors.New("invalid authorization format. Use 'Bearer <token>' or 'ApiKey <key>'")
+	ErrIntegrationEndpoint             = errors.New("unauthorized: Integration endpoint")
+	ErrFailedToCreateIntegrationClient = errors.New("failed to create integration client")
 )
 
 type AuthHandler struct {
@@ -36,7 +46,7 @@ func NewAuthHandler(
 func (h *AuthHandler) ValidateToken(ctx *gin.Context) {
 	authHeader := ctx.GetHeader("Authorization")
 	if authHeader == "" {
-		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "No authorization header"})
+		ctx.JSON(http.StatusUnauthorized, errorResponse(ErrUnauthorized))
 		return
 	}
 	originalPath := ctx.GetHeader("X-Forwarded-Uri")
@@ -59,7 +69,7 @@ func (h *AuthHandler) ValidateToken(ctx *gin.Context) {
 		apiKey := strings.TrimPrefix(authHeader, "ApiKey ")
 		h.handleAPITokenAuth(ctx, apiKey, isIntegrationEndpoint, originalPath)
 	} else {
-		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid authorization format. Use 'Bearer <token>' or 'ApiKey <key>'"})
+		ctx.JSON(http.StatusUnauthorized, errorResponse(ErrInvalidAuthorizationFormat))
 	}
 
 }
@@ -78,12 +88,12 @@ func (h *AuthHandler) handlePasetoAuth(ctx *gin.Context, token string, isIntegra
 
 	claims, err := h.tokenVerifier.Verify(token)
 	if err != nil {
-		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+		ctx.JSON(http.StatusUnauthorized, errorResponse(ErrInvalidToken))
 		return
 	}
 
 	if isIntegrationEndpoint {
-		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: Integration endpoint"})
+		ctx.JSON(http.StatusUnauthorized, errorResponse(ErrIntegrationEndpoint))
 		return
 	}
 
@@ -105,7 +115,7 @@ func (h *AuthHandler) handlePasetoAuth(ctx *gin.Context, token string, isIntegra
 
 func (h *AuthHandler) handleAPITokenAuth(ctx *gin.Context, apiKey string, isIntegrationEndpoint bool, path string) {
 	if !isIntegrationEndpoint {
-		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: Integration endpoint"})
+		ctx.JSON(http.StatusUnauthorized, errorResponse(ErrIntegrationEndpoint))
 		return
 	}
 
@@ -124,7 +134,7 @@ func (h *AuthHandler) handleAPITokenAuth(ctx *gin.Context, apiKey string, isInte
 
 	integrationClient, err := services.NewIntegrationClient(h.integrationGrpcURL)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create integration client"})
+		ctx.JSON(http.StatusInternalServerError, errorResponse(ErrFailedToCreateIntegrationClient))
 		return
 	}
 
@@ -132,7 +142,7 @@ func (h *AuthHandler) handleAPITokenAuth(ctx *gin.Context, apiKey string, isInte
 
 	resp, err := integrationClient.ValidateAPIToken(apiKey)
 	if err != nil || !resp.Valid {
-		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid API token"})
+		ctx.JSON(http.StatusUnauthorized, errorResponse(ErrInvalidAPIKey))
 		return
 	}
 

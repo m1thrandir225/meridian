@@ -1,5 +1,7 @@
 package handlers
 
+import "github.com/gin-gonic/gin"
+
 type UserResponse struct {
 	ID        string `json:"id"`
 	Username  string `json:"username"`
@@ -31,4 +33,8 @@ type APIKeyValidateResponse struct {
 	IntegrationID             string `json:"integration_id"`
 	IntegrationName           string `json:"integration_name"`
 	IntegrationTargetChannels string `json:"integration_target_channels"`
+}
+
+func errorResponse(err error) gin.H {
+	return gin.H{"error": err.Error()}
 }

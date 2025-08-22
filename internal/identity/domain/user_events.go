@@ -38,7 +38,7 @@ type UserDeletedEvent struct {
 }
 
 func CreateUserRegisteredEvent(user *User) UserRegisteredEvent {
-	base := common.NewBaseDomainEvent("UserRegistered", user.ID.value, user.Version)
+	base := common.NewBaseDomainEvent("UserRegistered", user.ID.value, user.Version, "User")
 
 	return UserRegisteredEvent{
 		BaseDomainEvent: base,
@@ -52,7 +52,7 @@ func CreateUserRegisteredEvent(user *User) UserRegisteredEvent {
 }
 
 func CreateUserAuthenticatedEvent(user *User, token string) UserAuthenticatedEvent {
-	base := common.NewBaseDomainEvent("UserAuthenticated", user.ID.value, user.Version)
+	base := common.NewBaseDomainEvent("UserAuthenticated", user.ID.value, user.Version, "User")
 
 	return UserAuthenticatedEvent{
 		BaseDomainEvent:     base,
@@ -64,7 +64,7 @@ func CreateUserAuthenticatedEvent(user *User, token string) UserAuthenticatedEve
 }
 
 func CreateUserProfileUpdated(user *User, updatedFields map[string]interface{}) UserProfileUpdatedEvent {
-	base := common.NewBaseDomainEvent("UserProfileUpdated", user.ID.value, user.Version)
+	base := common.NewBaseDomainEvent("UserProfileUpdated", user.ID.value, user.Version, "User")
 
 	return UserProfileUpdatedEvent{
 		BaseDomainEvent: base,
@@ -75,7 +75,7 @@ func CreateUserProfileUpdated(user *User, updatedFields map[string]interface{}) 
 }
 
 func CreateUserDeletedEvent(user *User) UserDeletedEvent {
-	base := common.NewBaseDomainEvent("UserDeleted", user.ID.value, user.Version)
+	base := common.NewBaseDomainEvent("UserDeleted", user.ID.value, user.Version, "User")
 
 	return UserDeletedEvent{
 		BaseDomainEvent: base,
