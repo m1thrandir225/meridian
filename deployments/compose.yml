@@ -30,6 +30,17 @@ services:
       - meridian_network
     labels:
       - "traefik.enable=true"
+  landing:
+    build:
+      context: ../
+      dockerfile: deployments/landing/Dockerfile
+    container_name: meridian_landing
+    networks:
+      - meridian_network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.services.landing.loadbalancer.server.port=80"
+    restart: unless-stopped
   frontend:
     build:
       context: ../
