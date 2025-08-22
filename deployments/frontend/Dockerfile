@@ -4,11 +4,11 @@ RUN npm install -g pnpm@10.13.1
 
 WORKDIR /app
 
-COPY frontend/package.json frontend/pnpm-lock.yaml ./
+COPY internal/frontend/package.json internal/frontend/pnpm-lock.yaml ./
 
 RUN pnpm install --frozen-lockfile
 
-COPY frontend/ .
+COPY internal/frontend/ .
 
 FROM base AS build
 
