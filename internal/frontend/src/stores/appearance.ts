@@ -30,7 +30,7 @@ export const useAppearanceStore = defineStore(
     const accentColorClass = computed(() => {
       const colorMap = {
         blue: '220 91% 56%', // HSL values for shadcn compatibility
-        green: '142 71% 45%',
+        green: '142 71% 40%', // Slightly darker green for better contrast
         purple: '262 83% 58%',
         red: '0 84% 60%',
         orange: '25 95% 53%',
@@ -50,11 +50,20 @@ export const useAppearanceStore = defineStore(
 
       const isDark = themeClass.value === 'dark'
 
+      // Special handling for green theme to improve contrast
+      const getPrimaryForeground = () => {
+        if (accentColor.value === 'green') {
+          return isDark ? '142 15% 95%' : '142 20% 8%'
+        }
+        // Default white for other colors
+        return isDark ? '0 0% 100%' : '0 0% 100%'
+      }
+
       return {
         // Primary colors
         primary: `${baseHue} 91% ${isDark ? '65%' : '56%'}`,
-        // Use white for light theme and very light gray for dark theme for better readability
-        primaryForeground: isDark ? '0 0% 100%' : '0 0% 100%',
+        // Use custom foreground for green, white for others
+        primaryForeground: getPrimaryForeground(),
 
         // Background colors - tinted with accent
         background: isDark
@@ -89,8 +98,8 @@ export const useAppearanceStore = defineStore(
         sidebar: isDark ? `${baseHue} 25% 8%` : `${baseHue} 35% 95%`,
         sidebarForeground: isDark ? `${baseHue} 8% 88%` : `${baseHue} 18% 15%`,
         sidebarPrimary: `${baseHue} 91% ${isDark ? '65%' : '56%'}`,
-        // Also update sidebar primary foreground for consistency
-        sidebarPrimaryForeground: isDark ? '0 0% 100%' : '0 0% 100%',
+        // Use the same custom foreground logic for sidebar
+        sidebarPrimaryForeground: getPrimaryForeground(),
         sidebarAccent: isDark ? `${baseHue} 30% 20%` : `${baseHue} 40% 88%`,
         sidebarAccentForeground: isDark ? `${baseHue} 10% 85%` : `${baseHue} 25% 20%`,
         sidebarBorder: isDark ? `${baseHue} 20% 15%` : `${baseHue} 30% 82%`,

@@ -11,8 +11,8 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import type { SidebarProps } from '@/components/ui/sidebar'
-import { Bot, Loader2, Plus, Settings, Waves } from 'lucide-vue-next'
-import { onMounted, ref } from 'vue'
+import { Bot, Loader2, Plus, Settings } from 'lucide-vue-next'
+import { onMounted, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader } from '@/components/ui/sidebar'
@@ -26,23 +26,47 @@ import NavUser from './NavUser.vue'
 import { FormControl, FormField, FormItem, FormLabel } from './ui/form'
 import { toast } from 'vue-sonner'
 import { useChannelStore } from '@/stores/channel'
+import Logo from './LogoWord.vue'
 
-const props = withDefaults(defineProps<SidebarProps>(), {
-  collapsible: 'icon',
-  side: 'left',
-})
+const props = withDefaults(
+  defineProps<
+    SidebarProps & {
+      showCreateDialog?: boolean
+    }
+  >(),
+  {
+    collapsible: 'icon',
+    side: 'left',
+    showCreateDialog: false,
+  },
+)
+
+const emit = defineEmits<{
+  'update:showCreateDialog': [value: boolean]
+}>()
 
 const router = useRouter()
 const channelStore = useChannelStore()
 
 const isNewChannelDialogOpen = ref(false)
 
-onMounted(() => channelStore.fetchChannels())
+watch(
+  () => props.showCreateDialog,
+  (newValue) => {
+    if (newValue) {
+      isNewChannelDialogOpen.value = true
+    }
+  },
+)
 
-const server = {
-  name: 'Meridian',
-  avatar: '/server-avatar.png',
-}
+watch(
+  () => isNewChannelDialogOpen.value,
+  (newValue) => {
+    emit('update:showCreateDialog', newValue)
+  },
+)
+
+onMounted(() => channelStore.fetchChannels())
 
 const createChannelSchema = toTypedSchema(
   z.object({
@@ -85,11 +109,8 @@ const createChannel = handleSubmit(async (values) => {
 <template>
   <Sidebar v-bind="props" class="border-r">
     <SidebarHeader>
-      <div class="flex items-center gap-3 px-4 py-3 border-b">
-        <Waves class="h-6 w-6" />
-        <div class="flex-1 min-w-0">
-          <h2 class="font-semibold text-sm truncate">{{ server.name }}</h2>
-        </div>
+      <div class="flex items-center justify-between gap-3 px-4 py-3 border-b">
+        <Logo size="24" />
         <Button variant="ghost" size="icon" class="h-6 w-6">
           <Settings class="h-4 w-4" />
         </Button>

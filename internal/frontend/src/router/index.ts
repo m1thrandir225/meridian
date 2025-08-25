@@ -11,6 +11,7 @@ import AppearanceView from '@/views/settings/AppearanceView.vue'
 import { useAuthStore } from '@/stores/auth'
 import BotManagementView from '@/views/BotManagementView.vue'
 import InviteAcceptView from '@/views/InviteAcceptView.vue'
+import HomeView from '@/views/HomeView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -19,7 +20,7 @@ const router = createRouter({
     {
       path: '/',
       name: 'home',
-      component: ChatView,
+      component: HomeView,
       meta: { requiresAuth: true },
     },
     {
