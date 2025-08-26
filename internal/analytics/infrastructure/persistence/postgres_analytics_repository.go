@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/m1thrandir225/meridian/internal/analytics/domain"
 )
@@ -751,4 +752,109 @@ func (r *PostgresAnalyticsRepository) GetReactionUsage(ctx context.Context, star
 	}
 
 	return reactionData, nil
+}
+
+// GetMetricByMessageID checks if a message has already been processed
+func (r *PostgresAnalyticsRepository) GetMetricByMessageID(ctx context.Context, messageID string) (*domain.AnalyticsMetric, error) {
+	query := `
+		SELECT id, name, value, channel_id, user_id, timestamp, metadata, version
+		FROM analytics_metrics
+		WHERE name = 'message_sent'
+		AND metadata->>'message_id' = $1
+		LIMIT 1
+	`
+
+	var metric domain.AnalyticsMetric
+	err := r.db.QueryRow(ctx, query, messageID).Scan(
+		&metric.ID,
+		&metric.Name,
+		&metric.Value,
+		&metric.ChannelID,
+		&metric.UserID,
+		&metric.Timestamp,
+		&metric.Metadata,
+		&metric.Version,
+	)
+
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return &metric, nil
+}
+
+// Fix the atomic increment methods to handle the interval type correctly
+func (r *PostgresAnalyticsRepository) IncrementUserMessages(ctx context.Context, userID uuid.UUID, timestamp time.Time) error {
+	query := `
+		INSERT INTO user_activities (id, user_id, last_active_at, messages_sent, channels_joined, reactions_given, session_duration, version)
+		VALUES (gen_random_uuid(), $1, $2, 1, 0, 0, INTERVAL '0 seconds', 1)
+		ON CONFLICT (user_id) DO UPDATE SET
+			messages_sent = user_activities.messages_sent + 1,
+			last_active_at = EXCLUDED.last_active_at,
+			version = user_activities.version + 1
+	`
+
+	_, err := r.db.Exec(ctx, query, userID, timestamp)
+	return err
+}
+
+func (r *PostgresAnalyticsRepository) IncrementUserChannelsJoined(ctx context.Context, userID uuid.UUID, timestamp time.Time) error {
+	query := `
+		INSERT INTO user_activities (id, user_id, last_active_at, messages_sent, channels_joined, reactions_given, session_duration, version)
+		VALUES (gen_random_uuid(), $1, $2, 0, 1, 0, INTERVAL '0 seconds', 1)
+		ON CONFLICT (user_id) DO UPDATE SET
+			channels_joined = user_activities.channels_joined + 1,
+			last_active_at = EXCLUDED.last_active_at,
+			version = user_activities.version + 1
+	`
+
+	_, err := r.db.Exec(ctx, query, userID, timestamp)
+	return err
+}
+
+func (r *PostgresAnalyticsRepository) IncrementUserReactions(ctx context.Context, userID uuid.UUID, timestamp time.Time) error {
+	query := `
+		INSERT INTO user_activities (id, user_id, last_active_at, messages_sent, channels_joined, reactions_given, session_duration, version)
+		VALUES (gen_random_uuid(), $1, $2, 0, 0, 1, INTERVAL '0 seconds', 1)
+		ON CONFLICT (user_id) DO UPDATE SET
+			reactions_given = user_activities.reactions_given + 1,
+			last_active_at = EXCLUDED.last_active_at,
+			version = user_activities.version + 1
+	`
+
+	_, err := r.db.Exec(ctx, query, userID, timestamp)
+	return err
+}
+
+func (r *PostgresAnalyticsRepository) IncrementChannelMessages(ctx context.Context, channelID uuid.UUID, timestamp time.Time) error {
+	query := `
+		INSERT INTO channel_activities (id, channel_id, messages_count, members_count, last_message_at, activity_score, version)
+		VALUES (gen_random_uuid(), $1, 1, 0, $2, 1.0, 1)
+		ON CONFLICT (channel_id) DO UPDATE SET
+			messages_count = channel_activities.messages_count + 1,
+			last_message_at = EXCLUDED.last_message_at,
+			activity_score = (channel_activities.messages_count + 1) * 1.0 + channel_activities.members_count * 2.0,
+			version = channel_activities.version + 1
+	`
+
+	_, err := r.db.Exec(ctx, query, channelID, timestamp)
+	return err
+}
+
+func (r *PostgresAnalyticsRepository) IncrementChannelMembers(ctx context.Context, channelID uuid.UUID, timestamp time.Time) error {
+	query := `
+		INSERT INTO channel_activities (id, channel_id, messages_count, members_count, last_message_at, activity_score, version)
+		VALUES (gen_random_uuid(), $1, 0, 1, $2, 2.0, 1)
+		ON CONFLICT (channel_id) DO UPDATE SET
+			members_count = channel_activities.members_count + 1,
+			last_message_at = EXCLUDED.last_message_at,
+			activity_score = channel_activities.messages_count * 1.0 + (channel_activities.members_count + 1) * 2.0,
+			version = channel_activities.version + 1
+	`
+
+	_, err := r.db.Exec(ctx, query, channelID, timestamp)
+	return err
 }

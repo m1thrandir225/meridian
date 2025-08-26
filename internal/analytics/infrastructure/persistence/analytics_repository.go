@@ -45,4 +45,11 @@ type AnalyticsRepository interface {
 	GetChannelActivityList(ctx context.Context, startDate, endDate time.Time, limit int) ([]domain.ChannelActivityData, error)
 	GetTopUsers(ctx context.Context, startDate, endDate time.Time, limit int) ([]domain.TopUserData, error)
 	GetReactionUsage(ctx context.Context, startDate, endDate time.Time) ([]domain.ReactionUsageData, error)
+	GetMetricByMessageID(ctx context.Context, messageID string) (*domain.AnalyticsMetric, error)
+
+	IncrementUserMessages(ctx context.Context, userID uuid.UUID, timestamp time.Time) error
+	IncrementUserChannelsJoined(ctx context.Context, userID uuid.UUID, timestamp time.Time) error
+	IncrementUserReactions(ctx context.Context, userID uuid.UUID, timestamp time.Time) error
+	IncrementChannelMessages(ctx context.Context, channelID uuid.UUID, timestamp time.Time) error
+	IncrementChannelMembers(ctx context.Context, channelID uuid.UUID, timestamp time.Time) error
 }

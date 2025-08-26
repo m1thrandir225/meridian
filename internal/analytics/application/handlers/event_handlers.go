@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"time"
 
+	"sync"
+
 	"github.com/m1thrandir225/meridian/internal/analytics/application/services"
 	"github.com/m1thrandir225/meridian/internal/analytics/domain"
 	"github.com/m1thrandir225/meridian/pkg/kafka"
@@ -15,12 +17,16 @@ import (
 type AnalyticsEventHandler struct {
 	analyticsService *services.AnalyticsService
 	logger           *logging.Logger
+	processedMsgs    map[string]time.Time
+	mu               sync.RWMutex
 }
 
 func NewAnalyticsEventHandler(analyticsService *services.AnalyticsService, logger *logging.Logger) *AnalyticsEventHandler {
 	return &AnalyticsEventHandler{
 		analyticsService: analyticsService,
 		logger:           logger,
+		processedMsgs:    make(map[string]time.Time),
+		mu:               sync.RWMutex{},
 	}
 }
 
@@ -32,7 +38,6 @@ func (h *AnalyticsEventHandler) HandleEvent(ctx context.Context, event kafka.Eve
 		zap.Int32("partition", event.Partition),
 		zap.Int64("offset", event.Offset))
 
-	// Debug: Log the raw JSON structure to see what we're actually receiving
 	var rawEvent map[string]interface{}
 	if err := json.Unmarshal(event.Data, &rawEvent); err != nil {
 		logger.Error("Failed to parse raw event", zap.Error(err))
@@ -40,10 +45,10 @@ func (h *AnalyticsEventHandler) HandleEvent(ctx context.Context, event kafka.Eve
 	}
 	logger.Info("Raw event structure", zap.Any("event", rawEvent))
 
-	// Parse the event type from the BaseDomainEvent structure
 	var baseEvent struct {
 		Name string `json:"name"`
 	}
+
 	if err := json.Unmarshal(event.Data, &baseEvent); err != nil {
 		logger.Error("Failed to parse event name", zap.Error(err))
 		return err
@@ -76,6 +81,7 @@ func (h *AnalyticsEventHandler) HandleEvent(ctx context.Context, event kafka.Eve
 	}
 }
 
+// handleUserRegistered is a handler for the UserRegistered event
 func (h *AnalyticsEventHandler) handleUserRegistered(ctx context.Context, event kafka.Event) error {
 	logger := h.logger.WithMethod("handleUserRegistered")
 	logger.Info("Processing user registration event")
@@ -94,6 +100,7 @@ func (h *AnalyticsEventHandler) handleUserRegistered(ctx context.Context, event 
 	return h.analyticsService.TrackUserRegistration(ctx, cmd)
 }
 
+// handleUserProfileUpdated is a handler for the UserProfileUpdated event
 func (h *AnalyticsEventHandler) handleUserProfileUpdated(ctx context.Context, event kafka.Event) error {
 	logger := h.logger.WithMethod("handleUserProfileUpdated")
 	logger.Info("Processing user profile updated event")
@@ -104,7 +111,6 @@ func (h *AnalyticsEventHandler) handleUserProfileUpdated(ctx context.Context, ev
 		return err
 	}
 
-	// Track profile update as a metric
 	cmd := domain.TrackMessageSentCommand{
 		MessageID:     "profile_update_" + userEvent.UserID,
 		ChannelID:     "system",
@@ -116,49 +122,46 @@ func (h *AnalyticsEventHandler) handleUserProfileUpdated(ctx context.Context, ev
 	return h.analyticsService.TrackMessageSent(ctx, cmd)
 }
 
+// handleMessageSent is a handler for the MessageSent event
 func (h *AnalyticsEventHandler) handleMessageSent(ctx context.Context, eventData []byte) error {
 	logger := h.logger.WithMethod("handleMessageSent")
 
 	var messageEvent MessageSentEvent
 	if err := json.Unmarshal(eventData, &messageEvent); err != nil {
 		logger.Error("Failed to unmarshal message event", zap.Error(err))
-		// Log the raw data to see what we're trying to parse
 		logger.Error("Raw message event data", zap.String("data", string(eventData)))
 		return err
 	}
 
-	// Log the parsed event to debug
-	logger.Info("Parsed message event",
+	h.mu.Lock()
+	if lastProcessed, exists := h.processedMsgs[messageEvent.MessageID]; exists {
+		if time.Since(lastProcessed) < time.Minute {
+			logger.Info("Message already processed recently, skipping",
+				zap.String("message_id", messageEvent.MessageID))
+			h.mu.Unlock()
+			return nil
+		}
+	}
+	h.processedMsgs[messageEvent.MessageID] = time.Now()
+	h.mu.Unlock()
+
+	logger.Info("Processing message event",
 		zap.String("message_id", messageEvent.MessageID),
 		zap.String("aggr_id", messageEvent.AggrID),
-		zap.String("sender_user_id", func() string {
-			if messageEvent.SenderUserID != nil {
-				return *messageEvent.SenderUserID
-			}
-			return "nil"
-		}()),
-		zap.String("integration_id", func() string {
-			if messageEvent.IntegrationID != nil {
-				return *messageEvent.IntegrationID
-			}
-			return "nil"
-		}()))
+		zap.String("timestamp", messageEvent.Timestamp))
 
-	// Check if we have a sender (either user or integration)
 	if messageEvent.SenderUserID == nil && messageEvent.IntegrationID == nil {
 		logger.Warn("No sender ID found in message event",
 			zap.String("message_id", messageEvent.MessageID))
-		return nil // Skip this message, don't treat as error
+		return nil
 	}
 
-	// Parse timestamp
 	timestamp, err := time.Parse(time.RFC3339, messageEvent.Timestamp)
 	if err != nil {
 		logger.Error("Failed to parse timestamp", zap.Error(err))
 		return err
 	}
 
-	// Use the sender ID (either user or integration)
 	senderID := ""
 	if messageEvent.SenderUserID != nil {
 		senderID = *messageEvent.SenderUserID
@@ -166,22 +169,20 @@ func (h *AnalyticsEventHandler) handleMessageSent(ctx context.Context, eventData
 		senderID = *messageEvent.IntegrationID
 	}
 
-	// Create command for tracking message sent
 	cmd := domain.TrackMessageSentCommand{
 		MessageID:     messageEvent.MessageID,
 		ChannelID:     messageEvent.AggrID, // Channel ID is the aggregate ID
 		SenderID:      senderID,
 		Timestamp:     timestamp,
-		ContentLength: len(messageEvent.Content.Text), // Use the actual text content
+		ContentLength: len(messageEvent.Content.Text),
 	}
 
-	// Track the message using the service method
 	if err := h.analyticsService.TrackMessageSent(ctx, cmd); err != nil {
 		logger.Error("Failed to track message sent", zap.Error(err))
 		return err
 	}
 
-	logger.Info("Tracked message sent",
+	logger.Info("Successfully tracked message sent",
 		zap.String("message_id", messageEvent.MessageID),
 		zap.String("channel_id", messageEvent.AggrID))
 
@@ -236,7 +237,6 @@ func (h *AnalyticsEventHandler) handleUserLeftChannel(ctx context.Context, event
 		return err
 	}
 
-	// Track user leaving channel (could be used for engagement metrics)
 	cmd := domain.TrackMessageSentCommand{
 		MessageID:     "user_left_" + leftEvent.UserID + "_" + leftEvent.AggrID,
 		ChannelID:     leftEvent.AggrID,
@@ -279,7 +279,6 @@ func (h *AnalyticsEventHandler) handleReactionRemoved(ctx context.Context, event
 		return err
 	}
 
-	// Track reaction removal (could be used for engagement metrics)
 	cmd := domain.TrackReactionAddedCommand{
 		ReactionID:   "removed_" + reactionEvent.MessageID + "_" + reactionEvent.UserID,
 		MessageID:    reactionEvent.MessageID,
@@ -301,7 +300,6 @@ func (h *AnalyticsEventHandler) handleIntegrationRegistered(ctx context.Context,
 		return err
 	}
 
-	// Track integration registration
 	cmd := domain.TrackMessageSentCommand{
 		MessageID:     "integration_registered_" + integrationEvent.IntegrationID,
 		ChannelID:     "system",

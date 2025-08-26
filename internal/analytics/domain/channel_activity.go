@@ -1,10 +1,12 @@
-package domain // ChannelActivity represents channel engagement metrics
+package domain
+
 import (
 	"time"
 
 	"github.com/google/uuid"
 )
 
+// ChannelActivity represents channel engagement metrics
 type ChannelActivity struct {
 	ID            MetricID
 	ChannelID     uuid.UUID

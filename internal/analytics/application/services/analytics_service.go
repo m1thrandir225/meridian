@@ -34,12 +34,37 @@ func (s *AnalyticsService) TrackUserRegistration(ctx context.Context, cmd domain
 		return err
 	}
 
+	// Check if user already exists
+	existingUser, err := s.repo.GetUserActivity(ctx, userID)
+	if err == nil && existingUser != nil {
+		logger.Info("User already exists, skipping registration", zap.String("user_id", cmd.UserID))
+		return nil
+	}
+
+	// Create new user activity
 	metricID, err := domain.NewMetricID()
 	if err != nil {
 		logger.Error("Failed to create metric ID", zap.Error(err))
 		return err
 	}
 
+	userActivity := &domain.UserActivity{
+		ID:              *metricID,
+		UserID:          userID,
+		LastActiveAt:    cmd.Timestamp,
+		MessagesSent:    0,
+		ChannelsJoined:  0,
+		ReactionsGiven:  0,
+		SessionDuration: 0,
+		Version:         1,
+	}
+
+	if err := s.repo.SaveUserActivity(ctx, userActivity); err != nil {
+		logger.Error("Failed to save user activity", zap.Error(err))
+		return err
+	}
+
+	// Save metric for tracking
 	metric := &domain.AnalyticsMetric{
 		ID:        *metricID,
 		Name:      "user_registration",
@@ -54,21 +79,6 @@ func (s *AnalyticsService) TrackUserRegistration(ctx context.Context, cmd domain
 		return err
 	}
 
-	// Update daily aggregation
-	dailyMetric := &domain.DailyMetric{
-		ID:      *metricID,
-		Name:    "user_registrations_daily",
-		Date:    cmd.Timestamp.Truncate(24 * time.Hour),
-		Value:   1,
-		Count:   1,
-		Version: 1,
-	}
-
-	if err := s.repo.SaveDailyMetric(ctx, dailyMetric); err != nil {
-		logger.Error("Failed to save daily user registration metric", zap.Error(err))
-		return err
-	}
-
 	logger.Info("User registration tracked successfully", zap.String("user_id", cmd.UserID))
 	return nil
 }
@@ -77,6 +87,13 @@ func (s *AnalyticsService) TrackUserRegistration(ctx context.Context, cmd domain
 func (s *AnalyticsService) TrackMessageSent(ctx context.Context, cmd domain.TrackMessageSentCommand) error {
 	logger := s.logger.WithMethod("TrackMessageSent")
 	logger.Info("Tracking message sent", zap.String("message_id", cmd.MessageID))
+
+	// Check if message already processed
+	existingMetric, err := s.repo.GetMetricByMessageID(ctx, cmd.MessageID)
+	if err == nil && existingMetric != nil {
+		logger.Info("Message already processed, skipping", zap.String("message_id", cmd.MessageID))
+		return nil
+	}
 
 	channelID, err := uuid.Parse(cmd.ChannelID)
 	if err != nil {
@@ -96,7 +113,7 @@ func (s *AnalyticsService) TrackMessageSent(ctx context.Context, cmd domain.Trac
 		return err
 	}
 
-	// Track message metric
+	// Save the message metric
 	metric := &domain.AnalyticsMetric{
 		ID:        *metricID,
 		Name:      "message_sent",
@@ -106,6 +123,7 @@ func (s *AnalyticsService) TrackMessageSent(ctx context.Context, cmd domain.Trac
 		Timestamp: cmd.Timestamp,
 		Metadata: map[string]interface{}{
 			"content_length": cmd.ContentLength,
+			"message_id":     cmd.MessageID,
 		},
 		Version: 1,
 	}
@@ -115,44 +133,14 @@ func (s *AnalyticsService) TrackMessageSent(ctx context.Context, cmd domain.Trac
 		return err
 	}
 
-	// Update daily aggregation
-	dailyMetric := &domain.DailyMetric{
-		ID:      *metricID,
-		Name:    "messages_daily",
-		Date:    cmd.Timestamp.Truncate(24 * time.Hour),
-		Value:   1,
-		Count:   1,
-		Version: 1,
-	}
-
-	if err := s.repo.SaveDailyMetric(ctx, dailyMetric); err != nil {
-		logger.Error("Failed to save daily message metric", zap.Error(err))
-		return err
-	}
-
-	// Update hourly aggregation
-	hourlyMetric := &domain.HourlyMetric{
-		ID:       *metricID,
-		Name:     "messages_hourly",
-		DateTime: cmd.Timestamp.Truncate(time.Hour),
-		Value:    1,
-		Count:    1,
-		Version:  1,
-	}
-
-	if err := s.repo.SaveHourlyMetric(ctx, hourlyMetric); err != nil {
-		logger.Error("Failed to save hourly message metric", zap.Error(err))
-		return err
-	}
-
-	// Update user activity for message
-	if err := s.updateUserActivityForMessage(ctx, senderID, cmd.Timestamp); err != nil {
+	// Update user activity
+	if err := s.incrementUserMessages(ctx, senderID, cmd.Timestamp); err != nil {
 		logger.Error("Failed to update user activity", zap.Error(err))
 		return err
 	}
 
-	// Update channel activity for message
-	if err := s.updateChannelActivityForMessage(ctx, channelID, cmd.Timestamp); err != nil {
+	// Update channel activity
+	if err := s.incrementChannelMessages(ctx, channelID, cmd.Timestamp); err != nil {
 		logger.Error("Failed to update channel activity", zap.Error(err))
 		return err
 	}
@@ -178,12 +166,36 @@ func (s *AnalyticsService) TrackChannelCreated(ctx context.Context, cmd domain.T
 		return err
 	}
 
+	// Check if channel already exists
+	existingChannel, err := s.repo.GetChannelActivity(ctx, channelID)
+	if err == nil && existingChannel != nil {
+		logger.Info("Channel already exists, skipping creation", zap.String("channel_id", cmd.ChannelID))
+		return nil
+	}
+
 	metricID, err := domain.NewMetricID()
 	if err != nil {
 		logger.Error("Failed to create metric ID", zap.Error(err))
 		return err
 	}
 
+	// Create channel activity
+	channelActivity := &domain.ChannelActivity{
+		ID:            *metricID,
+		ChannelID:     channelID,
+		MessagesCount: 0,
+		MembersCount:  1, // Creator is the first member
+		LastMessageAt: cmd.Timestamp,
+		ActivityScore: 2.0, // Base score for creation
+		Version:       1,
+	}
+
+	if err := s.repo.SaveChannelActivity(ctx, channelActivity); err != nil {
+		logger.Error("Failed to save channel activity", zap.Error(err))
+		return err
+	}
+
+	// Save metric
 	metric := &domain.AnalyticsMetric{
 		ID:        *metricID,
 		Name:      "channel_created",
@@ -196,22 +208,6 @@ func (s *AnalyticsService) TrackChannelCreated(ctx context.Context, cmd domain.T
 
 	if err := s.repo.SaveMetric(ctx, metric); err != nil {
 		logger.Error("Failed to save channel created metric", zap.Error(err))
-		return err
-	}
-
-	// Initialize channel activity
-	channelActivity := &domain.ChannelActivity{
-		ID:            *metricID,
-		ChannelID:     channelID,
-		MessagesCount: 0,
-		MembersCount:  1,
-		LastMessageAt: cmd.Timestamp,
-		ActivityScore: 0,
-		Version:       1,
-	}
-
-	if err := s.repo.SaveChannelActivity(ctx, channelActivity); err != nil {
-		logger.Error("Failed to save channel activity", zap.Error(err))
 		return err
 	}
 
@@ -242,6 +238,7 @@ func (s *AnalyticsService) TrackUserJoinedChannel(ctx context.Context, cmd domai
 		return err
 	}
 
+	// Save metric
 	metric := &domain.AnalyticsMetric{
 		ID:        *metricID,
 		Name:      "user_joined_channel",
@@ -257,14 +254,14 @@ func (s *AnalyticsService) TrackUserJoinedChannel(ctx context.Context, cmd domai
 		return err
 	}
 
-	// Update user activity for channel join
-	if err := s.updateUserActivityForChannelJoin(ctx, userID, cmd.Timestamp); err != nil {
+	// Update user activity
+	if err := s.incrementUserChannelsJoined(ctx, userID, cmd.Timestamp); err != nil {
 		logger.Error("Failed to update user activity", zap.Error(err))
 		return err
 	}
 
-	// Update channel activity for member join
-	if err := s.updateChannelActivityForMemberJoin(ctx, channelID, cmd.Timestamp); err != nil {
+	// Update channel activity
+	if err := s.incrementChannelMembers(ctx, channelID, cmd.Timestamp); err != nil {
 		logger.Error("Failed to update channel activity", zap.Error(err))
 		return err
 	}
@@ -290,6 +287,7 @@ func (s *AnalyticsService) TrackReactionAdded(ctx context.Context, cmd domain.Tr
 		return err
 	}
 
+	// Save metric
 	metric := &domain.AnalyticsMetric{
 		ID:        *metricID,
 		Name:      "reaction_added",
@@ -308,8 +306,8 @@ func (s *AnalyticsService) TrackReactionAdded(ctx context.Context, cmd domain.Tr
 		return err
 	}
 
-	// Update user activity for reaction
-	if err := s.updateUserActivityForReaction(ctx, userID, cmd.Timestamp); err != nil {
+	// Update user activity
+	if err := s.incrementUserReactions(ctx, userID, cmd.Timestamp); err != nil {
 		logger.Error("Failed to update user activity", zap.Error(err))
 		return err
 	}
@@ -318,7 +316,28 @@ func (s *AnalyticsService) TrackReactionAdded(ctx context.Context, cmd domain.Tr
 	return nil
 }
 
-// GetDashboardData retrieves dashboard metrics
+// Helper methods for atomic increments
+func (s *AnalyticsService) incrementUserMessages(ctx context.Context, userID uuid.UUID, timestamp time.Time) error {
+	return s.repo.IncrementUserMessages(ctx, userID, timestamp)
+}
+
+func (s *AnalyticsService) incrementUserChannelsJoined(ctx context.Context, userID uuid.UUID, timestamp time.Time) error {
+	return s.repo.IncrementUserChannelsJoined(ctx, userID, timestamp)
+}
+
+func (s *AnalyticsService) incrementUserReactions(ctx context.Context, userID uuid.UUID, timestamp time.Time) error {
+	return s.repo.IncrementUserReactions(ctx, userID, timestamp)
+}
+
+func (s *AnalyticsService) incrementChannelMessages(ctx context.Context, channelID uuid.UUID, timestamp time.Time) error {
+	return s.repo.IncrementChannelMessages(ctx, channelID, timestamp)
+}
+
+func (s *AnalyticsService) incrementChannelMembers(ctx context.Context, channelID uuid.UUID, timestamp time.Time) error {
+	return s.repo.IncrementChannelMembers(ctx, channelID, timestamp)
+}
+
+// Query methods remain the same
 func (s *AnalyticsService) GetDashboardData(ctx context.Context, query domain.GetDashboardDataQuery) (*domain.DashboardData, error) {
 	logger := s.logger.WithMethod("GetDashboardData")
 	logger.Info("Getting dashboard data")
@@ -394,271 +413,23 @@ func (s *AnalyticsService) GetDashboardData(ctx context.Context, query domain.Ge
 	return dashboardData, nil
 }
 
-// GetUserGrowth retrieves user growth data
+// Other query methods remain the same...
 func (s *AnalyticsService) GetUserGrowth(ctx context.Context, query domain.GetUserGrowthQuery) ([]domain.UserGrowthData, error) {
-	logger := s.logger.WithMethod("GetUserGrowth")
-	logger.Info("Getting user growth data")
-
-	growthData, err := s.repo.GetUserGrowth(ctx, query.StartDate, query.EndDate, query.Interval)
-	if err != nil {
-		logger.Error("Failed to get user growth data", zap.Error(err))
-		return nil, err
-	}
-
-	logger.Info("User growth data retrieved successfully", zap.Int("data_points", len(growthData)))
-	return growthData, nil
+	return s.repo.GetUserGrowth(ctx, query.StartDate, query.EndDate, query.Interval)
 }
 
-// GetMessageVolume retrieves message volume data
 func (s *AnalyticsService) GetMessageVolume(ctx context.Context, query domain.GetMessageVolumeQuery) ([]domain.MessageVolumeData, error) {
-	logger := s.logger.WithMethod("GetMessageVolume")
-	logger.Info("Getting message volume data")
-
-	volumeData, err := s.repo.GetMessageVolume(ctx, query.StartDate, query.EndDate, query.ChannelID)
-	if err != nil {
-		logger.Error("Failed to get message volume data", zap.Error(err))
-		return nil, err
-	}
-
-	logger.Info("Message volume data retrieved successfully", zap.Int("data_points", len(volumeData)))
-	return volumeData, nil
+	return s.repo.GetMessageVolume(ctx, query.StartDate, query.EndDate, query.ChannelID)
 }
 
-// GetChannelActivity retrieves channel activity data
 func (s *AnalyticsService) GetChannelActivity(ctx context.Context, query domain.GetChannelActivityQuery) ([]domain.ChannelActivityData, error) {
-	logger := s.logger.WithMethod("GetChannelActivity")
-	logger.Info("Getting channel activity data")
-
-	activityData, err := s.repo.GetChannelActivityList(ctx, query.StartDate, query.EndDate, query.Limit)
-	if err != nil {
-		logger.Error("Failed to get channel activity data", zap.Error(err))
-		return nil, err
-	}
-
-	logger.Info("Channel activity data retrieved successfully", zap.Int("data_points", len(activityData)))
-	return activityData, nil
+	return s.repo.GetChannelActivityList(ctx, query.StartDate, query.EndDate, query.Limit)
 }
 
-// GetTopUsers retrieves top active users
 func (s *AnalyticsService) GetTopUsers(ctx context.Context, query domain.GetTopUsersQuery) ([]domain.TopUserData, error) {
-	logger := s.logger.WithMethod("GetTopUsers")
-	logger.Info("Getting top users data")
-
-	topUsers, err := s.repo.GetTopUsers(ctx, query.StartDate, query.EndDate, query.Limit)
-	if err != nil {
-		logger.Error("Failed to get top users data", zap.Error(err))
-		return nil, err
-	}
-
-	logger.Info("Top users data retrieved successfully", zap.Int("users_count", len(topUsers)))
-	return topUsers, nil
+	return s.repo.GetTopUsers(ctx, query.StartDate, query.EndDate, query.Limit)
 }
 
-// GetReactionUsage retrieves reaction usage statistics
 func (s *AnalyticsService) GetReactionUsage(ctx context.Context, query domain.GetReactionUsageQuery) ([]domain.ReactionUsageData, error) {
-	logger := s.logger.WithMethod("GetReactionUsage")
-	logger.Info("Getting reaction usage data")
-
-	reactionData, err := s.repo.GetReactionUsage(ctx, query.StartDate, query.EndDate)
-	if err != nil {
-		logger.Error("Failed to get reaction usage data", zap.Error(err))
-		return nil, err
-	}
-
-	logger.Info("Reaction usage data retrieved successfully", zap.Int("reaction_types", len(reactionData)))
-	return reactionData, nil
-}
-
-// Helper methods
-func (s *AnalyticsService) updateUserActivity(ctx context.Context, userID uuid.UUID, timestamp time.Time) error {
-	activity, err := s.repo.GetUserActivity(ctx, userID)
-	if err != nil {
-		// Create new user activity if not exists
-		metricID, err := domain.NewMetricID()
-		if err != nil {
-			return err
-		}
-
-		activity = &domain.UserActivity{
-			ID:              *metricID,
-			UserID:          userID,
-			LastActiveAt:    timestamp,
-			MessagesSent:    0,
-			ChannelsJoined:  0,
-			ReactionsGiven:  0,
-			SessionDuration: 0,
-			Version:         1,
-		}
-	}
-
-	activity.LastActiveAt = timestamp
-	activity.MessagesSent++
-	activity.Version++
-
-	return s.repo.SaveUserActivity(ctx, activity)
-}
-
-func (s *AnalyticsService) updateChannelActivity(ctx context.Context, channelID uuid.UUID, timestamp time.Time) error {
-	activity, err := s.repo.GetChannelActivity(ctx, channelID)
-	if err != nil {
-		// Create new channel activity if not exists
-		metricID, err := domain.NewMetricID()
-		if err != nil {
-			return err
-		}
-
-		activity = &domain.ChannelActivity{
-			ID:            *metricID,
-			ChannelID:     channelID,
-			MessagesCount: 0,
-			MembersCount:  0,
-			LastMessageAt: timestamp,
-			ActivityScore: 0,
-			Version:       1,
-		}
-	}
-
-	activity.LastMessageAt = timestamp
-	activity.MessagesCount++
-	activity.Version++
-
-	return s.repo.SaveChannelActivity(ctx, activity)
-}
-
-func (s *AnalyticsService) updateUserActivityForMessage(ctx context.Context, userID uuid.UUID, timestamp time.Time) error {
-	activity, err := s.repo.GetUserActivity(ctx, userID)
-	if err != nil {
-		// Create new user activity if not exists
-		metricID, err := domain.NewMetricID()
-		if err != nil {
-			return err
-		}
-
-		activity = &domain.UserActivity{
-			ID:              *metricID,
-			UserID:          userID,
-			LastActiveAt:    timestamp,
-			MessagesSent:    0,
-			ChannelsJoined:  0,
-			ReactionsGiven:  0,
-			SessionDuration: 0,
-			Version:         1,
-		}
-	}
-
-	activity.LastActiveAt = timestamp
-	activity.MessagesSent++
-	activity.Version++
-
-	return s.repo.SaveUserActivity(ctx, activity)
-}
-
-func (s *AnalyticsService) updateUserActivityForChannelJoin(ctx context.Context, userID uuid.UUID, timestamp time.Time) error {
-	activity, err := s.repo.GetUserActivity(ctx, userID)
-	if err != nil {
-		// Create new user activity if not exists
-		metricID, err := domain.NewMetricID()
-		if err != nil {
-			return err
-		}
-
-		activity = &domain.UserActivity{
-			ID:              *metricID,
-			UserID:          userID,
-			LastActiveAt:    timestamp,
-			MessagesSent:    0,
-			ChannelsJoined:  0,
-			ReactionsGiven:  0,
-			SessionDuration: 0,
-			Version:         1,
-		}
-	}
-
-	activity.LastActiveAt = timestamp
-	activity.ChannelsJoined++
-	activity.Version++
-
-	return s.repo.SaveUserActivity(ctx, activity)
-}
-
-func (s *AnalyticsService) updateUserActivityForReaction(ctx context.Context, userID uuid.UUID, timestamp time.Time) error {
-	activity, err := s.repo.GetUserActivity(ctx, userID)
-	if err != nil {
-		// Create new user activity if not exists
-		metricID, err := domain.NewMetricID()
-		if err != nil {
-			return err
-		}
-
-		activity = &domain.UserActivity{
-			ID:              *metricID,
-			UserID:          userID,
-			LastActiveAt:    timestamp,
-			MessagesSent:    0,
-			ChannelsJoined:  0,
-			ReactionsGiven:  0,
-			SessionDuration: 0,
-			Version:         1,
-		}
-	}
-
-	activity.LastActiveAt = timestamp
-	activity.ReactionsGiven++
-	activity.Version++
-
-	return s.repo.SaveUserActivity(ctx, activity)
-}
-
-func (s *AnalyticsService) updateChannelActivityForMessage(ctx context.Context, channelID uuid.UUID, timestamp time.Time) error {
-	activity, err := s.repo.GetChannelActivity(ctx, channelID)
-	if err != nil {
-		// Create new channel activity if not exists
-		metricID, err := domain.NewMetricID()
-		if err != nil {
-			return err
-		}
-
-		activity = &domain.ChannelActivity{
-			ID:            *metricID,
-			ChannelID:     channelID,
-			MessagesCount: 0,
-			MembersCount:  0,
-			LastMessageAt: timestamp,
-			ActivityScore: 0,
-			Version:       1,
-		}
-	}
-
-	activity.LastMessageAt = timestamp
-	activity.MessagesCount++
-	activity.Version++
-
-	return s.repo.SaveChannelActivity(ctx, activity)
-}
-
-func (s *AnalyticsService) updateChannelActivityForMemberJoin(ctx context.Context, channelID uuid.UUID, timestamp time.Time) error {
-	activity, err := s.repo.GetChannelActivity(ctx, channelID)
-	if err != nil {
-		// Create new channel activity if not exists
-		metricID, err := domain.NewMetricID()
-		if err != nil {
-			return err
-		}
-
-		activity = &domain.ChannelActivity{
-			ID:            *metricID,
-			ChannelID:     channelID,
-			MessagesCount: 0,
-			MembersCount:  0,
-			LastMessageAt: timestamp,
-			ActivityScore: 0,
-			Version:       1,
-		}
-	}
-
-	activity.LastMessageAt = timestamp
-	activity.MembersCount++
-	activity.Version++
-
-	return s.repo.SaveChannelActivity(ctx, activity)
+	return s.repo.GetReactionUsage(ctx, query.StartDate, query.EndDate)
 }

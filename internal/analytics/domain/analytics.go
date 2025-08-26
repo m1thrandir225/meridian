@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/m1thrandir225/meridian/pkg/common"
 )
 
 // Analytics is the aggregate root for the analytics domain
@@ -13,7 +12,6 @@ type Analytics struct {
 	ID      AnalyticsID
 	Metrics []*AnalyticsMetric
 	Version int64
-	events  []common.DomainEvent
 }
 
 func NewAnalytics() (*Analytics, error) {
@@ -26,7 +24,6 @@ func NewAnalytics() (*Analytics, error) {
 		ID:      *id,
 		Metrics: make([]*AnalyticsMetric, 0),
 		Version: 1,
-		events:  make([]common.DomainEvent, 0),
 	}, nil
 }
 
@@ -50,10 +47,6 @@ func (a *Analytics) TrackMetric(name string, value float64, channelID *uuid.UUID
 
 	a.Metrics = append(a.Metrics, metric)
 	a.Version++
-
-	// Add domain event
-	event := CreateMetricTrackedEvent(a, metric)
-	a.addEvent(event)
 
 	return nil
 }
@@ -101,17 +94,4 @@ func (a *Analytics) TrackChannelCreated(channelID, creatorID string, timestamp t
 	return a.TrackMetric("channel_created", 1, &parsedChannelID, &parsedCreatorID, map[string]interface{}{
 		"creation_time": timestamp,
 	})
-}
-
-// Event handling methods
-func (a *Analytics) addEvent(event common.DomainEvent) {
-	a.events = append(a.events, event)
-}
-
-func (a *Analytics) Events() []common.DomainEvent {
-	return a.events
-}
-
-func (a *Analytics) ClearEvents() {
-	a.events = nil
 }
