@@ -1,19 +1,21 @@
 <script setup lang="ts">
-import { ref, computed, nextTick, watch, onMounted, onUnmounted } from 'vue'
-import { Hash, Users, Send, Smile, Menu, Paperclip, Bot, Reply } from 'lucide-vue-next'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { getUserDisplayName, getUserInitials } from '@/lib/utils'
+import websocketService from '@/services/websocket.service'
 import { useAppearanceStore } from '@/stores/appearance'
+import { useAuthStore } from '@/stores/auth'
 import { useChannelStore } from '@/stores/channel'
 import { useMessageStore } from '@/stores/message'
-import { useAuthStore } from '@/stores/auth'
-import websocketService from '@/services/websocket.service'
-import { getUserInitials, getUserDisplayName } from '@/lib/utils'
 import type { Message } from '@/types/models/message'
+import { Bot, Hash, Menu, Reply, Send, Smile, Users, X } from 'lucide-vue-next'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import ChannelInviteModal from './ChannelInviteModal.vue'
+import ChannelSettings from './ChannelSettings.vue'
 import MessageActionsPopup from './MessageActionsPopup.vue'
 import MessageReactions from './MessageReactions.vue'
-import ChannelInviteModal from './ChannelInviteModal.vue'
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
 
 // Props and emits
 interface Props {
@@ -42,12 +44,51 @@ const messagesContainer = ref<HTMLElement | null>(null)
 const typingTimeout = ref<number | null>(null)
 const isTyping = ref<boolean>(false)
 const newMessage = ref<string>('')
+const emojiPickerOpen = ref<boolean>(false)
 const replyingTo = ref<Message | null>(null)
-// Remove the hover state management since we're using hover-card now
-// const hoveredMessageId = ref<string | null>(null)
 const messages = computed(() => messageStore.currentMessages)
 const currentChannel = computed(() => channelStore.getCurrentChannel)
 const isLoading = computed(() => messageStore.loading)
+const inputRef = ref<{ inputRef: HTMLInputElement | null; focus: () => void } | null>(null)
+const emojis = ref<string[]>([
+  '👋',
+  '👍',
+  '👎',
+  '🤔',
+  '🤯',
+  '🤮',
+  '🤢',
+  '🤪',
+  '🤣',
+  '😂',
+  '😍',
+  '😘',
+  '😊',
+  '😇',
+  '😉',
+  '😌',
+  '😍',
+  '😘',
+  '😊',
+  '😇',
+  '😉',
+  '😌',
+  '🤑',
+  '🤗',
+  '🤓',
+  '🤠',
+  '🤡',
+  '🤠',
+])
+
+const onEmojiSelect = (emoji: string) => {
+  newMessage.value += emoji
+  emojiPickerOpen.value = false
+  setTimeout(() => {
+    inputRef.value?.focus()
+  }, 0)
+}
+
 // Computed styles based on appearance settings
 const messageContainerClasses = () => {
   const baseClasses =
@@ -232,6 +273,7 @@ const handleReply = (message: Message) => {
         <div v-if="currentChannel" class="px-2">
           <ChannelInviteModal :channel-id="currentChannel.id" :channel-name="currentChannel.name" />
         </div>
+        <ChannelSettings v-if="currentChannel" :channel="currentChannel" />
         <Button
           variant="ghost"
           size="icon"
@@ -371,12 +413,9 @@ const handleReply = (message: Message) => {
     <!-- Input Area -->
     <div class="p-4 border-t">
       <div class="flex gap-2">
-        <Button variant="ghost" size="icon" class="h-9 w-9">
-          <Paperclip class="h-4 w-4" />
-        </Button>
-
         <div class="flex-1 relative">
           <Input
+            ref="inputRef"
             v-model="newMessage"
             placeholder="Type a message..."
             class="pr-20"
@@ -385,9 +424,25 @@ const handleReply = (message: Message) => {
           />
 
           <div class="absolute right-2 top-1/2 transform -translate-y-1/2 flex gap-1">
-            <Button variant="ghost" size="icon" class="h-6 w-6">
-              <Smile class="h-3 w-3" />
-            </Button>
+            <Popover v-model:open="emojiPickerOpen">
+              <PopoverTrigger as-child>
+                <Button variant="ghost" size="icon" class="h-6 w-6">
+                  <Smile class="h-3 w-3" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent side="top" align="center" class="p-2 w-64">
+                <div class="grid grid-cols-8 gap-1">
+                  <button
+                    v-for="emoji in emojis"
+                    :key="emoji"
+                    class="h-7 w-7 flex items-center justify-center rounded-md text-2xl hover:bg-accent"
+                    @click="onEmojiSelect(emoji)"
+                  >
+                    {{ emoji }}
+                  </button>
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
         </div>
 

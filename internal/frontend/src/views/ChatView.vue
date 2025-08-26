@@ -2,15 +2,16 @@
 import ChatLayout from '@/layouts/ChatLayout.vue'
 import ChatArea from '@/components/ChatArea.vue'
 import { onMounted, onUnmounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useMessageStore } from '@/stores/message'
 import { useChannelStore } from '@/stores/channel'
 import websocketService from '@/services/websocket.service'
+import { toast } from 'vue-sonner'
 
 const route = useRoute()
 const messageStore = useMessageStore()
 const channelStore = useChannelStore()
-
+const router = useRouter()
 // Sidebar state
 const isChannelsSidebarOpen = ref(true)
 const isMembersSidebarOpen = ref(true)
@@ -23,6 +24,13 @@ onMounted(async () => {
     await channelStore.fetchChannels()
   }
   if (route.params.id) {
+    const channel = channelStore.channels.find((c) => c.id === route.params.id)
+    if (channel && channel.is_archived) {
+      toast.error('This channel is archived and cannot be accessed')
+      router.push({ name: 'home' })
+      return
+    }
+
     channelStore.setCurrentChannel(route.params.id as string)
     messageStore.fetchMessages(route.params.id as string)
   }
@@ -35,6 +43,13 @@ watch(
   [() => route.params.id, () => channelStore.channels.length],
   ([id, channelsLength], [oldId, oldChannelsLength]) => {
     if (id && channelsLength > 0) {
+      const channel = channelStore.channels.find((c) => c.id === id)
+      if (channel && channel.is_archived) {
+        toast.error('This channel is archived and cannot be accessed')
+        router.push({ name: 'home' })
+        return
+      }
+
       channelStore.setCurrentChannel(id as string)
       messageStore.fetchMessages(id as string)
     }

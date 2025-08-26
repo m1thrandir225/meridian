@@ -34,6 +34,22 @@ const channelService = {
       params: undefined,
       method: 'GET',
     }),
+  archiveChannel: (channelId: string) =>
+    apiRequest<Channel>({
+      url: `${channelApiURL}/${channelId}/archive`,
+      protected: true,
+      headers: undefined,
+      params: undefined,
+      method: 'PUT',
+    }),
+  unarchiveChannel: (channelId: string) =>
+    apiRequest<Channel>({
+      url: `${channelApiURL}/${channelId}/unarchive`,
+      protected: true,
+      headers: undefined,
+      params: undefined,
+      method: 'PUT',
+    }),
   getMessages: (channelId: string) =>
     apiRequest<Message[]>({
       url: `${channelApiURL}/${channelId}/messages`,

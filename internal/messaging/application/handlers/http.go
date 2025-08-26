@@ -240,14 +240,57 @@ func (h *HTTPHandler) handleArchiveChannel(ctx *gin.Context) {
 	logger := h.logger.WithMethod("handleArchiveChannel")
 	logger.Info("Archiving channel")
 
+	userID := ctx.GetHeader("X-User-ID")
+	if userID == "" {
+		ctx.JSON(http.StatusUnauthorized, errorResponse(ErrUnauthorized))
+		return
+	}
+
 	var req ChannelIDUri
 	if err := ctx.ShouldBindUri(&req); err != nil {
 		logger.Error("Failed to bind URI", zap.Error(err))
 		ctx.JSON(http.StatusBadRequest, errorResponse(err))
 		return
 	}
-	// TODO: implement authentication
-	ctx.Status(http.StatusOK)
+
+	userUUID, err := uuid.Parse(userID)
+	if err != nil {
+		logger.Error("Failed to parse user ID", zap.Error(err))
+		ctx.JSON(http.StatusBadRequest, errorResponse(err))
+		return
+	}
+
+	channelId, err := uuid.Parse(req.ChannelID)
+	if err != nil {
+		logger.Error("Failed to parse channel ID", zap.Error(err))
+		ctx.JSON(http.StatusBadRequest, errorResponse(err))
+		return
+	}
+
+	cmd := domain.ArchiveChannelCommand{
+		ChannelID: channelId,
+		UserID:    userUUID,
+	}
+
+	channel, err := h.channelService.HandleArchiveChannel(ctx, cmd)
+	if err != nil {
+		logger.Error("Failed to archive channel", zap.Error(err))
+		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
+		return
+	}
+
+	cacheKey := fmt.Sprintf("user_channels:%s", userUUID.String())
+	h.cache.Delete(ctx.Request.Context(), cacheKey)
+
+	channelDTO, err := h.channelService.ReturnChannelDTO(ctx, channel)
+	if err != nil {
+		logger.Error("Failed to return channel DTO", zap.Error(err))
+		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
+		return
+	}
+
+	logger.Info("Channel archived", zap.String("channel_id", channel.ID.String()))
+	ctx.JSON(http.StatusOK, channelDTO)
 }
 
 // PUT /api/v1/channels/:channelId/unarchive
@@ -255,6 +298,12 @@ func (h *HTTPHandler) handleUnarchiveChannel(ctx *gin.Context) {
 	logger := h.logger.WithMethod("handleUnarchiveChannel")
 	logger.Info("Unarchiving channel")
 
+	userID := ctx.GetHeader("X-User-ID")
+	if userID == "" {
+		ctx.JSON(http.StatusUnauthorized, errorResponse(ErrUnauthorized))
+		return
+	}
+
 	var req ChannelIDUri
 	if err := ctx.ShouldBindUri(&req); err != nil {
 		logger.Error("Failed to bind URI", zap.Error(err))
@@ -262,9 +311,44 @@ func (h *HTTPHandler) handleUnarchiveChannel(ctx *gin.Context) {
 		return
 	}
 
-	// TODO: implement authentication
+	userUUID, err := uuid.Parse(userID)
+	if err != nil {
+		logger.Error("Failed to parse user ID", zap.Error(err))
+		ctx.JSON(http.StatusBadRequest, errorResponse(err))
+		return
+	}
 
-	ctx.Status(http.StatusOK)
+	channelId, err := uuid.Parse(req.ChannelID)
+	if err != nil {
+		logger.Error("Failed to parse channel ID", zap.Error(err))
+		ctx.JSON(http.StatusBadRequest, errorResponse(err))
+		return
+	}
+
+	cmd := domain.UnarchiveChannelCommand{
+		ChannelID: channelId,
+		UserID:    userUUID,
+	}
+
+	channel, err := h.channelService.HandleUnarchiveChannel(ctx, cmd)
+	if err != nil {
+		logger.Error("Failed to unarchive channel", zap.Error(err))
+		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
+		return
+	}
+
+	cacheKey := fmt.Sprintf("user_channels:%s", userUUID.String())
+	h.cache.Delete(ctx.Request.Context(), cacheKey)
+
+	channelDTO, err := h.channelService.ReturnChannelDTO(ctx, channel)
+	if err != nil {
+		logger.Error("Failed to return channel DTO", zap.Error(err))
+		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
+		return
+	}
+
+	logger.Info("Channel unarchived", zap.String("channel_id", channel.ID.String()))
+	ctx.JSON(http.StatusOK, channelDTO)
 }
 
 // POST /api/v1/channels/:channelId/join

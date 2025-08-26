@@ -12,6 +12,8 @@ import { useAuthStore } from '@/stores/auth'
 import BotManagementView from '@/views/BotManagementView.vue'
 import InviteAcceptView from '@/views/InviteAcceptView.vue'
 import HomeView from '@/views/HomeView.vue'
+import { useChannelStore } from '@/stores/channel'
+import { toast } from 'vue-sonner'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -95,16 +97,32 @@ const router = createRouter({
   ],
 })
 
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
   const isAuthenticated = useAuthStore().checkAuth()
 
   if (to.meta.requiresAuth && !isAuthenticated) {
     const redirect = to.fullPath
 
     next({ name: 'login', query: { redirect } })
-  } else {
-    next()
   }
+
+  if (to.name === 'channel' && to.params.id) {
+    const channelStore = useChannelStore()
+
+    // Ensure channels are loaded
+    if (!channelStore.channels.length) {
+      await channelStore.fetchChannels()
+    }
+
+    const channel = channelStore.channels.find((c) => c.id === to.params.id)
+
+    if (channel && channel.is_archived) {
+      toast.error('This channel is archived and cannot be accessed')
+      next({ name: 'home' })
+      return
+    }
+  }
+  next()
 })
 
 export default router

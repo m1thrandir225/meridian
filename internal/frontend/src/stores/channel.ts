@@ -44,6 +44,34 @@ export const useChannelStore = defineStore('channels', () => {
       currentChannel.value = null
     }
   }
+  async function archiveChannel(channelId: string) {
+    try {
+      await channelService.archiveChannel(channelId)
+      const channel = channels.value.find((c) => c.id === channelId)
+      if (channel) {
+        channel.is_archived = true
+        updateChannel(channel)
+      }
+    } catch (error) {
+      console.error('Failed to archive channel:', error)
+      throw error
+    }
+  }
+
+  async function unarchiveChannel(channelId: string) {
+    try {
+      await channelService.unarchiveChannel(channelId)
+      // Update the channel in the store
+      const channel = channels.value.find((c) => c.id === channelId)
+      if (channel) {
+        channel.is_archived = false
+        updateChannel(channel)
+      }
+    } catch (error) {
+      console.error('Failed to unarchive channel:', error)
+      throw error
+    }
+  }
 
   return {
     channels,
@@ -55,5 +83,7 @@ export const useChannelStore = defineStore('channels', () => {
     addChannel,
     updateChannel,
     removeChannel,
+    archiveChannel,
+    unarchiveChannel,
   }
 })
