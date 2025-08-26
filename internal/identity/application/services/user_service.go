@@ -381,3 +381,34 @@ func (s *IdentityService) RefreshAuthentication(ctx context.Context, cmd domain.
 	logger.Info("Authentication refreshed", zap.String("user_id", user.ID.String()))
 	return newAccessToken, newRefreshToken, nil
 }
+
+func (s *IdentityService) EnsureDefaultAdmin(ctx context.Context) error {
+	logger := s.logger.WithMethod("EnsureDefaultAdmin")
+	logger.Info("Ensuring default admin user exists")
+
+	adminEmail, err := domain.NewEmail("admin@meridian.com")
+	if err != nil {
+		logger.Error("Error creating admin email", zap.Error(err))
+		return fmt.Errorf("error creating admin email: %w", err)
+	}
+
+	existingUser, _ := s.repo.FindByEmail(ctx, adminEmail.String())
+	if existingUser != nil {
+		logger.Info("Default admin user already exists", zap.String("user_id", existingUser.ID.String()))
+		return nil
+	}
+
+	newAdmin, err := domain.NewUser("admin", "admin@meridian.com", "Admin", "User", "AdminPassword@123")
+	if err != nil {
+		logger.Error("Error creating admin user", zap.Error(err))
+		return fmt.Errorf("error creating admin user: %w", err)
+	}
+
+	if err := s.repo.Save(ctx, newAdmin); err != nil {
+		logger.Error("Error saving admin user", zap.Error(err))
+		return fmt.Errorf("error saving admin user: %w", err)
+	}
+
+	logger.Info("Default admin user created", zap.String("user_id", newAdmin.ID.String()))
+	return nil
+}

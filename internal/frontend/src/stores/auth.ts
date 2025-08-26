@@ -2,7 +2,7 @@ import type { AuthenticationTokens } from '@/types/models/tokens'
 import type { User } from '@/types/models/user'
 import type { LoginResponse } from '@/types/responses/auth'
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 
 export const useAuthStore = defineStore(
   'auth',
@@ -57,8 +57,13 @@ export const useAuthStore = defineStore(
       return true
     }
 
+    const isAdmin = computed(() => {
+      return user.value?.is_admin ?? false
+    })
+
     return {
       user,
+      isAdmin,
       accessToken,
       refreshToken,
       accessTokenExpirationTime,

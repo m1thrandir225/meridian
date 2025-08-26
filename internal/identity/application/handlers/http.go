@@ -60,6 +60,7 @@ func (h *HTTPHandler) handleRegisterRequest(ctx *gin.Context) {
 		Email:     user.Email.String(),
 		FirstName: user.FirstName,
 		LastName:  user.LastName,
+		IsAdmin:   user.IsAdmin(),
 	}
 	ctx.JSON(http.StatusOK, response)
 }
@@ -105,6 +106,7 @@ func (h *HTTPHandler) handleLoginRequest(ctx *gin.Context) {
 			Email:     user.Email.String(),
 			FirstName: user.FirstName,
 			LastName:  user.LastName,
+			IsAdmin:   user.IsAdmin(),
 		},
 		Tokens: AuthenticateTokensResponse{
 			AccessToken:  accessToken,
@@ -149,6 +151,7 @@ func (h *HTTPHandler) handleGetCurrentUser(ctx *gin.Context) {
 		Email:     user.Email.String(),
 		FirstName: user.FirstName,
 		LastName:  user.LastName,
+		IsAdmin:   user.IsAdmin(),
 	}
 
 	h.cache.Set(ctx.Request.Context(), cacheKey, response, 15*time.Minute)
@@ -208,6 +211,7 @@ func (h *HTTPHandler) handleUpdateCurrentUserRequest(ctx *gin.Context) {
 		Email:     updatedUser.Email.String(),
 		FirstName: updatedUser.FirstName,
 		LastName:  updatedUser.LastName,
+		IsAdmin:   updatedUser.IsAdmin(),
 	}
 	ctx.JSON(http.StatusOK, response)
 }

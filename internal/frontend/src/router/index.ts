@@ -14,6 +14,7 @@ import InviteAcceptView from '@/views/InviteAcceptView.vue'
 import HomeView from '@/views/HomeView.vue'
 import { useChannelStore } from '@/stores/channel'
 import { toast } from 'vue-sonner'
+import AnalyticsView from '@/views/AnalyticsView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -94,35 +95,44 @@ const router = createRouter({
       component: ForgotPasswordView,
       meta: { requiresAuth: false },
     },
+    {
+      path: '/admin/analytics',
+      name: 'admin-analytics',
+      component: AnalyticsView,
+      meta: { requiresAuth: true, requiresAdmin: true },
+    },
   ],
 })
 
 router.beforeEach(async (to, from, next) => {
   const isAuthenticated = useAuthStore().checkAuth()
-
+  const isAdmin = useAuthStore().isAdmin
   if (to.meta.requiresAuth && !isAuthenticated) {
     const redirect = to.fullPath
 
     next({ name: 'login', query: { redirect } })
-  }
+  } else if (to.meta.requiresAdmin && !isAdmin) {
+    next({ name: 'home' })
+  } else {
+    if (to.name === 'channel' && to.params.id) {
+      const channelStore = useChannelStore()
 
-  if (to.name === 'channel' && to.params.id) {
-    const channelStore = useChannelStore()
+      // Ensure channels are loaded
+      if (!channelStore.channels.length) {
+        await channelStore.fetchChannels()
+      }
 
-    // Ensure channels are loaded
-    if (!channelStore.channels.length) {
-      await channelStore.fetchChannels()
+      const channel = channelStore.channels.find((c) => c.id === to.params.id)
+
+      if (channel && channel.is_archived) {
+        toast.error('This channel is archived and cannot be accessed')
+        next({ name: 'home' })
+        return
+      }
+    } else {
+      next()
     }
-
-    const channel = channelStore.channels.find((c) => c.id === to.params.id)
-
-    if (channel && channel.is_archived) {
-      toast.error('This channel is archived and cannot be accessed')
-      next({ name: 'home' })
-      return
-    }
   }
-  next()
 })
 
 export default router

@@ -80,6 +80,7 @@ func (h *AuthHandler) handlePasetoAuth(ctx *gin.Context, token string, isIntegra
 	if hit, _ := h.cache.GetWithMetrics(ctx.Request.Context(), cacheKey, &cachedResponse); hit {
 		ctx.Header("X-User-ID", cachedResponse.UserID)
 		ctx.Header("X-User-Email", cachedResponse.Email)
+		ctx.Header("X-User-Is-Admin", fmt.Sprintf("%t", cachedResponse.IsAdmin))
 		ctx.Header("X-User-Type", "user")
 		ctx.Header("X-Auth-Method", "paseto")
 		ctx.JSON(http.StatusOK, cachedResponse)
@@ -99,16 +100,18 @@ func (h *AuthHandler) handlePasetoAuth(ctx *gin.Context, token string, isIntegra
 
 	ctx.Header("X-User-ID", claims.Custom.UserID)
 	ctx.Header("X-User-Email", claims.Custom.Email)
+	ctx.Header("X-User-Is-Admin", fmt.Sprintf("%t", claims.Custom.IsAdmin))
 	ctx.Header("X-User-Type", "user")
 	ctx.Header("X-Auth-Method", "paseto")
 
 	response := PasetoValidateResponse{
-		Valid:  true,
-		UserID: claims.Custom.UserID,
-		Email:  claims.Custom.Email,
+		Valid:   true,
+		UserID:  claims.Custom.UserID,
+		Email:   claims.Custom.Email,
+		IsAdmin: claims.Custom.IsAdmin,
 	}
 
-	h.cache.Set(ctx.Request.Context(), cacheKey, response, 15*time.Minute)
+	h.cache.Set(ctx.Request.Context(), cacheKey, response, 2*time.Minute)
 
 	ctx.JSON(http.StatusOK, response)
 }

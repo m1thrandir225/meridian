@@ -1,8 +1,9 @@
 package auth
 
 import (
-	"aidanwoods.dev/go-paseto"
 	"time"
+
+	"aidanwoods.dev/go-paseto"
 )
 
 const (
@@ -12,8 +13,9 @@ const (
 )
 
 type CustomClaims struct {
-	UserID string `json:"user_id"`
-	Email  string `json:"email"`
+	UserID  string `json:"user_id"`
+	Email   string `json:"email"`
+	IsAdmin bool   `json:"is_admin"`
 }
 
 type TokenClaims struct {

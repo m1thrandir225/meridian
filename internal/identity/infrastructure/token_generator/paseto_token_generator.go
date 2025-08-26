@@ -1,14 +1,15 @@
 package token_generator
 
 import (
-	"aidanwoods.dev/go-paseto"
 	"crypto/ed25519"
 	"encoding/hex"
 	"fmt"
+	"time"
+
+	"aidanwoods.dev/go-paseto"
 	"github.com/m1thrandir225/meridian/internal/identity/application/services"
 	"github.com/m1thrandir225/meridian/internal/identity/domain"
 	"github.com/m1thrandir225/meridian/pkg/auth"
-	"time"
 )
 
 type PasetoTokenGenerator struct {
@@ -44,8 +45,9 @@ func (g *PasetoTokenGenerator) GenerateToken(user *domain.User, duration time.Du
 		auth.AUTH_AUDIENCE,
 		auth.AUTH_SUBJECT,
 		auth.CustomClaims{
-			UserID: user.ID.String(),
-			Email:  user.Email.String(),
+			UserID:  user.ID.String(),
+			Email:   user.Email.String(),
+			IsAdmin: user.IsAdmin(),
 		},
 	)
 	token := paseto.NewToken()

@@ -8,6 +8,7 @@ type UserResponse struct {
 	Email     string `json:"email"`
 	FirstName string `json:"first_name"`
 	LastName  string `json:"last_name"`
+	IsAdmin   bool   `json:"is_admin"`
 }
 
 type AuthenticateTokensResponse struct {
@@ -23,9 +24,10 @@ type AuthenticateUserResponse struct {
 }
 
 type PasetoValidateResponse struct {
-	Valid  bool   `json:"valid"`
-	UserID string `json:"user_id"`
-	Email  string `json:"email"`
+	Valid   bool   `json:"valid"`
+	UserID  string `json:"user_id"`
+	Email   string `json:"email"`
+	IsAdmin bool   `json:"is_admin"`
 }
 
 type APIKeyValidateResponse struct {

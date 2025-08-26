@@ -211,3 +211,7 @@ func (u *User) RevokeAllRefreshTokens() {
 		rt.Revoke()
 	}
 }
+
+func (u *User) IsAdmin() bool {
+	return u.Email.String() == "admin@meridian.com"
+}

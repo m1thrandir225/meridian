@@ -198,6 +198,11 @@ func main() {
 		logger,
 	)
 
+	if err := service.EnsureDefaultAdmin(ctx); err != nil {
+		logger.Fatal("Failed to ensure default admin user exists", zap.Error(err))
+		return
+	}
+
 	tokenVerifier, err := auth.NewPasetoTokenVerifier()
 	if err != nil {
 		logger.Fatal("Failed to create token verifier", zap.Error(err))

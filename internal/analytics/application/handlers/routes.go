@@ -23,6 +23,7 @@ func SetupAnalyticsRouter(
 	router.GET("/health", handler.handleGetHealth)
 
 	apiV1 := router.Group("/api/v1/analytics")
+	apiV1.Use(AdminMiddleware())
 	{
 		apiV1.GET("/dashboard", handler.handleGetDashboard)
 		apiV1.GET("/user-growth", handler.handleGetUserGrowth)
