@@ -146,6 +146,18 @@ http:
         - web
       priority: 400
 
+    analytics:
+      rule: "Host(`api.localhost`) && PathPrefix(`/api/v1/analytics`)"
+      service: analytics-service
+      entryPoints:
+        - web
+      middlewares:
+        - cors-headers
+        - security-headers
+        - identity-auth
+        - rate-limit
+      priority: 200
+
   services:
     landing-service:
       loadBalancer:
@@ -177,6 +189,15 @@ http:
       loadBalancer:
         servers:
           - url: "http://integration:8083"
+        healthCheck:
+          path: "/health"
+          interval: "30s"
+          timeout: "5s"
+
+    analytics-service:
+      loadBalancer:
+        servers:
+          - url: "http://analytics:8084"
         healthCheck:
           path: "/health"
           interval: "30s"

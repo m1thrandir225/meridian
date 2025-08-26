@@ -9,7 +9,7 @@ import (
 
 type ChannelCreatedEvent struct {
 	common.BaseDomainEvent
-	Name          string
+	ChannelName   string
 	CreatorUserID string
 	Topic         string
 }
@@ -113,7 +113,7 @@ func CreateChannelCreatedEvent(channel *Channel) ChannelCreatedEvent {
 	base := common.NewBaseDomainEvent("ChannelCreated", channel.ID, channel.Version, "Channel")
 	return ChannelCreatedEvent{
 		BaseDomainEvent: base,
-		Name:            channel.Name,
+		ChannelName:     channel.Name,
 		CreatorUserID:   channel.CreatorUserID.String(),
 		Topic:           channel.Topic,
 	}

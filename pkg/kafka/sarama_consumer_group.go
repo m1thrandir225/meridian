@@ -1,8 +1,9 @@
 package kafka
 
 import (
-	"github.com/IBM/sarama"
 	"log"
+
+	"github.com/IBM/sarama"
 )
 
 type SaramaConsumerGroupHandler struct {

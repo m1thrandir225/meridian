@@ -1,4 +1,4 @@
-SERVICES := identity messaging integration
+SERVICES := identity messaging integration analytics
 DEFAULT_SERVICE := messaging
 GO := go
 GO_VERSION := $(shell $(GO) version)
@@ -85,6 +85,21 @@ $(COMPOSE_ENV_FILE):
 	@echo "MESSAGING_GRPC_URL=messaging:9091" >> $(COMPOSE_ENV_FILE)
 	@echo "INTEGRATION_ENVIRONMENT=development" >> $(COMPOSE_ENV_FILE)
 	@echo "INTEGRATION_LOG_LEVEL=info" >> $(COMPOSE_ENV_FILE)
+	@echo "" >> $(COMPOSE_ENV_FILE)
+	@echo "# ========================================" >> $(COMPOSE_ENV_FILE)
+	@echo "# Analytics Service Configuration" >> $(COMPOSE_ENV_FILE)
+	@echo "# ========================================" >> $(COMPOSE_ENV_FILE)
+	@echo "ANALYTICS_POSTGRES_USER=root" >> $(COMPOSE_ENV_FILE)
+	@echo "ANALYTICS_POSTGRES_PASSWORD=secret" >> $(COMPOSE_ENV_FILE)
+	@echo "ANALYTICS_DB_NAME=analytics_db" >> $(COMPOSE_ENV_FILE)
+	@echo "ANALYTICS_DB_PORT=5435" >> $(COMPOSE_ENV_FILE)
+	@echo "ANALYTICS_HTTP_PORT=8084" >> $(COMPOSE_ENV_FILE)
+	@echo "ANALYTICS_DB_URL=postgres://root:secret@analytics_postgres:5432/analytics_db?sslmode=disable" >> $(COMPOSE_ENV_FILE)
+	@echo "ANALYTICS_DB_URL_MIGRATE=pgx5://root:secret@analytics_postgres:5432/analytics_db?sslmode=disable" >> $(COMPOSE_ENV_FILE)
+	@echo "ANALYTICS_KAFKA_BROKERS=kafka:9092" >> $(COMPOSE_ENV_FILE)
+	@echo "ANALYTICS_CONSUMER_GROUP=analytics-service" >> $(COMPOSE_ENV_FILE)
+	@echo "ANALYTICS_ENVIRONMENT=development" >> $(COMPOSE_ENV_FILE)
+	@echo "ANALYTICS_LOG_LEVEL=info" >> $(COMPOSE_ENV_FILE)
 	@echo "" >> $(COMPOSE_ENV_FILE)
 	@echo "# ========================================" >> $(COMPOSE_ENV_FILE)
 	@echo "# Frontend Configuration" >> $(COMPOSE_ENV_FILE)
