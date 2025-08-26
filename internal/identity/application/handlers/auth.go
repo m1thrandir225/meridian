@@ -119,19 +119,6 @@ func (h *AuthHandler) handleAPITokenAuth(ctx *gin.Context, apiKey string, isInte
 		return
 	}
 
-	cacheKey := fmt.Sprintf("api_token_validation:%s", apiKey)
-	var cachedResponse APIKeyValidateResponse
-	if hit, _ := h.cache.GetWithMetrics(ctx.Request.Context(), cacheKey, &cachedResponse); hit {
-		// Set headers from cached response
-		ctx.Header("X-Integration-ID", cachedResponse.IntegrationID)
-		ctx.Header("X-Integration-Name", cachedResponse.IntegrationName)
-		ctx.Header("X-User-Type", "integration")
-		ctx.Header("X-Auth-Method", "api-token")
-		ctx.Header("X-Integration-Target-Channels", cachedResponse.IntegrationTargetChannels)
-		ctx.JSON(http.StatusOK, cachedResponse)
-		return
-	}
-
 	integrationClient, err := services.NewIntegrationClient(h.integrationGrpcURL)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, errorResponse(ErrFailedToCreateIntegrationClient))
@@ -163,8 +150,6 @@ func (h *AuthHandler) handleAPITokenAuth(ctx *gin.Context, apiKey string, isInte
 		IntegrationName:           resp.IntegrationName,
 		IntegrationTargetChannels: targetChannelsJSON,
 	}
-
-	h.cache.Set(ctx.Request.Context(), cacheKey, response, 15*time.Minute)
 
 	ctx.JSON(http.StatusOK, response)
 }

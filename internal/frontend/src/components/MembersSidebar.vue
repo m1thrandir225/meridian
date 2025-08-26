@@ -23,6 +23,7 @@ const currentUser = computed(() => authStore.user)
 const currentChannel = computed(() => channelStore.currentChannel)
 
 const bots = computed(() => currentChannel.value?.bots)
+const activeBots = computed(() => bots.value?.filter((bot) => !bot.is_revoked))
 const members = computed(() => currentChannel.value?.members)
 </script>
 
@@ -52,15 +53,15 @@ const members = computed(() => currentChannel.value?.members)
           <div>
             <div class="flex items-center justify-between px-2 py-1 mb-2">
               <h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Bots
+                Active Bots
               </h3>
               <Badge variant="secondary" class="text-xs">
-                {{ bots?.length }}
+                {{ activeBots?.length }}
               </Badge>
             </div>
-            <div v-if="bots && bots?.length > 0" class="space-y-1">
+            <div v-if="activeBots && activeBots?.length > 0" class="space-y-1">
               <div
-                v-for="bot in bots"
+                v-for="bot in activeBots"
                 :key="bot.id"
                 class="flex items-center gap-3 rounded-lg p-2 hover:bg-accent transition-colors cursor-pointer"
               >
@@ -82,7 +83,7 @@ const members = computed(() => currentChannel.value?.members)
                 </div>
               </div>
             </div>
-            <p v-else class="text-sm text-muted-foreground">No bots registered</p>
+            <p v-else class="text-sm text-muted-foreground">No active bots.</p>
           </div>
 
           <!-- Members Section (Second) -->

@@ -86,23 +86,24 @@ func (c *Channel) AddMember(userID uuid.UUID) error {
 }
 
 // RemoveMember removes a member from a channel
-func (c *Channel) RemoveMember(userID uuid.UUID) error {
+func (c *Channel) RemoveMember(memberID uuid.UUID) error {
 	found := false
 	var searchMember Member
-	for _, member := range c.Members {
-		if member.GetId() == userID {
+	for i, member := range c.Members {
+		if member.GetId() == memberID {
 			lastIdx := len(c.Members) - 1
 			searchMember = member
+			c.Members[i] = c.Members[lastIdx]
 			c.Members = c.Members[:lastIdx]
 			found = true
 			break
 		}
 	}
 	if !found {
-		return errors.New("user not apart of the channel")
+		return errors.New("member not apart of the channel")
 	}
-
-	c.addEvent(CreateUserLeftChannelEvent(c, searchMember.id))
+	c.Version++
+	c.addEvent(CreateUserLeftChannelEvent(c, searchMember.GetId()))
 
 	return nil
 }

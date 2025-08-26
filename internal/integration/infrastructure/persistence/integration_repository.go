@@ -12,4 +12,5 @@ type IntegrationRepository interface {
 	FindByID(ctx context.Context, id uuid.UUID) (*domain.Integration, error)
 	FindByTokenLookupHash(ctx context.Context, lookupHash string) (*domain.Integration, error)
 	FindByCreatorUserID(ctx context.Context, creatorUserID uuid.UUID) ([]*domain.Integration, error)
+	Delete(ctx context.Context, id uuid.UUID) error
 }

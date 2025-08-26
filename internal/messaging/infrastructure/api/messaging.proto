@@ -8,6 +8,7 @@ option go_package = "github.com/m1thrandir225/meridian/internal/messaging/infras
 service MessagingService {
   rpc SendMessage(SendMessageRequest) returns (SendMessageResponse);
   rpc RegisterBot(RegisterBotRequest) returns (RegisterBotResponse);
+  rpc RemoveBot(RemoveBotRequest) returns (RemoveBotResponse);
 }
 
 message SendMessageRequest {
@@ -51,10 +52,25 @@ message Reaction {
 
 message RegisterBotRequest {
   string integration_id = 1;
-  repeated string channel_ids = 2;
+  string requestor_id = 2;
+  repeated string channel_ids = 3;
 }
 
 message RegisterBotResponse {
+  bool success = 1;
+  string integration_id = 2;
+  repeated string channel_ids = 3;
+  string error = 4;
+}
+
+message RemoveBotRequest {
+  string integration_id = 1;
+  string requestor_id = 2;
+  repeated string channel_ids = 3;
+
+}
+
+message RemoveBotResponse {
   bool success = 1;
   string integration_id = 2;
   repeated string channel_ids = 3;

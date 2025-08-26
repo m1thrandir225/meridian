@@ -6,6 +6,8 @@ import type {
   RevokeIntegrationRequest,
   UpdateIntegrationRequest,
   UpdateIntegrationResponse,
+  UpvokeIntegrationRequest,
+  UpvokeIntegrationResponse,
 } from '@/types/responses/integration'
 import { apiRequest } from './api.service'
 
@@ -21,10 +23,27 @@ const integrationService = {
       protected: true,
       data: input,
     }),
+  deleteIntegration: (integrationId: string) =>
+    apiRequest<void>({
+      method: 'DELETE',
+      url: `${integrationApiURL}/${integrationId}`,
+      headers: undefined,
+      params: undefined,
+      protected: true,
+    }),
   revokeIntegration: (input: RevokeIntegrationRequest) =>
     apiRequest<void>({
       method: 'DELETE',
-      url: integrationApiURL,
+      url: `${integrationApiURL}/revoke`,
+      headers: undefined,
+      params: undefined,
+      protected: true,
+      data: input,
+    }),
+  upvokeIntegration: (input: UpvokeIntegrationRequest) =>
+    apiRequest<UpvokeIntegrationResponse>({
+      method: 'POST',
+      url: `${integrationApiURL}/upvoke`,
       headers: undefined,
       params: undefined,
       protected: true,

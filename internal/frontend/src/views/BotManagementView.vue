@@ -15,21 +15,33 @@ import {
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import integrationService from '@/services/integration.service'
+import { useAuthStore } from '@/stores/auth'
 import { useChannelStore } from '@/stores/channel'
 import type { IntegrationBot } from '@/types/models/integration_bot'
-import type { UpdateIntegrationRequest } from '@/types/responses/integration'
+import type {
+  UpdateIntegrationRequest,
+  UpvokeIntegrationRequest,
+  UpvokeIntegrationResponse,
+} from '@/types/responses/integration'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
-import { AlertTriangle, Edit, Loader2, Trash2 } from 'lucide-vue-next'
+import { AlertTriangle, Ban, Edit, Loader2, RefreshCcw, Trash } from 'lucide-vue-next'
 import { computed, onMounted, ref } from 'vue'
 import { toast } from 'vue-sonner'
 
 const queryClient = useQueryClient()
 const channelStore = useChannelStore()
+const authStore = useAuthStore()
 
 // State
 const editingIntegration = ref<IntegrationBot | null>(null)
 const showEditDialog = ref(false)
 const selectedChannels = ref<string[]>([])
+const upvokedIntegration = ref<UpvokeIntegrationResponse[]>([])
+const channels = computed(() => channelStore.channels)
+const isFetchingChannels = computed(() => channelStore.loading)
+const ownerChannels = computed(() =>
+  channels.value.filter((c) => c.creator_user_id === authStore.user?.id),
+)
 
 // Queries
 const {
@@ -69,24 +81,54 @@ const updateMutation = useMutation({
   },
 })
 
-// Computed
-const channels = computed(() => channelStore.channels)
-const isFetchingChannels = computed(() => channelStore.loading)
+const upvokeMutation = useMutation({
+  mutationFn: (data: UpvokeIntegrationRequest) => integrationService.upvokeIntegration(data),
+  onSuccess: (data) => {
+    queryClient.invalidateQueries({ queryKey: ['integrations'] })
+    upvokedIntegration.value = [...upvokedIntegration.value, data]
+    toast.success('Bot upvoked successfully')
+  },
+  onError: (error) => {
+    toast.error('Failed to upvoke bot: ' + error.message)
+  },
+})
 
+const deleteMutation = useMutation({
+  mutationFn: (integrationId: string) => integrationService.deleteIntegration(integrationId),
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['integrations'] })
+    toast.success('Bot deleted successfully')
+  },
+  onError: (error) => {
+    toast.error('Failed to delete bot: ' + error.message)
+  },
+})
+
+// Computed
 // Methods
 const handleRevoke = (integration: IntegrationBot) => {
   if (
-    confirm(
-      `Are you sure you want to revoke the "${integration.service_name}" bot? This action cannot be undone.`,
-    )
+    confirm(`Are you sure you want to revoke the api token of "${integration.service_name}" bot?`)
   ) {
     revokeMutation.mutate(integration.id)
   }
 }
 
+const handleUpvoke = (integration: IntegrationBot) => {
+  if (
+    confirm(
+      `Are you sure you want to generate a new api token for "${integration.service_name}" bot?`,
+    )
+  ) {
+    upvokeMutation.mutate({ integration_id: integration.id })
+  }
+}
+
 const handleEdit = (integration: IntegrationBot) => {
   editingIntegration.value = integration
-  selectedChannels.value = [...integration.target_channels]
+  selectedChannels.value = [...integration.target_channels].filter((channelId) =>
+    ownerChannels.value.some((c) => c.id === channelId),
+  )
   showEditDialog.value = true
 }
 
@@ -97,6 +139,18 @@ const handleUpdate = () => {
     integration_id: editingIntegration.value.id,
     target_channel_ids: selectedChannels.value,
   })
+}
+
+const handleDelete = (integration: IntegrationBot) => {
+  if (confirm(`Are you sure you want to delete the "${integration.service_name}" bot?`)) {
+    deleteMutation.mutate(integration.id)
+  }
+}
+
+const handleCopyToken = (token: string | undefined) => {
+  if (!token) return
+  navigator.clipboard.writeText(token)
+  toast.success('Token copied to clipboard')
 }
 
 const toggleChannelSelection = (channelId: string, checked: boolean | string) => {
@@ -193,13 +247,29 @@ onMounted(async () => {
                 Edit
               </Button>
               <Button
+                v-if="!integration.is_revoked"
                 variant="destructive"
                 size="sm"
+                class="bg-orange-500 hover:bg-orange-600"
                 @click="handleRevoke(integration)"
                 :disabled="integration.is_revoked"
               >
-                <Trash2 class="w-4 h-4 mr-1" />
+                <Ban class="w-4 h-4 mr-1" />
                 Revoke
+              </Button>
+              <Button
+                v-if="integration.is_revoked"
+                variant="outline"
+                size="sm"
+                @click="handleUpvoke(integration)"
+                :disabled="!integration.is_revoked"
+              >
+                <RefreshCcw class="w-4 h-4 mr-1" />
+                Upvoke
+              </Button>
+              <Button variant="destructive" size="sm" @click="handleDelete(integration)">
+                <Trash class="w-4 h-4 mr-1" />
+                Delete
               </Button>
             </div>
           </div>
@@ -217,6 +287,24 @@ onMounted(async () => {
               >
                 {{ channels.find((c) => c.id === channelId)?.name || channelId }}
               </Badge>
+            </div>
+          </div>
+
+          <div v-if="upvokedIntegration.find((i) => i.id === integration.id)">
+            <h4 class="font-medium mb-3">New API Token</h4>
+            <div class="flex flex-wrap gap-2">
+              <Badge variant="outline">
+                {{ upvokedIntegration.find((i) => i.id === integration.id)?.token }}
+              </Badge>
+              <Button
+                variant="outline"
+                size="sm"
+                @click="
+                  handleCopyToken(upvokedIntegration.find((i) => i.id === integration.id)?.token)
+                "
+              >
+                Copy
+              </Button>
             </div>
           </div>
         </div>
@@ -240,7 +328,7 @@ onMounted(async () => {
 
             <div v-else class="space-y-3">
               <div
-                v-for="channel in channels"
+                v-for="channel in ownerChannels"
                 :key="channel.id"
                 class="flex items-center space-x-3"
               >
@@ -266,9 +354,12 @@ onMounted(async () => {
             </Button>
             <Button
               @click="handleUpdate"
-              :disabled="updateMutation.isPending || selectedChannels.length === 0"
+              :disabled="isFetchingChannels || updateMutation.isPending.value"
             >
-              <Loader2 v-if="updateMutation.isPending" class="animate-spin mr-2" />
+              <Loader2
+                v-if="isFetchingChannels || updateMutation.isPending.value"
+                class="animate-spin mr-2"
+              />
               Update Bot
             </Button>
           </DialogFooter>

@@ -21,6 +21,7 @@ import { toast } from 'vue-sonner'
 import * as z from 'zod'
 import { Loader2 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
+import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
 
@@ -65,8 +66,12 @@ const onSubmit = handleSubmit(async (values) => {
 })
 
 const channelStore = useChannelStore()
+const authStore = useAuthStore()
 const channels = computed(() => channelStore.channels)
 const isFetchingChannels = computed(() => channelStore.loading)
+const ownerChannels = computed(() =>
+  channels.value.filter((c) => c.creator_user_id === authStore.user?.id),
+)
 
 onMounted(async () => {
   await channelStore.fetchChannels()
@@ -176,7 +181,7 @@ console.log('Component state:', {
                   </div>
                   <div class="space-y-3">
                     <div
-                      v-for="channel in channels"
+                      v-for="channel in ownerChannels"
                       :key="channel.id"
                       class="flex flex-row items-start space-x-3"
                     >

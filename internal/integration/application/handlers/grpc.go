@@ -39,13 +39,6 @@ func (h *GRPCServer) ValidateAPIToken(ctx context.Context, req *integrationpb.Va
 	logger := h.logger.WithMethod("ValidateAPIToken")
 	logger.Info("Validating API Token")
 
-	cacheKey := fmt.Sprintf("grpc_api_token_validation:%s", req.Token)
-	var cachedResponse integrationpb.ValidateAPITokenResponse
-	if hit, _ := h.cache.GetWithMetrics(ctx, cacheKey, &cachedResponse); hit {
-		logger.Info("API Token validation hit cache")
-		return &cachedResponse, nil
-	}
-
 	isValid, id, _, err := h.integrationService.ValidateApiToken(ctx, req.Token)
 	if err != nil {
 		logger.Error("Error validating API Token", zap.Error(err))
@@ -79,7 +72,6 @@ func (h *GRPCServer) ValidateAPIToken(ctx context.Context, req *integrationpb.Va
 		TargetChannelIds: integration.TargetChannelIDsAsStringSlice(),
 	}
 
-	h.cache.Set(ctx, cacheKey, response, 15*time.Minute)
 	logger.Info("API Token validation successful")
 
 	return response, nil

@@ -69,6 +69,19 @@ func (i *Integration) ClearEvents() {
 	i.events = nil
 }
 
+func (i *Integration) Upvoke(rawToken string, hashedToken APIToken) error {
+	if !i.IsRevoked {
+		return ErrIntegrationNotRevoked
+	}
+	i.IsRevoked = false
+	i.HashedAPIToken = hashedToken
+	i.TokenLookupHash = GenerateLookupHash(rawToken)
+	i.Version++
+
+	i.addEvent(CreateAPITokenUpvokedEvent(i))
+	return nil
+}
+
 func (i *Integration) Revoke() error {
 	if i.IsRevoked {
 		return ErrIntegrationRevoked

@@ -31,8 +31,11 @@ func SetupIntegrationRouter(
 		integrations := apiV1.Group("/integrations")
 		{
 			integrations.POST("", handler.handleRegisterIntegration)
-			integrations.DELETE("/:id", handler.handleRevokeIntegration)
+			integrations.POST("/upvoke", handler.handleUpvokeIntegration)
+			integrations.DELETE("/revoke", handler.handleRevokeIntegration)
+
 			integrations.PUT("/:id", handler.handleUpdateIntegration)
+			integrations.DELETE("/:id", handler.handleDeleteIntegration)
 			integrations.GET("", handler.handleListIntegrations)
 		}
 

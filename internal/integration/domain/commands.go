@@ -23,6 +23,15 @@ func (c RevokeTokenCommand) CommandName() string {
 	return "RevokeToken"
 }
 
+type UpvokeIntegrationCommand struct {
+	IntegrationID string
+	RequestorID   string
+}
+
+func (c UpvokeIntegrationCommand) CommandName() string {
+	return "UpvokeIntegration"
+}
+
 type GetIntegrationCommand struct {
 	IntegrationID string
 }
@@ -65,4 +74,13 @@ type RegisterIntegrationAsWebhookCommand struct {
 
 func (c RegisterIntegrationAsWebhookCommand) CommandName() string {
 	return "RegisterIntegrationAsWebhook"
+}
+
+type DeleteIntegrationCommand struct {
+	IntegrationID string
+	RequestorID   string
+}
+
+func (c DeleteIntegrationCommand) CommandName() string {
+	return "DeleteIntegration"
 }

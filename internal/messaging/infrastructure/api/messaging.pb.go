@@ -396,7 +396,8 @@ func (x *Reaction) GetCreatedAt() string {
 type RegisterBotRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	IntegrationId string                 `protobuf:"bytes,1,opt,name=integration_id,json=integrationId,proto3" json:"integration_id,omitempty"`
-	ChannelIds    []string               `protobuf:"bytes,2,rep,name=channel_ids,json=channelIds,proto3" json:"channel_ids,omitempty"`
+	RequestorId   string                 `protobuf:"bytes,2,opt,name=requestor_id,json=requestorId,proto3" json:"requestor_id,omitempty"`
+	ChannelIds    []string               `protobuf:"bytes,3,rep,name=channel_ids,json=channelIds,proto3" json:"channel_ids,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -434,6 +435,13 @@ func (*RegisterBotRequest) Descriptor() ([]byte, []int) {
 func (x *RegisterBotRequest) GetIntegrationId() string {
 	if x != nil {
 		return x.IntegrationId
+	}
+	return ""
+}
+
+func (x *RegisterBotRequest) GetRequestorId() string {
+	if x != nil {
+		return x.RequestorId
 	}
 	return ""
 }
@@ -513,6 +521,134 @@ func (x *RegisterBotResponse) GetError() string {
 	return ""
 }
 
+type RemoveBotRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	IntegrationId string                 `protobuf:"bytes,1,opt,name=integration_id,json=integrationId,proto3" json:"integration_id,omitempty"`
+	RequestorId   string                 `protobuf:"bytes,2,opt,name=requestor_id,json=requestorId,proto3" json:"requestor_id,omitempty"`
+	ChannelIds    []string               `protobuf:"bytes,3,rep,name=channel_ids,json=channelIds,proto3" json:"channel_ids,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RemoveBotRequest) Reset() {
+	*x = RemoveBotRequest{}
+	mi := &file_internal_messaging_infrastructure_api_messaging_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemoveBotRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemoveBotRequest) ProtoMessage() {}
+
+func (x *RemoveBotRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_messaging_infrastructure_api_messaging_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemoveBotRequest.ProtoReflect.Descriptor instead.
+func (*RemoveBotRequest) Descriptor() ([]byte, []int) {
+	return file_internal_messaging_infrastructure_api_messaging_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *RemoveBotRequest) GetIntegrationId() string {
+	if x != nil {
+		return x.IntegrationId
+	}
+	return ""
+}
+
+func (x *RemoveBotRequest) GetRequestorId() string {
+	if x != nil {
+		return x.RequestorId
+	}
+	return ""
+}
+
+func (x *RemoveBotRequest) GetChannelIds() []string {
+	if x != nil {
+		return x.ChannelIds
+	}
+	return nil
+}
+
+type RemoveBotResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	IntegrationId string                 `protobuf:"bytes,2,opt,name=integration_id,json=integrationId,proto3" json:"integration_id,omitempty"`
+	ChannelIds    []string               `protobuf:"bytes,3,rep,name=channel_ids,json=channelIds,proto3" json:"channel_ids,omitempty"`
+	Error         string                 `protobuf:"bytes,4,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RemoveBotResponse) Reset() {
+	*x = RemoveBotResponse{}
+	mi := &file_internal_messaging_infrastructure_api_messaging_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemoveBotResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemoveBotResponse) ProtoMessage() {}
+
+func (x *RemoveBotResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_messaging_infrastructure_api_messaging_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemoveBotResponse.ProtoReflect.Descriptor instead.
+func (*RemoveBotResponse) Descriptor() ([]byte, []int) {
+	return file_internal_messaging_infrastructure_api_messaging_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *RemoveBotResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *RemoveBotResponse) GetIntegrationId() string {
+	if x != nil {
+		return x.IntegrationId
+	}
+	return ""
+}
+
+func (x *RemoveBotResponse) GetChannelIds() []string {
+	if x != nil {
+		return x.ChannelIds
+	}
+	return nil
+}
+
+func (x *RemoveBotResponse) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
 var File_internal_messaging_infrastructure_api_messaging_proto protoreflect.FileDescriptor
 
 const file_internal_messaging_infrastructure_api_messaging_proto_rawDesc = "" +
@@ -555,20 +691,33 @@ const file_internal_messaging_infrastructure_api_messaging_proto_rawDesc = "" +
 	"\auser_id\x18\x03 \x01(\tR\x06userId\x12#\n" +
 	"\rreaction_type\x18\x04 \x01(\tR\freactionType\x12\x1d\n" +
 	"\n" +
-	"created_at\x18\x05 \x01(\tR\tcreatedAt\"\\\n" +
+	"created_at\x18\x05 \x01(\tR\tcreatedAt\"\x7f\n" +
 	"\x12RegisterBotRequest\x12%\n" +
-	"\x0eintegration_id\x18\x01 \x01(\tR\rintegrationId\x12\x1f\n" +
-	"\vchannel_ids\x18\x02 \x03(\tR\n" +
+	"\x0eintegration_id\x18\x01 \x01(\tR\rintegrationId\x12!\n" +
+	"\frequestor_id\x18\x02 \x01(\tR\vrequestorId\x12\x1f\n" +
+	"\vchannel_ids\x18\x03 \x03(\tR\n" +
 	"channelIds\"\x8d\x01\n" +
 	"\x13RegisterBotResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12%\n" +
 	"\x0eintegration_id\x18\x02 \x01(\tR\rintegrationId\x12\x1f\n" +
 	"\vchannel_ids\x18\x03 \x03(\tR\n" +
 	"channelIds\x12\x14\n" +
-	"\x05error\x18\x04 \x01(\tR\x05error2\xba\x01\n" +
+	"\x05error\x18\x04 \x01(\tR\x05error\"}\n" +
+	"\x10RemoveBotRequest\x12%\n" +
+	"\x0eintegration_id\x18\x01 \x01(\tR\rintegrationId\x12!\n" +
+	"\frequestor_id\x18\x02 \x01(\tR\vrequestorId\x12\x1f\n" +
+	"\vchannel_ids\x18\x03 \x03(\tR\n" +
+	"channelIds\"\x8b\x01\n" +
+	"\x11RemoveBotResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12%\n" +
+	"\x0eintegration_id\x18\x02 \x01(\tR\rintegrationId\x12\x1f\n" +
+	"\vchannel_ids\x18\x03 \x03(\tR\n" +
+	"channelIds\x12\x14\n" +
+	"\x05error\x18\x04 \x01(\tR\x05error2\x88\x02\n" +
 	"\x10MessagingService\x12R\n" +
 	"\vSendMessage\x12 .messaging.v1.SendMessageRequest\x1a!.messaging.v1.SendMessageResponse\x12R\n" +
-	"\vRegisterBot\x12 .messaging.v1.RegisterBotRequest\x1a!.messaging.v1.RegisterBotResponseBUZSgithub.com/m1thrandir225/meridian/internal/messaging/infrastructure/api;messagingpbb\x06proto3"
+	"\vRegisterBot\x12 .messaging.v1.RegisterBotRequest\x1a!.messaging.v1.RegisterBotResponse\x12L\n" +
+	"\tRemoveBot\x12\x1e.messaging.v1.RemoveBotRequest\x1a\x1f.messaging.v1.RemoveBotResponseBUZSgithub.com/m1thrandir225/meridian/internal/messaging/infrastructure/api;messagingpbb\x06proto3"
 
 var (
 	file_internal_messaging_infrastructure_api_messaging_proto_rawDescOnce sync.Once
@@ -582,7 +731,7 @@ func file_internal_messaging_infrastructure_api_messaging_proto_rawDescGZIP() []
 	return file_internal_messaging_infrastructure_api_messaging_proto_rawDescData
 }
 
-var file_internal_messaging_infrastructure_api_messaging_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_internal_messaging_infrastructure_api_messaging_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_internal_messaging_infrastructure_api_messaging_proto_goTypes = []any{
 	(*SendMessageRequest)(nil),  // 0: messaging.v1.SendMessageRequest
 	(*MessageResponse)(nil),     // 1: messaging.v1.MessageResponse
@@ -591,17 +740,21 @@ var file_internal_messaging_infrastructure_api_messaging_proto_goTypes = []any{
 	(*Reaction)(nil),            // 4: messaging.v1.Reaction
 	(*RegisterBotRequest)(nil),  // 5: messaging.v1.RegisterBotRequest
 	(*RegisterBotResponse)(nil), // 6: messaging.v1.RegisterBotResponse
-	nil,                         // 7: messaging.v1.SendMessageRequest.MetadataEntry
+	(*RemoveBotRequest)(nil),    // 7: messaging.v1.RemoveBotRequest
+	(*RemoveBotResponse)(nil),   // 8: messaging.v1.RemoveBotResponse
+	nil,                         // 9: messaging.v1.SendMessageRequest.MetadataEntry
 }
 var file_internal_messaging_infrastructure_api_messaging_proto_depIdxs = []int32{
-	7, // 0: messaging.v1.SendMessageRequest.metadata:type_name -> messaging.v1.SendMessageRequest.MetadataEntry
+	9, // 0: messaging.v1.SendMessageRequest.metadata:type_name -> messaging.v1.SendMessageRequest.MetadataEntry
 	1, // 1: messaging.v1.SendMessageResponse.responses:type_name -> messaging.v1.MessageResponse
 	0, // 2: messaging.v1.MessagingService.SendMessage:input_type -> messaging.v1.SendMessageRequest
 	5, // 3: messaging.v1.MessagingService.RegisterBot:input_type -> messaging.v1.RegisterBotRequest
-	2, // 4: messaging.v1.MessagingService.SendMessage:output_type -> messaging.v1.SendMessageResponse
-	6, // 5: messaging.v1.MessagingService.RegisterBot:output_type -> messaging.v1.RegisterBotResponse
-	4, // [4:6] is the sub-list for method output_type
-	2, // [2:4] is the sub-list for method input_type
+	7, // 4: messaging.v1.MessagingService.RemoveBot:input_type -> messaging.v1.RemoveBotRequest
+	2, // 5: messaging.v1.MessagingService.SendMessage:output_type -> messaging.v1.SendMessageResponse
+	6, // 6: messaging.v1.MessagingService.RegisterBot:output_type -> messaging.v1.RegisterBotResponse
+	8, // 7: messaging.v1.MessagingService.RemoveBot:output_type -> messaging.v1.RemoveBotResponse
+	5, // [5:8] is the sub-list for method output_type
+	2, // [2:5] is the sub-list for method input_type
 	2, // [2:2] is the sub-list for extension type_name
 	2, // [2:2] is the sub-list for extension extendee
 	0, // [0:2] is the sub-list for field type_name
@@ -618,7 +771,7 @@ func file_internal_messaging_infrastructure_api_messaging_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_messaging_infrastructure_api_messaging_proto_rawDesc), len(file_internal_messaging_infrastructure_api_messaging_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   8,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

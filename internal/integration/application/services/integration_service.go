@@ -138,6 +138,54 @@ func (s *IntegrationService) RevokeToken(ctx context.Context, cmd domain.RevokeT
 	return nil
 }
 
+func (s *IntegrationService) UpvokeIntegration(ctx context.Context, cmd domain.UpvokeIntegrationCommand) (*domain.Integration, string, error) {
+	logger := s.logger.WithMethod("UpvokeIntegration")
+	logger.Info("Upvoking integration")
+
+	integrationID, err := domain.NewIntegrationIDFromString(cmd.IntegrationID)
+	if err != nil {
+		logger.Error("Failed to parse integration ID", zap.Error(err))
+		return nil, "", fmt.Errorf("invalid integration ID: %w", err)
+	}
+
+	integration, err := s.repo.FindByID(ctx, integrationID.Value())
+	if err != nil {
+		logger.Error("Failed to find integration", zap.Error(err))
+		return nil, "", fmt.Errorf("failed to find integration: %w", err)
+	}
+
+	requestorId, err := domain.NewUserIDRef(cmd.RequestorID)
+	if err != nil {
+		logger.Error("Failed to parse requestor ID", zap.Error(err))
+		return nil, "", fmt.Errorf("invalid requestor ID: %w", err)
+	}
+
+	if integration.CreatorUserID != requestorId {
+		logger.Error("Forbidden", zap.String("integration_id", integration.ID.String()))
+		return nil, "", domain.ErrForbidden
+	}
+
+	newToken, hashedToken, err := s.tokenGenerator.Generate()
+	if err != nil {
+		logger.Error("Failed to generate new token", zap.Error(err))
+		return nil, "", fmt.Errorf("failed to generate new token: %w", err)
+	}
+
+	if err := integration.Upvoke(newToken, *hashedToken); err != nil {
+		logger.Error("failed to upvoke integration", zap.Error(err))
+		return nil, "", fmt.Errorf("failed to upvoke integration: %w", err)
+	}
+
+	if err := s.repo.Save(ctx, integration); err != nil {
+		logger.Error("failed to save upvoked integration", zap.Error(err))
+		return nil, "", fmt.Errorf("failed to save upvoked integration: %w", err)
+	}
+	s.dispatchEvents(ctx, integration)
+	logger.Info("Successfully upvoked integration", zap.String("integration_id", integration.ID.String()))
+
+	return integration, newToken, nil
+}
+
 func (s *IntegrationService) GetIntegration(ctx context.Context, cmd domain.GetIntegrationCommand) (*domain.Integration, error) {
 	logger := s.logger.WithMethod("GetIntegration")
 	logger.Info("Getting integration")
@@ -231,6 +279,42 @@ func (s *IntegrationService) UpdateIntegration(ctx context.Context, cmd domain.U
 	s.dispatchEvents(ctx, integration)
 	logger.Info("Successfully updated integration", zap.String("integration_id", integration.ID.String()))
 	return integration, nil
+}
+
+func (s *IntegrationService) DeleteIntegration(ctx context.Context, cmd domain.DeleteIntegrationCommand) error {
+	logger := s.logger.WithMethod("DeleteIntegration")
+	logger.Info("Deleting integration")
+
+	integrationID, err := domain.NewIntegrationIDFromString(cmd.IntegrationID)
+	if err != nil {
+		logger.Error("Failed to parse integration ID", zap.Error(err))
+		return fmt.Errorf("invalid integration ID: %w", err)
+	}
+
+	integration, err := s.repo.FindByID(ctx, integrationID.Value())
+	if err != nil {
+		logger.Error("Failed to find integration", zap.Error(err))
+		return fmt.Errorf("failed to find integration: %w", err)
+	}
+
+	requestorId, err := domain.NewUserIDRef(cmd.RequestorID)
+	if err != nil {
+		logger.Error("Failed to parse requestor ID", zap.Error(err))
+		return fmt.Errorf("invalid requestor ID: %w", err)
+	}
+
+	if integration.CreatorUserID != requestorId {
+		logger.Error("Forbidden", zap.String("integration_id", integration.ID.String()))
+		return domain.ErrForbidden
+	}
+
+	if err := s.repo.Delete(ctx, integrationID.Value()); err != nil {
+		logger.Error("failed to delete integration", zap.Error(err))
+		return fmt.Errorf("failed to delete integration: %w", err)
+	}
+
+	logger.Info("Successfully deleted integration", zap.String("integration_id", integration.ID.String()))
+	return nil
 }
 
 func (s *IntegrationService) dispatchEvents(ctx context.Context, integration *domain.Integration) {

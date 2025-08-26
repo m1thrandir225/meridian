@@ -160,3 +160,15 @@ func (r *PostgresIntegrationRepository) scanIntegration(row pgx.Row) (*domain.In
 
 	return &integ, nil
 }
+
+func (r *PostgresIntegrationRepository) Delete(ctx context.Context, id uuid.UUID) error {
+	const query = `DELETE FROM integrations WHERE id = $1`
+	cmdTag, err := r.db.Exec(ctx, query, id.String())
+	if err != nil {
+		return fmt.Errorf("failed to delete integration %s: %w", id.String(), err)
+	}
+	if cmdTag.RowsAffected() != 1 {
+		return domain.ErrIntegrationNotFound
+	}
+	return nil
+}

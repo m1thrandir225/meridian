@@ -157,6 +157,12 @@ func (h *GRPCServer) RegisterBot(ctx context.Context, req *messagingpb.RegisterB
 		return nil, fmt.Errorf("invalid integration ID %s: %w", req.IntegrationId, err)
 	}
 
+	requestorID, err := uuid.Parse(req.RequestorId)
+	if err != nil {
+		logger.Error("Invalid requestor ID", zap.String("requestor_id", req.RequestorId), zap.Error(err))
+		return nil, fmt.Errorf("invalid requestor ID %s: %w", req.RequestorId, err)
+	}
+
 	channels := make([]*domain.Channel, 0, len(req.ChannelIds))
 	success := true
 	for _, channelIDStr := range req.ChannelIds {
@@ -169,6 +175,7 @@ func (h *GRPCServer) RegisterBot(ctx context.Context, req *messagingpb.RegisterB
 		cmd := domain.AddBotToChannelCommand{
 			ChannelID:     channelID,
 			IntegrationID: integrationID,
+			RequestorID:   requestorID,
 		}
 
 		channel, err := h.channelService.HandleAddBotToChannel(ctx, cmd)
@@ -211,6 +218,63 @@ func (h *GRPCServer) RegisterBot(ctx context.Context, req *messagingpb.RegisterB
 	return response, nil
 
 }
+
+func (h *GRPCServer) RemoveBot(ctx context.Context, req *messagingpb.RemoveBotRequest) (*messagingpb.RemoveBotResponse, error) {
+	logger := h.logger.WithMethod("RemoveBot")
+	logger.Info("Removing bot")
+
+	integrationID, err := uuid.Parse(req.IntegrationId)
+	if err != nil {
+		logger.Error("Invalid integration ID", zap.String("integration_id", req.IntegrationId), zap.Error(err))
+		return nil, fmt.Errorf("invalid integration ID %s: %w", req.IntegrationId, err)
+	}
+	requestorID, err := uuid.Parse(req.RequestorId)
+	if err != nil {
+		logger.Error("Invalid requestor ID", zap.String("requestor_id", req.RequestorId), zap.Error(err))
+		return nil, fmt.Errorf("invalid requestor ID %s: %w", req.RequestorId, err)
+	}
+
+	success := true
+	for _, channelIDStr := range req.ChannelIds {
+		channelID, err := uuid.Parse(channelIDStr)
+		if err != nil {
+			logger.Error("Invalid channel ID", zap.String("channel_id", channelIDStr), zap.Error(err))
+			return nil, fmt.Errorf("invalid channel ID %s: %w", channelIDStr, err)
+		}
+
+		cmd := domain.RemoveBotFromChannelCommand{
+			ChannelID:     channelID,
+			IntegrationID: integrationID,
+			RequestorID:   requestorID,
+		}
+
+		_, err = h.channelService.HandleRemoveBotFromChannel(ctx, cmd)
+		if err != nil {
+			logger.Error("Failed to remove bot from channel", zap.String("channel_id", channelIDStr), zap.Error(err))
+			success = false
+		} else {
+			channelCacheKey := fmt.Sprintf("channel:%s", channelIDStr)
+			h.cache.Delete(ctx, channelCacheKey)
+			logger.Info("Invalidated cache for channel", zap.String("channel_id", channelIDStr))
+		}
+	}
+
+	if !success {
+		return &messagingpb.RemoveBotResponse{
+			Success:       false,
+			IntegrationId: req.IntegrationId,
+			ChannelIds:    req.ChannelIds,
+			Error:         "failed to remove bot from some channels",
+		}, nil
+	}
+
+	return &messagingpb.RemoveBotResponse{
+		Success:       true,
+		IntegrationId: req.IntegrationId,
+		ChannelIds:    req.ChannelIds,
+	}, nil
+}
+
 func StartGRPCServer(
 	port string,
 	channelService *services.ChannelService,

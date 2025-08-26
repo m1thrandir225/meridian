@@ -21,6 +21,12 @@ type APITokenRevokedEvent struct {
 	RevokedAt     time.Time `json:"revokedAt"`
 }
 
+type APITokenUpvokedEvent struct {
+	common.BaseDomainEvent
+	IntegrationID string    `json:"integrationId"`
+	UpvokedAt     time.Time `json:"upvokedAt"`
+}
+
 type IntegrationTargetChannelsUpdatedEvent struct {
 	common.BaseDomainEvent
 	IntegrationID         string    `json:"integrationId"`
@@ -59,5 +65,15 @@ func CreateIntegrationTargetChannelsUpdatedEvent(integration *Integration) Integ
 		IntegrationID:         integration.ID.String(),
 		UpdatedTargetChannels: integration.TargetChannelIDsAsStringSlice(),
 		UpdatedAt:             time.Now(),
+	}
+}
+
+func CreateAPITokenUpvokedEvent(integration *Integration) APITokenUpvokedEvent {
+	base := common.NewBaseDomainEvent("APITokenUpvoked", integration.ID.value, integration.Version, "Integration")
+
+	return APITokenUpvokedEvent{
+		BaseDomainEvent: base,
+		IntegrationID:   integration.ID.String(),
+		UpvokedAt:       time.Now(),
 	}
 }

@@ -108,6 +108,11 @@ func (s *ChannelService) HandleAddBotToChannel(ctx context.Context, cmd domain.A
 		return nil, err
 	}
 
+	if channel.CreatorUserID != cmd.RequestorID {
+		logger.Error("Only the channel creator can add a bot to the channel")
+		return nil, fmt.Errorf("only the channel creator can add a bot to the channel")
+	}
+
 	err = channel.AddBotMember(cmd.IntegrationID)
 	if err != nil {
 		logger.Error("Failed to add bot to channel", zap.Error(err))
@@ -127,6 +132,43 @@ func (s *ChannelService) HandleAddBotToChannel(ctx context.Context, cmd domain.A
 	channel.ClearPendingEvents()
 
 	logger.Info("Bot added to channel", zap.String("channel_id", channel.ID.String()))
+	return channel, nil
+}
+
+func (s *ChannelService) HandleRemoveBotFromChannel(ctx context.Context, cmd domain.RemoveBotFromChannelCommand) (*domain.Channel, error) {
+	logger := s.logger.WithMethod("HandleRemoveBotFromChannel")
+	logger.Info("Removing bot from channel")
+
+	channel, err := s.repo.FindById(ctx, cmd.ChannelID)
+	if err != nil {
+		logger.Error("Failed to get channel", zap.Error(err))
+		return nil, err
+	}
+
+	if channel.CreatorUserID != cmd.RequestorID {
+		logger.Error("Only the channel creator can remove a bot from the channel")
+		return nil, fmt.Errorf("only the channel creator can remove a bot from the channel")
+	}
+
+	err = channel.RemoveMember(cmd.IntegrationID)
+	if err != nil {
+		logger.Error("Failed to remove bot from channel", zap.Error(err))
+		return nil, err
+	}
+
+	if err := s.repo.Save(ctx, channel); err != nil {
+		logger.Error("Failed to save channel", zap.Error(err))
+		return nil, err
+	}
+
+	err = s.eventPub.PublishEvents(ctx, channel.GetPendingEvents())
+	if err != nil {
+		logger.Error("Failed to publish events", zap.Error(err))
+		return nil, err
+	}
+	channel.ClearPendingEvents()
+
+	logger.Info("Bot removed from channel", zap.String("channel_id", channel.ID.String()))
 	return channel, nil
 }
 

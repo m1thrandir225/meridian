@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -11,6 +12,8 @@ import (
 	"github.com/m1thrandir225/meridian/pkg/kafka"
 	"github.com/m1thrandir225/meridian/pkg/logging"
 	"go.uber.org/zap"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type MessageService struct {
@@ -279,19 +282,19 @@ func (s *MessageService) getSenderUser(ctx context.Context, userID string) (*dom
 func (s *MessageService) getSenderIntegrationBot(ctx context.Context, id string) (*domain.IntegrationBot, error) {
 	pbIntegration, err := s.integrationClient.GetIntegration(ctx, id)
 	if err != nil {
-		return nil, err
+		st, ok := status.FromError(err)
+		if !(ok && (st.Code() == codes.NotFound ||
+			(st.Code() == codes.Unknown && strings.Contains(st.Message(), "integration not found")))) {
+			return nil, err
+		}
+		pbIntegration = nil
 	}
-
-	if pbIntegration == nil {
-		return nil, fmt.Errorf("integration response is nil")
-	}
-
-	if pbIntegration.Integration == nil {
-		return nil, fmt.Errorf("integration data is nil")
-	}
-
-	if pbIntegration.Integration.Id == "" {
-		return nil, fmt.Errorf("integration ID is empty")
+	if pbIntegration == nil || pbIntegration.Integration == nil || pbIntegration.Integration.Id == "" {
+		integrationID, parseErr := uuid.Parse(id)
+		if parseErr != nil {
+			return nil, fmt.Errorf("invalid integration id on message: %w", parseErr)
+		}
+		return domain.NewIntegrationBot(integrationID, "Deleted Integration", time.Now().UTC(), true), nil
 	}
 
 	integrationID, err := uuid.Parse(pbIntegration.Integration.Id)
@@ -302,8 +305,11 @@ func (s *MessageService) getSenderIntegrationBot(ctx context.Context, id string)
 	if err != nil {
 		return nil, err
 	}
-
-	integrationBot := domain.NewIntegrationBot(integrationID, pbIntegration.Integration.ServiceName, createdAt, pbIntegration.Integration.IsRevoked)
-
+	integrationBot := domain.NewIntegrationBot(
+		integrationID,
+		pbIntegration.Integration.ServiceName,
+		createdAt,
+		pbIntegration.Integration.IsRevoked,
+	)
 	return integrationBot, nil
 }

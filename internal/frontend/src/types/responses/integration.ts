@@ -19,6 +19,12 @@ export type RevokeIntegrationRequest = {
   integration_id: string
 }
 
+export type UpvokeIntegrationRequest = {
+  integration_id: string
+}
+
+export type UpvokeIntegrationResponse = CreateIntegrationResponse
+
 export type UpdateIntegrationRequest = {
   integration_id: string
   target_channel_ids: string[]

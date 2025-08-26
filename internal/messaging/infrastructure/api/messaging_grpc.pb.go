@@ -21,6 +21,7 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	MessagingService_SendMessage_FullMethodName = "/messaging.v1.MessagingService/SendMessage"
 	MessagingService_RegisterBot_FullMethodName = "/messaging.v1.MessagingService/RegisterBot"
+	MessagingService_RemoveBot_FullMethodName   = "/messaging.v1.MessagingService/RemoveBot"
 )
 
 // MessagingServiceClient is the client API for MessagingService service.
@@ -29,6 +30,7 @@ const (
 type MessagingServiceClient interface {
 	SendMessage(ctx context.Context, in *SendMessageRequest, opts ...grpc.CallOption) (*SendMessageResponse, error)
 	RegisterBot(ctx context.Context, in *RegisterBotRequest, opts ...grpc.CallOption) (*RegisterBotResponse, error)
+	RemoveBot(ctx context.Context, in *RemoveBotRequest, opts ...grpc.CallOption) (*RemoveBotResponse, error)
 }
 
 type messagingServiceClient struct {
@@ -59,12 +61,23 @@ func (c *messagingServiceClient) RegisterBot(ctx context.Context, in *RegisterBo
 	return out, nil
 }
 
+func (c *messagingServiceClient) RemoveBot(ctx context.Context, in *RemoveBotRequest, opts ...grpc.CallOption) (*RemoveBotResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RemoveBotResponse)
+	err := c.cc.Invoke(ctx, MessagingService_RemoveBot_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // MessagingServiceServer is the server API for MessagingService service.
 // All implementations must embed UnimplementedMessagingServiceServer
 // for forward compatibility.
 type MessagingServiceServer interface {
 	SendMessage(context.Context, *SendMessageRequest) (*SendMessageResponse, error)
 	RegisterBot(context.Context, *RegisterBotRequest) (*RegisterBotResponse, error)
+	RemoveBot(context.Context, *RemoveBotRequest) (*RemoveBotResponse, error)
 	mustEmbedUnimplementedMessagingServiceServer()
 }
 
@@ -80,6 +93,9 @@ func (UnimplementedMessagingServiceServer) SendMessage(context.Context, *SendMes
 }
 func (UnimplementedMessagingServiceServer) RegisterBot(context.Context, *RegisterBotRequest) (*RegisterBotResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RegisterBot not implemented")
+}
+func (UnimplementedMessagingServiceServer) RemoveBot(context.Context, *RemoveBotRequest) (*RemoveBotResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RemoveBot not implemented")
 }
 func (UnimplementedMessagingServiceServer) mustEmbedUnimplementedMessagingServiceServer() {}
 func (UnimplementedMessagingServiceServer) testEmbeddedByValue()                          {}
@@ -138,6 +154,24 @@ func _MessagingService_RegisterBot_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _MessagingService_RemoveBot_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoveBotRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MessagingServiceServer).RemoveBot(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MessagingService_RemoveBot_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MessagingServiceServer).RemoveBot(ctx, req.(*RemoveBotRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // MessagingService_ServiceDesc is the grpc.ServiceDesc for MessagingService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -152,6 +186,10 @@ var MessagingService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RegisterBot",
 			Handler:    _MessagingService_RegisterBot_Handler,
+		},
+		{
+			MethodName: "RemoveBot",
+			Handler:    _MessagingService_RemoveBot_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

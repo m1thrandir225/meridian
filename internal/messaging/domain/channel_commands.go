@@ -185,6 +185,7 @@ func SuccessWithData(data any) CommandResultWithData {
 type AddBotToChannelCommand struct {
 	ChannelID     uuid.UUID
 	IntegrationID uuid.UUID
+	RequestorID   uuid.UUID
 }
 
 func (c AddBotToChannelCommand) CommandName() string {
@@ -226,4 +227,14 @@ type DeactivateChannelInviteCommand struct {
 
 func (c DeactivateChannelInviteCommand) CommandName() string {
 	return "DeactivateChannelInvite"
+}
+
+type RemoveBotFromChannelCommand struct {
+	ChannelID     uuid.UUID
+	IntegrationID uuid.UUID
+	RequestorID   uuid.UUID
+}
+
+func (c RemoveBotFromChannelCommand) CommandName() string {
+	return "RemoveBotFromChannel"
 }

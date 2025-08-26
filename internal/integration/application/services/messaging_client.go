@@ -53,6 +53,20 @@ func (mc *MessagingClient) RegisterBot(ctx context.Context, req *messagingpb.Reg
 	return resp, nil
 }
 
+func (mc *MessagingClient) RemoveBot(ctx context.Context, req *messagingpb.RemoveBotRequest) (*messagingpb.RemoveBotResponse, error) {
+	resp, err := mc.client.RemoveBot(ctx, req)
+	if err != nil {
+		log.Printf("gRPC call to RemoveBot failed: %v", err)
+		return nil, err
+	}
+
+	if resp.Error != "" || !resp.Success {
+		return nil, fmt.Errorf("failed to remove bot: %s", resp.Error)
+	}
+
+	return resp, nil
+}
+
 func (mc *MessagingClient) Close() error {
 	return mc.conn.Close()
 }
