@@ -38,6 +38,14 @@ export interface IncomingReactionPayload {
 export interface TypingPayload {
   channel_id: string
   user_id: string
+  username?: string
+  user?: {
+    id: string
+    username: string
+    email: string
+    first_name: string
+    last_name: string
+  }
 }
 
 export interface SendMessagePayload {

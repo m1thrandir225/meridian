@@ -3,7 +3,11 @@ import websocketService from '@/services/websocket.service'
 import { useAuthStore } from '@/stores/auth'
 import type { Message } from '@/types/models/message'
 import type { Reaction } from '@/types/models/reaction'
-import type { IncomingMessagePayload, IncomingReactionPayload } from '@/types/websocket'
+import type {
+  IncomingMessagePayload,
+  IncomingReactionPayload,
+  TypingPayload,
+} from '@/types/websocket'
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
@@ -11,6 +15,7 @@ export const useMessageStore = defineStore('message', () => {
   const messages = ref<Message[]>([])
   const loading = ref(false)
   const currentChannelId = ref<string | null>(null)
+  const typingUsers = ref<Map<string, Set<string>>>(new Map()) // channelId -> Set of usernames
   const authStore = useAuthStore()
 
   const currentMessages = computed(() => {
@@ -152,6 +157,45 @@ export const useMessageStore = defineStore('message', () => {
     websocketService.sendTypingStop(channelId)
   }
 
+  function handleTypingStart(payload: TypingPayload) {
+    if (!payload.channel_id || !payload.user_id || payload.user_id === authStore.user?.id) {
+      return // Don't show own typing indicator
+    }
+
+    const username = payload.username || payload.user?.username || 'Unknown User'
+
+    if (!typingUsers.value.has(payload.channel_id)) {
+      typingUsers.value.set(payload.channel_id, new Set())
+    }
+
+    typingUsers.value.get(payload.channel_id)!.add(username)
+  }
+
+  function handleTypingStop(payload: TypingPayload) {
+    if (!payload.channel_id || !payload.user_id || payload.user_id === authStore.user?.id) {
+      return
+    }
+
+    const username = payload.username || payload.user?.username || 'Unknown User'
+    const channelTypingUsers = typingUsers.value.get(payload.channel_id)
+
+    if (channelTypingUsers) {
+      channelTypingUsers.delete(username)
+      if (channelTypingUsers.size === 0) {
+        typingUsers.value.delete(payload.channel_id)
+      }
+    }
+  }
+
+  function getTypingUsers(channelId: string): string[] {
+    const channelTypingUsers = typingUsers.value.get(channelId)
+    return channelTypingUsers ? Array.from(channelTypingUsers) : []
+  }
+
+  function clearTypingUsers(channelId: string) {
+    typingUsers.value.delete(channelId)
+  }
+
   function initializeWebSocket() {
     websocketService.on('new_message', (payload: unknown) => {
       if (payload && typeof payload === 'object' && 'id' in payload) {
@@ -184,6 +228,30 @@ export const useMessageStore = defineStore('message', () => {
         )
       } else {
         console.log('Invalid reaction_removed payload:', payload)
+      }
+    })
+
+    websocketService.on('typing_start', (payload: unknown) => {
+      console.log('Received typing_start event:', payload)
+      if (
+        payload &&
+        typeof payload === 'object' &&
+        'channel_id' in payload &&
+        'user_id' in payload
+      ) {
+        handleTypingStart(payload as TypingPayload)
+      }
+    })
+
+    websocketService.on('typing_stop', (payload: unknown) => {
+      console.log('Received typing_stop event:', payload)
+      if (
+        payload &&
+        typeof payload === 'object' &&
+        'channel_id' in payload &&
+        'user_id' in payload
+      ) {
+        handleTypingStop(payload as TypingPayload)
       }
     })
 
@@ -223,6 +291,26 @@ export const useMessageStore = defineStore('message', () => {
         )
       }
     })
+    websocketService.off('typing_start', (payload: unknown) => {
+      if (
+        payload &&
+        typeof payload === 'object' &&
+        'channel_id' in payload &&
+        'user_id' in payload
+      ) {
+        handleTypingStart(payload as TypingPayload)
+      }
+    })
+    websocketService.off('typing_stop', (payload: unknown) => {
+      if (
+        payload &&
+        typeof payload === 'object' &&
+        'channel_id' in payload &&
+        'user_id' in payload
+      ) {
+        handleTypingStop(payload as TypingPayload)
+      }
+    })
   }
 
   return {
@@ -230,6 +318,7 @@ export const useMessageStore = defineStore('message', () => {
     loading,
     currentChannelId,
     currentMessages,
+    typingUsers,
     fetchMessages,
     addMessage,
     addReactionToMessage,
@@ -240,6 +329,8 @@ export const useMessageStore = defineStore('message', () => {
     sendMessage,
     startTyping,
     stopTyping,
+    getTypingUsers,
+    clearTypingUsers,
     initializeWebSocket,
     cleanupWebSocket,
   }

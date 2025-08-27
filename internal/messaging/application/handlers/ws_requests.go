@@ -58,6 +58,8 @@ type IntegrationBotDTO struct {
 }
 
 type TypingPayload struct {
-	ChannelID string `json:"channel_id"`
-	UserID    string `json:"user_id"`
+	ChannelID string   `json:"channel_id"`
+	UserID    string   `json:"user_id"`
+	Username  string   `json:"username,omitempty"`
+	User      *UserDTO `json:"user,omitempty"`
 }

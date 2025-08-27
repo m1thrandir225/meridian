@@ -479,6 +479,25 @@ func (h *WebSocketHandler) handleTypingIndicator(userID string, payload interfac
 	// Set user ID from authenticated user
 	typingPayload.UserID = userID
 
+	// Get user information from identity service
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	userInfo, err := h.identityClient.GetUserByID(ctx, userID)
+	if err != nil {
+		logger.Error("Failed to get user info for typing indicator", zap.Error(err))
+		// Continue without user info
+	} else {
+		typingPayload.Username = userInfo.User.Username
+		typingPayload.User = &UserDTO{
+			ID:        userInfo.User.Id,
+			Username:  userInfo.User.Username,
+			Email:     userInfo.User.Email,
+			FirstName: userInfo.User.FirstName,
+			LastName:  userInfo.User.LastName,
+		}
+	}
+
 	typingMsg := WebSocketMessage{
 		Type:    typingType,
 		Payload: typingPayload,

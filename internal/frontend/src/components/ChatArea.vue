@@ -16,6 +16,7 @@ import ChannelSettings from './ChannelSettings.vue'
 import MessageActionsPopup from './MessageActionsPopup.vue'
 import MessageReactions from './MessageReactions.vue'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
+import TypingIndicator from './TypingIndicator.vue'
 
 // Props and emits
 interface Props {
@@ -113,10 +114,6 @@ const messageSpacing = computed(() => {
   return appearanceStore.messageDisplayMode === 'compact' ? 'space-y-1' : 'space-y-4'
 })
 
-// Methods
-// Remove the handleMessageHover function since we don't need it anymore
-
-// Update scrollToBottom to remove hover check
 const scrollToBottom = () => {
   nextTick(() => {
     if (messagesContainer.value) {
@@ -385,6 +382,10 @@ const handleReply = (message: Message) => {
       </div>
     </div>
 
+    <!-- Typing Indicator -->
+    <TypingIndicator v-if="currentChannel?.id" :channel-id="currentChannel.id" />
+
+    <!-- Reply Area -->
     <div v-if="replyingTo" class="px-4 py-2 bg-muted/50 border-t border-border">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-2 text-sm">
