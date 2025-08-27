@@ -49,7 +49,6 @@ const { mutateAsync, status } = useMutation({
   onSuccess: async (data: CreateIntegrationResponse) => {
     createdIntegration.value = data
     await nextTick()
-    console.log('createdIntegration', createdIntegration.value)
     toast.success('Bot created successfully!')
   },
   onError: (error) => {
@@ -111,14 +110,6 @@ const createAnotherBot = () => {
   setFieldValue('serviceName', '')
   setFieldValue('targetChannelIds', [])
 }
-
-// Add this debugging
-console.log('Component state:', {
-  createdIntegration: createdIntegration.value,
-  isFetchingChannels: isFetchingChannels.value,
-  channels: channels.value?.length || 0,
-  status: status.value,
-})
 </script>
 
 <template>

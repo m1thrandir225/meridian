@@ -1,8 +1,7 @@
 <div align="center">
 
-![logo](./.github/images/logo.png)
-
-<h1>Meridian</h1>
+<img src="./.github/images/logo.png" width="200" />
+<br/>
 
 <p>
 <strong>Meridian</strong> is a modern, real-time communication platform built with Domain Driven Design (DDD) microservices architecture. Experience a seamless chat with enterprise-grade security, real-time messaging, and powerful integration capabilities.
@@ -153,14 +152,30 @@ graph TB
 - **Go** 1.24+ (for development)
 - **8GB+ RAM** recommended
 
-### One-Command Setup
+### Quick Setup
 
 ```bash
-# Clone and start Meridian
+# Clone the repository
 git clone https://github.com/your-org/meridian.git
 cd meridian
-make docker-env && make docker-build && make docker-up
+
+# Setup environment and start services
+make setup
+make docker-build
+make docker-up
 ```
+
+**Note**: Go is required for initial setup as you need to run the script to generate PASETO Asymmetric keys, if you just want to purely run it with docker, altough not recommended, here are placeholder Paseto Keys:
+
+```bash
+#PRIVATE KEY (64 bytes / 128 hex chars):
+de62c9983573159bc401db26eaad66f57f58127dfa74b409fc47721cf1c37d41acd1c1d9208c09f6990d84d19bfbee24e9f26ed8613819aa9ecbcf082cf24919
+
+#PUBLIC KEY (32 bytes / 64 hex chars):
+acd1c1d9208c09f6990d84d19bfbee24e9f26ed8613819aa9ecbcf082cf24919
+```
+
+Replace the keys in your `deployments/.env` file.
 
 ### Verify Installation
 
@@ -172,25 +187,10 @@ curl http://localhost:8082/health  # ✅ Integration Service
 curl http://localhost:8083/health  # ✅ Analytics Service
 ```
 
-### Create Your First User
-
-```bash
-curl -X POST http://localhost:8080/api/v1/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "username": "admin",
-    "email": "admin@example.com",
-    "first_name": "Admin",
-    "last_name": "User",
-    "password": "password123"
-  }'
-```
-
 ### Access the Platform
 
-- **Frontend Application**: http://chat.localhost
-- **Landing Page**: http://localhost
-- **Traefik Dashboard**: http://localhost:8080
+- **Frontend Application**: http://localhost:3000
+- **Landing Page**: http://localhost:3001
 - **API Documentation**: [docs/api/](docs/api/)
 
 ## 📖 Documentation
@@ -199,12 +199,11 @@ The comprehensive documentation covers everything you need:
 
 <div align="center">
 
-|    📚 **Category**     | 🔗 **Links**                                                                                                                    | 📝 **Description**                        |
-| :--------------------: | :------------------------------------------------------------------------------------------------------------------------------ | :---------------------------------------- |
-| **🏁 Getting Started** | [Quick Start](docs/getting-started/)                                                                                            | Installation, first steps, basic concepts |
-|  **🏗️ Architecture**   | [Overview](docs/architecture/) • [Domain Model](docs/architecture/domain-model.md)                                              | System design and DDD patterns            |
-|  **📡 API Reference**  | [REST](docs/api/rest-api.md) • [WebSocket](docs/api/websocket-api.md) • [gRPC](docs/api/grpc-api.md)                            | Complete API documentation                |
-|   **🚢 Deployment**    | [Docker](docs/deployment/docker.md) • [Kubernetes](docs/deployment/kubernetes.md) • [Production](docs/deployment/production.md) | Deployment guides and best practices      |
+|   📚 **Category**    | 🔗 **Links**                                                                                  | 📝 **Description**                  |
+| :------------------: | :-------------------------------------------------------------------------------------------- | :---------------------------------- |
+| **🏗️ Architecture**  | [Overview](docs/architecture/overview.md) • [Domain Model](docs/architecture/domain-model.md) | System design and DDD patterns      |
+| **📡 API Reference** | [REST](docs/api/rest-api.md)                                                                  | Complete API documentation          |
+|  **🚢 Deployment**   | [Docker](docs/deployment/docker.md)                                                           | Deployment guide and best practices |
 
 </div>
 
@@ -213,22 +212,26 @@ The comprehensive documentation covers everything you need:
 ### Development Commands
 
 ```bash
-# Environment setup
-make docker-env              # Generate environment files
-make docker-build           # Build all service images
+# Setup and deployment
+make setup                  # Generate keys and env file
+make docker-build                  # Build all service binaries
 make docker-up              # Start all services
 make docker-down            # Stop and remove containers
 
 # Development workflow
-make build                  # Build Go binaries
 make test                   # Run tests
 make lint                   # Run linters
-make migrate-up            # Run database migrations
+make fmt                    # Format code
+make tidy                   # Tidy Go modules
+
+# Database operations
+make migrate-up service=<name>    # Apply migrations
+make migrate-down service=<name>  # Rollback migrations
+make migrate-status service=<name> # Check migration status
 
 # Service-specific operations
-make docker-build-identity  # Build specific service
-make logs SERVICE=messaging # View service logs
-make shell SERVICE=identity # Access service shell
+make build-one service=<name>     # Build specific service
+make docker-logs service=<name>   # View service logs
 ```
 
 ### Project Structure
@@ -243,10 +246,7 @@ meridian/
 ├── internal/               # Service implementations
 │   ├── identity/          # Identity domain, app, infra
 │   ├── messaging/         # Messaging domain, app, infra
-│   ├── integration/       # Integration domain, app, infra
-│   ├── analytics/         # Analytics domain, app, infra
-│   ├── frontend/          # Vue.js frontend application
-│   └── landing/           # Landing page
+│   ├── integration/       # Integration domain, app,
 ├── pkg/                   # Shared libraries
 │   ├── auth/              # Authentication utilities
 │   ├── kafka/             # Event streaming
@@ -260,16 +260,6 @@ meridian/
 ## 🤝 Contributing
 
 We welcome contributions! Please see our [Contributing Guide](docs/contributing/) for details.
-
-### Development Workflow
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes following our [coding standards](docs/contributing/coding-standards.md)
-4. Add tests for new functionality
-5. Commit your changes (`git commit -m 'Add amazing feature'`)
-6. Push to the branch (`git push origin feature/amazing-feature`)
-7. Open a Pull Request
 
 ### Code Quality
 
@@ -289,6 +279,6 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 
 ⭐ **Star us on GitHub** if you find this project interesting!
 
-[🚀 Get Started](docs/getting-started/) • [📖 Documentation](docs/) • [🐛 Report Bug](https://github.com/m1thrandir225/meridian/issues) • [💡 Request Feature](https://github.com/m1thrandir225/meridian/issues/new?template=feature_request.md)
+[📖 Documentation](docs/) • [🐛 Report Bug](https://github.com/m1thrandir225/meridian/issues) • [💡 Request Feature](https://github.com/m1thrandir225/meridian/issues/new?template=feature_request.md)
 
 </div>
