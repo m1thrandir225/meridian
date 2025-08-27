@@ -113,26 +113,24 @@ router.beforeEach(async (to, from, next) => {
     next({ name: 'login', query: { redirect } })
   } else if (to.meta.requiresAdmin && !isAdmin) {
     next({ name: 'home' })
-  } else {
-    if (to.name === 'channel' && to.params.id) {
-      const channelStore = useChannelStore()
+  }
+  if (to.name === 'channel' && to.params.id) {
+    const channelStore = useChannelStore()
 
-      // Ensure channels are loaded
-      if (!channelStore.channels.length) {
-        await channelStore.fetchChannels()
-      }
+    // Ensure channels are loaded
+    if (!channelStore.channels.length) {
+      await channelStore.fetchChannels()
+    }
 
-      const channel = channelStore.channels.find((c) => c.id === to.params.id)
+    const channel = channelStore.channels.find((c) => c.id === to.params.id)
 
-      if (channel && channel.is_archived) {
-        toast.error('This channel is archived and cannot be accessed')
-        next({ name: 'home' })
-        return
-      }
-    } else {
-      next()
+    if (channel && channel.is_archived) {
+      toast.error('This channel is archived and cannot be accessed')
+      next({ name: 'home' })
+      return
     }
   }
+  next()
 })
 
 export default router
