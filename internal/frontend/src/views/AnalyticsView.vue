@@ -11,36 +11,99 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useAnalyticsQueries } from '@/queries/analytics'
-import { useAuthStore } from '@/stores/auth'
+import analyticsService from '@/services/analytics.service'
+import { useQuery } from '@tanstack/vue-query'
 import { AlertCircle, Hash, Heart, MessageSquare, Users } from 'lucide-vue-next'
 import { computed, ref } from 'vue'
-
-// Auth store
-const authStore = useAuthStore()
 
 // Reactive data
 const selectedTimeRange = ref('7d')
 
-// Use TanStack Query for data fetching
-const {
-  dashboardQuery,
-  userGrowthQuery,
-  messageVolumeQuery,
-  channelActivityQuery,
-  topUsersQuery,
-  reactionUsageQuery,
-} = useAnalyticsQueries(selectedTimeRange.value)
+// Helper function to get start date based on time range
+const getStartDate = () => {
+  const now = new Date()
+  switch (selectedTimeRange.value) {
+    case '1h':
+      return new Date(now.getTime() - 60 * 60 * 1000)
+    case '24h':
+      return new Date(now.getTime() - 24 * 60 * 60 * 1000)
+    case '7d':
+      return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+    case '30d':
+      return new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+    default:
+      return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+  }
+}
 
-// Computed properties
+const {
+  data: dashboardData,
+  status: dashboardDataStatus,
+  error: dashboardDataError,
+} = useQuery({
+  queryKey: ['dashboard-analytics', selectedTimeRange],
+  queryFn: () => analyticsService.getDashboardData(selectedTimeRange.value),
+  staleTime: 5 * 60 * 1000,
+})
+
+const {
+  data: userGrowthData,
+  status: userGrowthDataStatus,
+  error: userGrowthDataError,
+} = useQuery({
+  queryKey: ['user-growth-analytics', selectedTimeRange],
+  queryFn: () => analyticsService.getUserGrowth(getStartDate(), new Date(), 'daily'),
+  staleTime: 5 * 60 * 1000,
+})
+
+const {
+  data: messageVolumeData,
+  status: messageVolumeDataStatus,
+  error: messageVolumeDataError,
+} = useQuery({
+  queryKey: ['message-volume-analytics', selectedTimeRange],
+  queryFn: () => analyticsService.getMessageVolume(getStartDate(), new Date()),
+  staleTime: 5 * 60 * 1000,
+})
+
+const {
+  data: channelActivityData,
+  status: channelActivityDataStatus,
+  error: channelActivityDataError,
+} = useQuery({
+  queryKey: ['channel-activity-analytics', selectedTimeRange],
+  queryFn: () => analyticsService.getChannelActivity(getStartDate(), new Date(), 10),
+  staleTime: 5 * 60 * 1000,
+})
+
+const {
+  data: topUsersData,
+  status: topUsersDataStatus,
+  error: topUsersDataError,
+} = useQuery({
+  queryKey: ['top-users-analytics', selectedTimeRange],
+  queryFn: () => analyticsService.getTopUsers(getStartDate(), new Date(), 10),
+  staleTime: 5 * 60 * 1000,
+})
+
+const {
+  data: reactionUsageData,
+  status: reactionUsageDataStatus,
+  error: reactionUsageDataError,
+} = useQuery({
+  queryKey: ['reaction-usage-analytics', selectedTimeRange],
+  queryFn: () => analyticsService.getReactionUsage(getStartDate(), new Date()),
+  staleTime: 5 * 60 * 1000,
+})
+
 const hasErrors = computed(() => {
   return (
-    dashboardQuery.error ||
-    userGrowthQuery.error ||
-    messageVolumeQuery.error ||
-    channelActivityQuery.error ||
-    topUsersQuery.error ||
-    reactionUsageQuery.error
+    dashboardDataStatus.value === 'error' ||
+    userGrowthDataStatus.value === 'error' ||
+    messageVolumeDataStatus.value === 'error' ||
+    channelActivityDataStatus.value === 'error' ||
+    topUsersDataStatus.value === 'error' ||
+    reactionUsageDataStatus.value === 'error'
   )
 })
 </script>
@@ -72,32 +135,29 @@ const hasErrors = computed(() => {
       </div>
 
       <!-- Key Metrics Cards -->
-      <div v-if="dashboardQuery.data" class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div v-if="dashboardData" class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle class="text-sm font-medium">Total Users</CardTitle>
             <Users class="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div class="text-2xl font-bold">{{ dashboardQuery.data.value?.totalUsers || 0 }}</div>
+            <div class="text-2xl font-bold">{{ dashboardData?.total_users || 0 }}</div>
             <p class="text-xs text-muted-foreground">
-              +{{ dashboardQuery.data.value?.newUsers || 0 }} from last period
+              +{{ dashboardData?.new_users_today || 0 }} from last period
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle class="text-sm font-medium">Messages Sent</CardTitle>
+            <CardTitle class="text-sm font-medium">Today's messages</CardTitle>
             <MessageSquare class="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div class="text-2xl font-bold">
-              {{ dashboardQuery.data.value?.totalMessages || 0 }}
+              {{ dashboardData?.messages_today || 0 }}
             </div>
-            <p class="text-xs text-muted-foreground">
-              +{{ dashboardQuery.data.value?.newMessages || 0 }} from last period
-            </p>
           </CardContent>
         </Card>
 
@@ -108,32 +168,29 @@ const hasErrors = computed(() => {
           </CardHeader>
           <CardContent>
             <div class="text-2xl font-bold">
-              {{ dashboardQuery.data.value?.activeChannels || 0 }}
+              {{ dashboardData?.active_channels || 0 }}
             </div>
-            <p class="text-xs text-muted-foreground">
-              +{{ dashboardQuery.data.value?.newChannels || 0 }} from last period
-            </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle class="text-sm font-medium">Reactions Given</CardTitle>
+            <CardTitle class="text-sm font-medium">Active Users</CardTitle>
             <Heart class="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div class="text-2xl font-bold">
-              {{ dashboardQuery.data.value?.totalReactions || 0 }}
+              {{ dashboardData?.active_users || 0 }}
             </div>
-            <p class="text-xs text-muted-foreground">
-              +{{ dashboardQuery.data.value?.newReactions || 0 }} from last period
-            </p>
           </CardContent>
         </Card>
       </div>
 
       <!-- Loading skeleton for metrics -->
-      <div v-else-if="dashboardQuery.isLoading" class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div
+        v-else-if="dashboardDataStatus === 'pending'"
+        class="grid gap-4 md:grid-cols-2 lg:grid-cols-4"
+      >
         <Card v-for="i in 4" :key="i">
           <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
             <Skeleton class="h-4 w-20" />
@@ -156,16 +213,16 @@ const hasErrors = computed(() => {
           </CardHeader>
           <CardContent class="pl-2">
             <div
-              v-if="userGrowthQuery.isLoading"
+              v-if="userGrowthDataStatus === 'pending'"
               class="h-[300px] flex items-center justify-center"
             >
               <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
             <LineChart
-              v-else-if="userGrowthQuery.data?.value?.data"
-              :data="userGrowthQuery.data.value?.data"
-              :categories="['newUsers']"
-              :index="'date'"
+              v-else-if="userGrowthData"
+              :data="userGrowthData"
+              :categories="['new_users']"
+              :index="'period'"
               class="h-[300px]"
             />
             <div v-else class="h-[300px] flex items-center justify-center text-muted-foreground">
@@ -182,16 +239,16 @@ const hasErrors = computed(() => {
           </CardHeader>
           <CardContent class="pl-2">
             <div
-              v-if="messageVolumeQuery.isLoading"
+              v-if="messageVolumeDataStatus === 'pending'"
               class="h-[300px] flex items-center justify-center"
             >
               <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
             <BarChart
-              v-else-if="messageVolumeQuery.data?.value?.data"
-              :data="messageVolumeQuery.data.value?.data"
-              :categories="['messageCount']"
-              :index="'date'"
+              v-else-if="messageVolumeData"
+              :data="messageVolumeData"
+              :categories="['messages']"
+              :index="'period'"
               class="h-[300px]"
             />
             <div v-else class="h-[300px] flex items-center justify-center text-muted-foreground">
@@ -207,30 +264,30 @@ const hasErrors = computed(() => {
             <CardDescription>Channels with highest message activity</CardDescription>
           </CardHeader>
           <CardContent>
-            <div v-if="channelActivityQuery.isLoading" class="space-y-4">
+            <div v-if="channelActivityDataStatus === 'pending'" class="space-y-4">
               <div v-for="i in 5" :key="i" class="flex items-center justify-between">
                 <Skeleton class="h-4 w-32" />
                 <Skeleton class="h-4 w-20" />
               </div>
             </div>
-            <div v-else-if="channelActivityQuery.data?.value?.channels" class="space-y-4">
+            <div v-else-if="channelActivityData" class="space-y-4">
               <div
-                v-for="channel in channelActivityQuery.data.value?.channels"
-                :key="channel.channelId"
+                v-for="channel in channelActivityData"
+                :key="channel.channel_id"
                 class="flex items-center justify-between"
               >
                 <div class="flex items-center space-x-2">
                   <div class="w-2 h-2 rounded-full bg-primary"></div>
                   <span class="text-sm font-medium">{{
-                    channel.channelName || channel.channelId
+                    channel.channel_name || channel.channel_id
                   }}</span>
                 </div>
                 <div class="flex items-center space-x-2">
                   <span class="text-sm text-muted-foreground"
-                    >{{ channel.messageCount }} messages</span
+                    >{{ channel.messages_count }} messages</span
                   >
                   <span class="text-sm text-muted-foreground"
-                    >{{ channel.memberCount }} members</span
+                    >{{ channel.members_count }} members</span
                   >
                 </div>
               </div>
@@ -248,7 +305,7 @@ const hasErrors = computed(() => {
             <CardDescription>Most active users by messages sent</CardDescription>
           </CardHeader>
           <CardContent>
-            <div v-if="topUsersQuery.isLoading" class="space-y-4">
+            <div v-if="topUsersDataStatus === 'pending'" class="space-y-4">
               <div v-for="i in 5" :key="i" class="flex items-center justify-between">
                 <div class="flex items-center space-x-2">
                   <Skeleton class="h-6 w-6 rounded-full" />
@@ -257,10 +314,10 @@ const hasErrors = computed(() => {
                 <Skeleton class="h-4 w-16" />
               </div>
             </div>
-            <div v-else-if="topUsersQuery.data?.value?.users" class="space-y-4">
+            <div v-else-if="topUsersData" class="space-y-4">
               <div
-                v-for="(user, index) in topUsersQuery.data.value?.users"
-                :key="user.userId"
+                v-for="(user, index) in topUsersData"
+                :key="user.user_id"
                 class="flex items-center justify-between"
               >
                 <div class="flex items-center space-x-2">
@@ -269,9 +326,9 @@ const hasErrors = computed(() => {
                   >
                     {{ index + 1 }}
                   </div>
-                  <span class="text-sm font-medium">{{ user.username || user.userId }}</span>
+                  <span class="text-sm font-medium">{{ user.username || user.user_id }}</span>
                 </div>
-                <span class="text-sm text-muted-foreground">{{ user.messageCount }} messages</span>
+                <span class="text-sm text-muted-foreground">{{ user.messages_sent }} messages</span>
               </div>
             </div>
             <div v-else class="text-center text-muted-foreground py-8">No user data available</div>
@@ -286,7 +343,7 @@ const hasErrors = computed(() => {
           </CardHeader>
           <CardContent class="pl-2">
             <div
-              v-if="reactionUsageQuery.isLoading"
+              v-if="reactionUsageDataStatus === 'pending'"
               class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4"
             >
               <div
@@ -300,17 +357,17 @@ const hasErrors = computed(() => {
               </div>
             </div>
             <div
-              v-else-if="reactionUsageQuery.data?.value?.reactions"
+              v-else-if="reactionUsageData"
               class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4"
             >
               <div
-                v-for="reaction in reactionUsageQuery.data.value?.reactions"
-                :key="reaction.name"
+                v-for="reaction in reactionUsageData"
+                :key="reaction.reaction_type"
                 class="flex flex-col items-center space-y-2 p-4 border rounded-lg"
               >
-                <div class="text-2xl">{{ reaction.emoji || '👍' }}</div>
-                <div class="text-sm font-medium">{{ reaction.name }}</div>
-                <div class="text-xs text-muted-foreground">{{ reaction.value }} uses</div>
+                <div class="text-2xl">{{ reaction.reaction_type || '👍' }}</div>
+                <div class="text-sm font-medium">{{ reaction.percentage }}%</div>
+                <div class="text-xs text-muted-foreground">{{ reaction.count }} uses</div>
               </div>
             </div>
             <div v-else class="text-center text-muted-foreground py-8">
@@ -322,22 +379,40 @@ const hasErrors = computed(() => {
 
       <!-- Error states -->
       <div v-if="hasErrors" class="space-y-4">
-        <Alert v-if="dashboardQuery.error" variant="destructive">
+        <Alert v-if="dashboardDataStatus === 'error'" variant="destructive">
           <AlertCircle class="h-4 w-4" />
           <AlertTitle>Error loading dashboard data</AlertTitle>
-          <AlertDescription>{{ dashboardQuery.error.value?.message }}</AlertDescription>
+          <AlertDescription>{{ dashboardDataError?.message }}</AlertDescription>
         </Alert>
 
-        <Alert v-if="userGrowthQuery.error" variant="destructive">
+        <Alert v-if="userGrowthDataStatus === 'error'" variant="destructive">
           <AlertCircle class="h-4 w-4" />
           <AlertTitle>Error loading user growth data</AlertTitle>
-          <AlertDescription>{{ userGrowthQuery.error.value?.message }}</AlertDescription>
+          <AlertDescription>{{ userGrowthDataError?.message }}</AlertDescription>
         </Alert>
 
-        <Alert v-if="messageVolumeQuery.error" variant="destructive">
+        <Alert v-if="messageVolumeDataStatus === 'error'" variant="destructive">
           <AlertCircle class="h-4 w-4" />
           <AlertTitle>Error loading message volume data</AlertTitle>
-          <AlertDescription>{{ messageVolumeQuery.error.value?.message }}</AlertDescription>
+          <AlertDescription>{{ messageVolumeDataError?.message }}</AlertDescription>
+        </Alert>
+
+        <Alert v-if="channelActivityDataStatus === 'error'" variant="destructive">
+          <AlertCircle class="h-4 w-4" />
+          <AlertTitle>Error loading channel activity data</AlertTitle>
+          <AlertDescription>{{ channelActivityDataError?.message }}</AlertDescription>
+        </Alert>
+
+        <Alert v-if="topUsersDataStatus === 'error'" variant="destructive">
+          <AlertCircle class="h-4 w-4" />
+          <AlertTitle>Error loading top users data</AlertTitle>
+          <AlertDescription>{{ topUsersDataError?.message }}</AlertDescription>
+        </Alert>
+
+        <Alert v-if="reactionUsageDataStatus === 'error'" variant="destructive">
+          <AlertCircle class="h-4 w-4" />
+          <AlertTitle>Error loading reaction usage data</AlertTitle>
+          <AlertDescription>{{ reactionUsageDataError?.message }}</AlertDescription>
         </Alert>
       </div>
     </div>

@@ -9,7 +9,7 @@ import (
 
 func AdminMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		adminHeader := c.GetHeader("X-User-Is-Admin")
+		adminHeader := c.Request.Header.Get("X-User-Is-Admin")
 		if adminHeader == "" {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Admin access required"})
 			c.Abort()

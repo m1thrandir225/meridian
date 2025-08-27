@@ -6,6 +6,7 @@ http:
         authResponseHeaders:
           - "X-User-Id"
           - "X-User-Email"
+          - "X-User-Is-Admin"
           - "X-User-Type"
           - "X-Integration-ID"
           - "X-Auth-Method"

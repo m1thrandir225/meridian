@@ -575,25 +575,22 @@ func (r *PostgresAnalyticsRepository) GetUserGrowth(ctx context.Context, startDa
 }
 
 func (r *PostgresAnalyticsRepository) GetMessageVolume(ctx context.Context, startDate, endDate time.Time, channelID *string) ([]domain.MessageVolumeData, error) {
-	query := `
+	queryArgs := []any{startDate, endDate}
+	q := `
 		SELECT
-			date as period,
-			SUM(value) as messages,
-			COUNT(DISTINCT channel_id) as channels,
-			AVG(metadata->>'content_length') as avg_length
+			to_char(date_trunc('day', "timestamp"), 'YYYY-MM-DD') AS date,
+			COUNT(*)::int AS message_count
 		FROM analytics_metrics
-		WHERE name = 'message_sent' AND timestamp >= $1 AND timestamp <= $2
+		WHERE name = 'message_sent'
+			AND "timestamp" >= $1 AND "timestamp" < $2
 	`
-
-	args := []interface{}{startDate, endDate}
 	if channelID != nil {
-		query += " AND channel_id = $3"
-		args = append(args, *channelID)
+		q += " AND channel_id = $3::uuid"
+		queryArgs = append(queryArgs, *channelID)
 	}
+	q += " GROUP BY 1 ORDER BY 1"
 
-	query += " GROUP BY date ORDER BY date"
-
-	rows, err := r.db.Query(ctx, query, args...)
+	rows, err := r.db.Query(ctx, q, queryArgs...)
 	if err != nil {
 		return nil, err
 	}
@@ -602,19 +599,18 @@ func (r *PostgresAnalyticsRepository) GetMessageVolume(ctx context.Context, star
 	var volumeData []domain.MessageVolumeData
 	for rows.Next() {
 		var data domain.MessageVolumeData
-		var period time.Time
-		var avgLength sql.NullFloat64
+		var dateStr string
+		var messageCount int
 
-		err := rows.Scan(&period, &data.Messages, &data.Channels, &avgLength)
+		err := rows.Scan(&dateStr, &messageCount)
 		if err != nil {
 			return nil, err
 		}
 
-		data.Period = period.Format("2006-01-02")
-		if avgLength.Valid {
-			data.AvgLength = avgLength.Float64
-		}
-
+		data.Period = dateStr
+		data.Messages = int64(messageCount)
+		data.Channels = 0
+		data.AvgLength = 0
 		volumeData = append(volumeData, data)
 	}
 

@@ -22,7 +22,7 @@ export const analyticsService = {
     }),
 
   getUserGrowth: (startDate: Date, endDate: Date, interval: string) =>
-    apiRequest<{ data: UserGrowthData[] }>({
+    apiRequest<UserGrowthData[] | null>({
       url: `${analyticsAPI}/user-growth`,
       method: 'GET',
       params: {
@@ -35,7 +35,7 @@ export const analyticsService = {
     }),
 
   getMessageVolume: (startDate: Date, endDate: Date, channelId?: string) =>
-    apiRequest<{ data: MessageVolumeData[] }>({
+    apiRequest<MessageVolumeData[]>({
       url: `${analyticsAPI}/message-volume`,
       method: 'GET',
       params: {
@@ -48,7 +48,7 @@ export const analyticsService = {
     }),
 
   getChannelActivity: (startDate: Date, endDate: Date, limit: number) =>
-    apiRequest<{ channels: ChannelActivityData[] }>({
+    apiRequest<ChannelActivityData[]>({
       url: `${analyticsAPI}/channel-activity`,
       method: 'GET',
       params: {
@@ -61,7 +61,7 @@ export const analyticsService = {
     }),
 
   getTopUsers: (startDate: Date, endDate: Date, limit: number) =>
-    apiRequest<{ users: TopUserData[] }>({
+    apiRequest<TopUserData[]>({
       url: `${analyticsAPI}/top-users`,
       method: 'GET',
       params: {
@@ -74,7 +74,7 @@ export const analyticsService = {
     }),
 
   getReactionUsage: (startDate: Date, endDate: Date) =>
-    apiRequest<{ reactions: ReactionUsageData[] }>({
+    apiRequest<ReactionUsageData[]>({
       url: `${analyticsAPI}/reaction-usage`,
       method: 'GET',
       params: {
