@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
+
 	"github.com/IBM/sarama"
 	"github.com/m1thrandir225/meridian/pkg/common"
-	"log"
 )
 
 type SaramaEventPublisher struct {
