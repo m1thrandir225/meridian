@@ -189,8 +189,9 @@ curl http://localhost:8083/health  # ✅ Analytics Service
 
 ### Access the Platform
 
-- **Frontend Application**: http://localhost:3000
-- **Landing Page**: http://localhost:3001
+- **Frontend Application**: http://chat.localhost
+- **Landing Page**: http://localhost
+- **API**: http://api.localhost
 - **API Documentation**: [docs/api/](docs/api/)
 
 ## 📖 Documentation
@@ -256,10 +257,6 @@ meridian/
 ├── docs/                  # Documentation
 └── examples/              # Integration examples (TODO)
 ```
-
-## 🤝 Contributing
-
-We welcome contributions! Please see our [Contributing Guide](docs/contributing/) for details.
 
 ### Code Quality
 
