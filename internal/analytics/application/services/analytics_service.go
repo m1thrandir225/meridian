@@ -2,6 +2,8 @@ package services
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -337,7 +339,7 @@ func (s *AnalyticsService) incrementChannelMembers(ctx context.Context, channelI
 	return s.repo.IncrementChannelMembers(ctx, channelID, timestamp)
 }
 
-// Query methods remain the same
+// GetDashboardData returns basic dashboard data for the system
 func (s *AnalyticsService) GetDashboardData(ctx context.Context, query domain.GetDashboardDataQuery) (*domain.DashboardData, error) {
 	logger := s.logger.WithMethod("GetDashboardData")
 	logger.Info("Getting dashboard data")
@@ -347,54 +349,86 @@ func (s *AnalyticsService) GetDashboardData(ctx context.Context, query domain.Ge
 
 	totalUsers, err := s.repo.GetTotalUsers(ctx)
 	if err != nil {
-		logger.Error("Failed to get total users", zap.Error(err))
-		return nil, err
+		if errors.Is(err, sql.ErrNoRows) {
+			logger.Error("No users found", zap.Error(err))
+		} else {
+			logger.Error("Failed to get total users", zap.Error(err))
+			return nil, err
+		}
 	}
 
 	activeUsers, err := s.repo.GetActiveUsers(ctx, query.TimeRange)
 	if err != nil {
-		logger.Error("Failed to get active users", zap.Error(err))
-		return nil, err
+		if errors.Is(err, sql.ErrNoRows) {
+			logger.Error("No users found", zap.Error(err))
+		} else {
+			logger.Error("Failed to get active users", zap.Error(err))
+			return nil, err
+		}
 	}
 
 	newUsersToday, err := s.repo.GetNewUsersCount(ctx, now.Truncate(24*time.Hour))
 	if err != nil {
-		logger.Error("Failed to get new users today", zap.Error(err))
-		return nil, err
+		if errors.Is(err, sql.ErrNoRows) {
+			logger.Error("No users found", zap.Error(err))
+		} else {
+			logger.Error("Failed to get new users today", zap.Error(err))
+			return nil, err
+		}
 	}
 
 	messagesToday, err := s.repo.GetMessagesCount(ctx, now.Truncate(24*time.Hour))
 	if err != nil {
-		logger.Error("Failed to get messages today", zap.Error(err))
-		return nil, err
+		if errors.Is(err, sql.ErrNoRows) {
+			logger.Error("No messages found", zap.Error(err))
+		} else {
+			logger.Error("Failed to get messages today", zap.Error(err))
+			return nil, err
+		}
 	}
 
 	totalChannels, err := s.repo.GetTotalChannels(ctx)
 	if err != nil {
-		logger.Error("Failed to get total channels", zap.Error(err))
-		return nil, err
+		if errors.Is(err, sql.ErrNoRows) {
+			logger.Error("No channels found", zap.Error(err))
+		} else {
+			logger.Error("Failed to get total channels", zap.Error(err))
+			return nil, err
+		}
 	}
 
 	activeChannels, err := s.repo.GetActiveChannels(ctx, query.TimeRange)
 	if err != nil {
-		logger.Error("Failed to get active channels", zap.Error(err))
-		return nil, err
+		if errors.Is(err, sql.ErrNoRows) {
+			logger.Error("No channels found", zap.Error(err))
+		} else {
+			logger.Error("Failed to get active channels", zap.Error(err))
+			return nil, err
+		}
 	}
 
 	averageMessagesPerUser := float64(0)
 	if totalUsers > 0 {
 		totalMessages, err := s.repo.GetTotalMessages(ctx)
 		if err != nil {
-			logger.Error("Failed to get total messages", zap.Error(err))
-			return nil, err
+			if errors.Is(err, sql.ErrNoRows) {
+				logger.Error("No messages in the system.", zap.Error(err))
+			} else {
+				logger.Error("Failed to get total messages", zap.Error(err))
+				return nil, err
+			}
 		}
 		averageMessagesPerUser = float64(totalMessages) / float64(totalUsers)
 	}
 
 	peakHour, err := s.repo.GetPeakHour(ctx, startDate, now)
 	if err != nil {
-		logger.Error("Failed to get peak hour", zap.Error(err))
-		return nil, err
+		if errors.Is(err, sql.ErrNoRows) {
+			logger.Error("No peak our yet", zap.Error(err))
+		} else {
+			logger.Error("Failed to get peak hour", zap.Error(err))
+			return nil, err
+		}
 	}
 
 	dashboardData := &domain.DashboardData{
