@@ -217,8 +217,12 @@ docker-ps: $(COMPOSE_ENV_FILE) ## List running Docker Compose services
 	@echo "Listing running services..."
 	@$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) --env-file $(COMPOSE_ENV_FILE) ps
 
+
 get_db_url_var_name = $(call DB_URL_ENV_VAR_PATTERN,$(1))
 get_migration_path = $(subst %,$(1),$(MIGRATION_PATH_PATTERN))
+
+get_migrate_db_url_var_name = $(shell echo $(1) | tr '[:lower:]' '[:upper:]')_DB_URL_MIGRATE
+derive_migrate_url = $(shell echo $(1) | sed -e 's/^postgres:\/\//pgx5:\/\//')
 
 ifneq (,$(wildcard $(COMPOSE_ENV_FILE)))
     include $(COMPOSE_ENV_FILE)
@@ -238,36 +242,39 @@ migrate-create: ## Create new migration files (e.g., make migrate-create service
 migrate-up: ## Apply all pending UP migrations (e.g., make migrate-up service=messaging)
 	@$(eval SERVICE_NAME := $(if $(service),$(service),$(DEFAULT_SERVICE)))
 	@$(eval MIGRATION_DIR := $(call get_migration_path,$(SERVICE_NAME)))
-	@$(eval DB_URL_VAR := $(call get_db_url_var_name,$(SERVICE_NAME)))
+	@$(eval BASE_DB_URL_VAR := $(call get_db_url_var_name,$(SERVICE_NAME)))
+	@$(eval MIGRATE_DB_URL_VAR := $(call get_migrate_db_url_var_name,$(SERVICE_NAME)))
 	@$(if $(MIGRATION_DIR),,$(error Migration directory not found for $(SERVICE_NAME)))
-	@$(if $(DB_URL_VAR),,$(error DB URL environment variable name not found for $(SERVICE_NAME)))
-	@$(if $(value $(DB_URL_VAR)),,$(error Environment variable $(DB_URL_VAR) is not set))
+	@$(if $(value $(BASE_DB_URL_VAR)),,$(error Environment variable $(BASE_DB_URL_VAR) is not set))
+	@$(eval EFFECTIVE_MIGRATE_URL := $(or $(value $(MIGRATE_DB_URL_VAR)),$(call derive_migrate_url,$(value $(BASE_DB_URL_VAR)))))
 	@echo "Applying UP migrations for service '$(SERVICE_NAME)' from $(MIGRATION_DIR)..."
-	@$(MIGRATE) -path $(MIGRATION_DIR) -database '$(value $(DB_URL_VAR))' up $(steps) # Pass optional steps
+	@$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) --env-file $(COMPOSE_ENV_FILE) run --rm $(SERVICE_NAME)_migrate -path /migrations -database '$(EFFECTIVE_MIGRATE_URL)' up $(steps)
 
 .PHONY: migrate-down
 migrate-down: ## Roll back migrations (e.g., make migrate-down service=messaging steps=1)
 	@$(eval SERVICE_NAME := $(if $(service),$(service),$(DEFAULT_SERVICE)))
 	@$(eval MIGRATION_DIR := $(call get_migration_path,$(SERVICE_NAME)))
-	@$(eval DB_URL_VAR := $(call get_db_url_var_name,$(SERVICE_NAME)))
+	@$(eval BASE_DB_URL_VAR := $(call get_db_url_var_name,$(SERVICE_NAME)))
+	@$(eval MIGRATE_DB_URL_VAR := $(call get_migrate_db_url_var_name,$(SERVICE_NAME)))
 	@$(if $(MIGRATION_DIR),,$(error Migration directory not found for $(SERVICE_NAME)))
-	@$(if $(DB_URL_VAR),,$(error DB URL environment variable name not found for $(SERVICE_NAME)))
-	@$(if $(value $(DB_URL_VAR)),,$(error Environment variable $(DB_URL_VAR) is not set))
-	@$(eval STEPS_ARG := $(if $(steps),$(steps),1)) # Default to 1 step if not provided
+	@$(if $(value $(BASE_DB_URL_VAR)),,$(error Environment variable $(BASE_DB_URL_VAR) is not set))
+	@$(eval STEPS_ARG := $(if $(steps),$(steps),-all))
+	@$(eval EFFECTIVE_MIGRATE_URL := $(or $(value $(MIGRATE_DB_URL_VAR)),$(call derive_migrate_url,$(value $(BASE_DB_URL_VAR)))))
 	@echo "Rolling back $(STEPS_ARG) DOWN migration(s) for service '$(SERVICE_NAME)' from $(MIGRATION_DIR)..."
 	@read -p "WARNING: Rolling back migrations. Are you sure? (y/N) " answer && [ $${answer:-N} = y ] || (echo "Aborted." && exit 1)
-	@$(MIGRATE) -path $(MIGRATION_DIR) -database '$(value $(DB_URL_VAR))' down $(STEPS_ARG)
+	@$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) --env-file $(COMPOSE_ENV_FILE) run --rm $(SERVICE_NAME)_migrate -path /migrations -database '$(EFFECTIVE_MIGRATE_URL)' down $(STEPS_ARG)
 
 .PHONY: migrate-status
 migrate-status: ## Check migration status (e.g., make migrate-status service=messaging)
 	@$(eval SERVICE_NAME := $(if $(service),$(service),$(DEFAULT_SERVICE)))
 	@$(eval MIGRATION_DIR := $(call get_migration_path,$(SERVICE_NAME)))
-	@$(eval DB_URL_VAR := $(call get_db_url_var_name,$(SERVICE_NAME)))
+	@$(eval BASE_DB_URL_VAR := $(call get_db_url_var_name,$(SERVICE_NAME)))
+	@$(eval MIGRATE_DB_URL_VAR := $(call get_migrate_db_url_var_name,$(SERVICE_NAME)))
 	@$(if $(MIGRATION_DIR),,$(error Migration directory not found for $(SERVICE_NAME)))
-	@$(if $(DB_URL_VAR),,$(error DB URL environment variable name not found for $(SERVICE_NAME)))
-	@$(if $(value $(DB_URL_VAR)),,$(error Environment variable $(DB_URL_VAR) is not set))
+	@$(if $(value $(BASE_DB_URL_VAR)),,$(error Environment variable $(BASE_DB_URL_VAR) is not set))
+	@$(eval EFFECTIVE_MIGRATE_URL := $(or $(value $(MIGRATE_DB_URL_VAR)),$(call derive_migrate_url,$(value $(BASE_DB_URL_VAR)))))
 	@echo "Checking migration status for service '$(SERVICE_NAME)'..."
-	@$(MIGRATE) -path $(MIGRATION_DIR) -database '$(value $(DB_URL_VAR))' version
+	@$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) --env-file $(COMPOSE_ENV_FILE) run --rm $(SERVICE_NAME)_migrate -path /migrations -database '$(EFFECTIVE_MIGRATE_URL)' version
 
 .PHONY: clean
 clean: ## Remove build artifacts
